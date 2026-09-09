@@ -1,10 +1,32 @@
 # Pipeline Project
 
-## Local Run Steps
+## Quick Start
 
-1. Install dependencies: `pip install -r requirements.txt`
-2. Generate sample data: `python scripts/generate_sample_data.py`
-3. Run the pipeline: `python pipeline/cli.py --input sample_data.json --env dev`
+Prerequisites: Python 3.10+ and `make` (Linux/macOS). Every step has a
+`make` target; the manual equivalents are listed below for environments
+without `make`.
+
+| # | Command | What it does |
+|---|---------|--------------|
+| 1 | `make setup` | First run only: create `.venv` and install dependencies |
+| 2 | `make data` | Generate `sample_data.json` (106 records incl. injected anomalies) |
+| 3 | `make run` | Run the pipeline (default env `dev`; override: `ENV=test make run`) |
+| 4 | `make test` | Run the pytest suite |
+| 5 | `make clean` | Remove run artifacts (`data/`, `logs/`, `metrics.json`, `sample_data.json`) for a clean re-run |
+
+Manual equivalents (no `make`):
+
+```bash
+# 1. Setup (first run only)
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+# 2. Generate data
+.venv/bin/python scripts/generate_sample_data.py
+# 3. Run the pipeline
+.venv/bin/python pipeline/cli.py --input sample_data.json --env dev
+# 4. Run tests
+.venv/bin/python -m pytest tests/
+```
 
 ## Design Notes
 
@@ -67,12 +89,6 @@ project_root/
 ├── requirements.txt
 └── README.md
 ```
-
-Test commands:
-Generate data: python scripts/generate_sample_data.py
-Run the pipeline: python pipeline/cli.py --input sample_data.json --env dev
-Run tests: pytest tests/
-
 
 git repo:
 https://github.com/wleycn/demo-gx
