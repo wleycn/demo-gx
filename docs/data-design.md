@@ -1,181 +1,184 @@
-# 数据流与数据结构设计
+# Data Flow and Data Structure Design
 
-## 1. 物理数据路径（存储布局）
+## 1. Physical Data Paths (Storage Layout)
 
-采用 **按环境隔离** 的目录结构。本地开发以 `./data` 为根目录，生产环境可映射至 S3/ADLS（通过配置切换）。
+Adopts an **environment-isolated** directory structure. Local development uses `./data` as the root directory; production can map to S3/ADLS (via configuration switching).
 data/
-├── bronze/ # 原始 JSON 存档（不可变）
-│ └── {source_system}/ # 按源系统分目录
-│ └── dt={YYYY-MM-DD}/ # 按摄入日期分区
+├── bronze/ # Raw JSON archive (immutable)
+│ └── {source_system}/ # Subdirectory per source system
+│ └── dt={YYYY-MM-DD}/ # Partitioned by ingestion date
 │ └── events.json
-├── silver/ # 清洗后的明细层（Parquet）
-│ └── event_date={YYYY-MM-DD}/ # 按事件日期分区
+├── silver/ # Cleaned detail layer (Parquet)
+│ └── event_date={YYYY-MM-DD}/ # Partitioned by event date
 │ └── data.parquet
-├── gold/ # 聚合/维度层（Parquet）
+├── gold/ # Aggregation/dimension layer (Parquet)
 │ ├── fact_daily_events/
 │ │ └── event_date={YYYY-MM-DD}/
 │ │ └── data.parquet
 │ ├── dim_customer/
-│ │ └── data.parquet （全量快照，非分区）
+│ │ └── data.parquet (full snapshot, non-partitioned)
 │ ├── dim_event_type/
 │ │ └── data.parquet
 │ └── wide_daily_user_events/
 │ └── event_date={YYYY-MM-DD}/
 │ └── data.parquet
-└── errors/ # 异常数据隔离区
-├── bad_schema/ # 字段缺失/额外字段/格式错误
+└── errors/ # Anomalous data quarantine area
+├── bad_schema/ # Missing fields/extra fields/format errors
 │ └── {timestamp}_errors.json
-├── type_mismatch/ # 类型转换失败（含 _raw 列）
+├── type_mismatch/ # Type conversion failures (with _raw columns)
 │ └── {timestamp}_errors.json
-└── duplicates.log # 去重记录日志（纯文本，追加）
+└── duplicates.log # Deduplication record log (plain text, appended)
 
 
 ---
 
-## 2. 详细数据流（含异常分支）
+## 2. Detailed Data Flow (with Exception Branches)
 
-下图展示从输入到输出的完整路径，以及坏数据和特殊情况的处理流向。
+The diagram below shows the complete path from input to output, including the handling flow for bad data and special cases.
 ┌─────────────┐
-│ 输入文件 │
-│ (JSON/CSV/ │
-│ Parquet) │
+│ Input file  │
+│ (JSON/CSV/  │
+│ Parquet)    │
 └──────┬──────┘
 │ ingestion.read()
 ▼
 ┌─────────────────────┐
-│ 附加 raw_json 列 │ ← 保留原始行用于审计
+│ Append raw_json col │ ← preserve original row for audit
 └──────────┬──────────┘
 │
 ▼
 ┌─────────────────────────────────┐
-│ validation.validate_schema() │ ← 严格校验 8 个必填字段，拒绝额外字段
+│ validation.validate_schema()    │ ← strictly validate 8 required fields, reject extra fields
 └──────────┬──────────┬───────────┘
 │ │
-校验成功│ │校验失败
+Pass │ │ Fail
 │ ▼
 │ ┌─────────────────────┐
-│ │ 写入 errors/bad_schema/ │
-│ │ + 发送告警（可选） │
+│ │ Write to errors/    │
+│ │ bad_schema/         │
+│ │ + send alert (opt)  │
 │ └─────────────────────┘
 ▼
 ┌─────────────────────────────────┐
-│ transformation.clean() │ ← 时间戳 UTC 标准化、货币归一化
-│ 生成 raw* 列（若类型转换失败） │ ← 标记 validation_status
+│ transformation.clean()          │ ← timestamp UTC standardization, currency normalization
+│ Generate raw* cols (if type     │ ← set validation_status
+│ conversion fails)               │
 └──────────┬──────────────────────┘
 │
 ▼
 ┌─────────────────────────────────┐
-│ transformation.deduplicate() │ ← 按 event_id 去重，保留最新 ingestion_timestamp
-│ 重复记录写入 duplicates.log │
+│ transformation.deduplicate()    │ ← deduplicate by event_id, keep latest ingestion_timestamp
+│ Duplicate records written to    │
+│ duplicates.log                  │
 └──────────┬──────────────────────┘
 │
 ▼
 ┌─────────────────────────────────┐
-│ 写入 Silver (Parquet) │ ← 按 event_date 分区，覆盖写入
+│ Write to Silver (Parquet)       │ ← partition by event_date, overwrite write
 └──────────┬──────────────────────┘
 │
 ├─────────────┬─────────────┐
 ▼ ▼ ▼
 ┌─────────────────┐ ┌──────────────┐ ┌──────────────────┐
-│ curation. │ │ curation. │ │ curation. │
-│ build_fact_table│ │ build_dims │ │ build_wide_table │
+│ curation.       │ │ curation.    │ │ curation.        │
+│ build_fact_table│ │ build_dims   │ │ build_wide_table │
 └────────┬────────┘ └──────┬───────┘ └────────┬─────────┘
 │ │ │
 ▼ ▼ ▼
 ┌─────────────────┐ ┌──────────────┐ ┌──────────────────┐
-│ fact_daily │ │ dim_customer │ │ wide_daily_user │
-│ events │ │ dim_event_ │ │ events │
-│ (分区表) │ │ type │ │ (分区表) │
+│ fact_daily      │ │ dim_customer │ │ wide_daily_user  │
+│ events          │ │ dim_event_   │ │ events           │
+│ (partitioned)   │ │ type         │ │ (partitioned)    │
 └─────────────────┘ └──────────────┘ └──────────────────┘
 
 
-**关键分支说明**：
+**Key branch descriptions**:
 
-- **坏数据流（红色路径）**：在 `validation` 阶段，若记录缺少必填字段、类型不符或包含额外字段，则被隔离至 `errors/bad_schema/`，并附带 `error_reason` 列。管道**继续处理**其余有效数据，不中断。
-- **类型变更流（黄色路径）**：在 `clean` 阶段，若 `amount` 等数值字段无法转换为数字，则保留原始值于 `_raw_amount` 列，并标记 `_validation_status = 'type_mismatch'`。此类记录仍进入 Silver，同时触发日志告警。
-- **去重流**：重复的 `event_id` 仅保留 `ingestion_timestamp` 最新的一条，其余写入 `duplicates.log`（含原始值和重复时间），用于事后核查。
-
----
-
-## 3. 数据结构定义（精确 Schema）
-
-### 3.1 Silver 层（Cleaned Parquet Schema）
-
-**分区键**：`event_date`（从 `event_timestamp` 提取的日期，类型为 `date`）
-
-| 字段名 | 类型 | 描述 | 约束/说明 |
-| :--- | :--- | :--- | :--- |
-| `event_id` | `string` | 事件唯一 ID | 非空，UUID v4 格式 |
-| `source_system` | `string` | 来源系统 | 枚举值：`web` / `mobile` / `api` |
-| `customer_id` | `string` | 客户 ID | 非空；生产环境可按策略进行哈希脱敏 |
-| `event_type` | `string` | 事件类型 | 非空，长度 ≤ 64 |
-| `event_timestamp` | `timestamp(us, UTC)` | 事件发生时间 | 精确到微秒，UTC 时区 |
-| `amount` | `double` | 金额 | ≥ 0，保留原始数值；若转换失败为 `NaN` |
-| `currency` | `string` | 货币代码 | ISO 4217 三字母码；非法值已修正为 `USD` |
-| `ingestion_timestamp` | `timestamp(us, UTC)` | 摄入时间（来自源系统或处理时） | 必须 ≤ 当前时间 |
-| `event_date` | `date` | **分区列** | 从 `event_timestamp` 推导 |
-| `_raw_amount` | `string` | （可选）原始金额字符串 | 仅在金额类型转换失败时填充 |
-| `_is_invalid_currency` | `boolean` | 货币是否被修正 | `true` 表示原始值非法，已改为 `USD` |
-| `_validation_status` | `string` | 校验状态 | `'passed'` 或 `'type_mismatch'` |
-| `_processed_timestamp` | `timestamp(us, UTC)` | 管道处理时间 | 写入时自动添加 |
+- **Bad data flow (red path)**: During the `validation` stage, if a record is missing required fields, has a type mismatch, or contains extra fields, it is quarantined to `errors/bad_schema/` with an `error_reason` column attached. The pipeline **continues processing** the remaining valid data without interruption.
+- **Type change flow (yellow path)**: During the `clean` stage, if a numeric field such as `amount` cannot be converted to a number, the original value is preserved in the `_raw_amount` column and `_validation_status` is set to `'type_mismatch'`. Such records still enter Silver and trigger a log alert.
+- **Deduplication flow**: For duplicate `event_id` values, only the record with the latest `ingestion_timestamp` is kept; the rest are written to `duplicates.log` (including original values and duplicate timestamps) for post-hoc review.
 
 ---
 
-### 3.2 Gold 层结构（星型模型）
+## 3. Data Structure Definitions (Precise Schema)
 
-#### 事实表：`fact_daily_events`
-| 字段名 | 类型 | 描述 |
-| :--- | :--- | :--- |
-| `event_date` | `date` | 分区列 |
-| `customer_id` | `string` | 关联维度表 `dim_customer` |
-| `event_type` | `string` | 关联维度表 `dim_event_type` |
-| `event_count` | `bigint` | 该分组下的事件总数 |
-| `total_amount` | `double` | 该分组下的总金额 |
-| `avg_amount` | `double` | 该分组下的平均金额 |
+### 3.1 Silver Layer (Cleaned Parquet Schema)
 
-#### 维度表：`dim_customer`
-| 字段名 | 类型 | 描述 |
-| :--- | :--- | :--- |
-| `customer_id` | `string` | 主键，唯一 |
-| `first_seen_date` | `date` | （预留）首次出现日期，当前设为 `event_date` 的最小值 |
+**Partition key**: `event_date` (the date extracted from `event_timestamp`, typed as `date`)
 
-#### 维度表：`dim_event_type`
-| 字段名 | 类型 | 描述 |
-| :--- | :--- | :--- |
-| `event_type` | `string` | 主键，唯一 |
-| `category` | `string` | （预留）业务分类，当前置空 |
-
-#### 宽表（非规范化）：`wide_daily_user_events`
-将 `fact_daily_events` 左连接 `dim_customer` 和 `dim_event_type`，包含所有事实和维度字段，直接供 BI 工具查询，避免运行时 Join。
+| Field name            | Type                  | Description                                       | Constraint/Notes                                              |
+| :---                  | :---                  | :---                                              | :---                                                          |
+| `event_id`            | `string`              | Unique event ID                                   | Non-null, UUID v4 format                                      |
+| `source_system`       | `string`              | Source system                                     | Enum: `web` / `mobile` / `api`                                |
+| `customer_id`         | `string`              | Customer ID                                       | Non-null; may be hash-masked by policy in production          |
+| `event_type`          | `string`              | Event type                                        | Non-null, length ≤ 64                                         |
+| `event_timestamp`     | `timestamp(us, UTC)`  | Event occurrence time                             | Microsecond precision, UTC timezone                           |
+| `amount`              | `double`              | Amount                                            | ≥ 0, original value preserved; `NaN` if conversion fails      |
+| `currency`            | `string`              | Currency code                                     | ISO 4217 three-letter code; invalid values corrected to `USD` |
+| `ingestion_timestamp` | `timestamp(us, UTC)`  | Ingestion time (from source system or processing) | Must be ≤ current time                                        |
+| `event_date`          | `date`                | **Partition column**                              | Derived from `event_timestamp`                                |
+| `_raw_amount`         | `string`              | (Optional) original amount string                 | Populated only when amount type conversion fails              |
+| `_is_invalid_currency`| `boolean`             | Whether currency was corrected                    | `true` means original value was invalid, changed to `USD`     |
+| `_validation_status`  | `string`              | Validation status                                 | `'passed'` or `'type_mismatch'`                               |
+| `_processed_timestamp`| `timestamp(us, UTC)`  | Pipeline processing time                          | Automatically added at write time                             |
 
 ---
 
-### 3.3 错误记录 Schema（`errors/` 目录）
+### 3.2 Gold Layer Structure (Star Schema)
 
-每个错误文件采用 **JSON Lines** 格式，每行一个错误对象，包含以下字段：
+#### Fact table: `fact_daily_events`
+| Field name     | Type     | Description                                  |
+| :---           | :---     | :---                                         |
+| `event_date`   | `date`   | Partition column                             |
+| `customer_id`  | `string` | Links to dimension table `dim_customer`      |
+| `event_type`   | `string` | Links to dimension table `dim_event_type`    |
+| `event_count`  | `bigint` | Total event count for the group              |
+| `total_amount` | `double` | Total amount for the group                   |
+| `avg_amount`   | `double` | Average amount for the group                 |
 
-| 字段名 | 类型 | 描述 |
-| :--- | :--- | :--- |
-| `original_json` | `string` | 原始输入行的完整 JSON 字符串 |
-| `error_type` | `string` | 错误类型：`schema_mismatch` / `type_coercion_failed` |
-| `error_details` | `string` | 具体原因，如 `"field 'event_id' missing"` 或 `"amount cannot be parsed as number"` |
-| `ingestion_timestamp` | `string` (ISO8601) | 管道处理该记录的时间 |
+#### Dimension table: `dim_customer`
+| Field name        | Type     | Description                                                       |
+| :---              | :---     | :---                                                              |
+| `customer_id`     | `string` | Primary key, unique                                               |
+| `first_seen_date` | `date`   | (Reserved) first-seen date; currently set to the min `event_date` |
+
+#### Dimension table: `dim_event_type`
+| Field name    | Type     | Description                                        |
+| :---          | :---     | :---                                               |
+| `event_type`  | `string` | Primary key, unique                                |
+| `category`    | `string` | (Reserved) business category; currently blank      |
+
+#### Wide table (denormalized): `wide_daily_user_events`
+Left-joins `fact_daily_events` with `dim_customer` and `dim_event_type`, containing all fact and dimension fields, directly available for BI queries, avoiding runtime joins.
 
 ---
 
-## 4. 数据新鲜度与重处理机制
+### 3.3 Error Record Schema (`errors/` directory)
 
-- **批处理窗口**：管道设计为每日运行一次，默认处理前一日（UTC）`event_timestamp` 的数据。可通过命令行参数 `--event-date YYYY-MM-DD` 指定处理任意历史日期，实现灵活回填。
-- **幂等性保证**：Silver 和 Gold 层的写入均采用 **按分区覆盖** 模式（`mode='overwrite'`）。重复运行同一日期的任务会完全覆盖该分区，保证结果一致，不会产生重复数据。
-- **迟到数据策略**：若记录的 `event_timestamp` 属于过去日期（如晚到 3 天的数据），管道会将其写入对应历史分区，不会丢弃。此行为依赖于分区覆盖机制，且 Bronze 层保留原始 JSON，可随时重放。
-- **安全回填**：通过指定 `--event-date`，可以只重处理特定日期的数据，不影响其他分区的数据，实现精准修复。
+Each error file uses **JSON Lines** format, one error object per line, containing the following fields:
+
+| Field name            | Type              | Description                                                                        |
+| :---                  | :---              | :---                                                                               |
+| `original_json`       | `string`          | The complete JSON string of the original input line                                |
+| `error_type`          | `string`          | Error type: `schema_mismatch` / `type_coercion_failed`                             |
+| `error_details`       | `string`          | Specific reason, e.g. `"field 'event_id' missing"` or `"amount cannot be parsed as number"` |
+| `ingestion_timestamp` | `string` (ISO8601)| The time the pipeline processed this record                                       |
 
 ---
 
-## 5. 血缘与可观测性（设计要点）
+## 4. Data Freshness and Reprocessing Mechanism
 
-- **血缘追踪**：每条记录从 Bronze（原始 JSON）到 Silver（Parquet）再到 Gold（聚合表）的路径，通过 `_processed_timestamp` 和分区键可追溯。未来可集成 OpenLineage 获取更细粒度的字段级血缘。
-- **运行指标**：每次运行结束时，在 `logs/metrics_{timestamp}.json` 中输出总输入行数、校验通过数、校验失败数、去重删除数、各阶段耗时，用于监控和 SLA 评估。
-- **数据新鲜度监控**：在编排层（如 Airflow）中，可设置传感器（Sensor）检查最新 Silver 分区的 `event_date` 是否与当前日期一致，若延迟超过阈值则触发告警。
+- **Batch window**: The pipeline is designed to run once daily, processing the previous day's (UTC) `event_timestamp` data by default. A specific historical date can be specified via the `--event-date YYYY-MM-DD` CLI argument for flexible backfill.
+- **Idempotency guarantee**: Silver and Gold layer writes use **partition overwrite** mode (`mode='overwrite'`). Re-running the same date fully overwrites that partition, ensuring consistent results without duplicate data.
+- **Late data strategy**: If a record's `event_timestamp` belongs to a past date (e.g. data arriving 3 days late), the pipeline writes it to the corresponding historical partition without discarding it. This behavior relies on the partition overwrite mechanism, and the Bronze layer retains the original JSON for replay at any time.
+- **Safe backfill**: By specifying `--event-date`, only the data for a specific date is reprocessed without affecting other partitions, enabling precise remediation.
+
+---
+
+## 5. Lineage and Observability (Design Highlights)
+
+- **Lineage tracking**: The path of each record from Bronze (raw JSON) to Silver (Parquet) to Gold (aggregation table) is traceable via `_processed_timestamp` and partition keys. OpenLineage can be integrated in the future for finer-grained field-level lineage.
+- **Run metrics**: At the end of each run, `logs/metrics_{timestamp}.json` is output with total input rows, validation pass count, validation fail count, deduplication removal count, and per-stage durations, for monitoring and SLA evaluation.
+- **Data freshness monitoring**: In the orchestration layer (e.g. Airflow), a sensor can be configured to check whether the latest Silver partition's `event_date` matches the current date; if the delay exceeds a threshold, an alert is triggered.
 
 ---

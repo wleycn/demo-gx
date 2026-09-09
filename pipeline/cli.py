@@ -1,4 +1,13 @@
 #!/usr/bin/env python
+"""Command-line entry point for the data pipeline.
+
+The CLI orchestrates the full ETL flow:
+read -> validate -> clean -> deduplicate -> Silver -> Gold.
+
+Environment configuration and schema contracts are loaded centrally
+via ``common.config`` (from ``config/`` at the project root).
+"""
+
 import argparse
 import sys
 from pathlib import Path
@@ -13,18 +22,24 @@ from transformation.cleaner import DataCleaner
 from transformation.deduplicator import Deduplicator
 from curation.builder import GoldBuilder
 
-"""
-数据管道 CLI 入口：读取 → 校验 → 清洗 → 去重 → Silver → Gold。
-环境配置与 schema 契约统一由 common.config 加载（项目根 config/）。
-"""
+
 def main():
+    """Run the pipeline end-to-end from the command line.
+
+    Parses ``--env``, ``--input``, and optional ``--event-date`` arguments,
+    then executes the six-stage ETL flow (read, validate, clean, deduplicate,
+    write Silver, build and write Gold).  Metrics are always persisted, even
+    on failure.
+
+    Exits with code 0 on success or 1 on any unhandled exception.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="dev", choices=["dev", "test", "prod"])
     parser.add_argument("--input", required=True, help="Path to input file")
     parser.add_argument("--event-date", help="Override event date for processing (YYYY-MM-DD)")
     args = parser.parse_args()
 
-    # 加载配置
+    # Load environment configuration
     config = load_config(args.env)
     logger = setup_logging(
         level=config["logging"]["level"],
@@ -34,13 +49,13 @@ def main():
     metrics = MetricsCollector()
 
     try:
-        # 1. 读取
+        # 1. Read input
         logger.info("Reading input...")
         raw_df = read_input(args.input)
         metrics.increment("input_rows", len(raw_df))
         logger.info(f"Read {len(raw_df)} rows")
 
-        # 2. 校验
+        # 2. Validate schema
         logger.info("Validating schema...")
         schema_cfg = load_schema()
         validator = SchemaValidator(schema_cfg)
@@ -48,7 +63,7 @@ def main():
         metrics.increment("valid_rows", len(valid_df))
         metrics.increment("invalid_rows", len(invalid_df))
         logger.info(f"Valid: {len(valid_df)}, Invalid: {len(invalid_df)}")
-        # 写入错误
+        # Write invalid records to the error quarantine area
         if not invalid_df.empty:
             errors_path = Path(config["storage"]["base_path"]) / config["storage"]["errors_subpath"] / "bad_schema"
             errors_path.mkdir(parents=True, exist_ok=True)
@@ -60,16 +75,16 @@ def main():
             metrics.save(config["metrics"]["output_file"])
             return
 
-        # 3. 清洗
+        # 3. Clean data
         logger.info("Cleaning data...")
         cleaner = DataCleaner()
         cleaned_df = cleaner.standardize_timestamps(valid_df)
         cleaned_df = cleaner.normalize_currency(cleaned_df)
         cleaned_df = cleaner.check_amount(cleaned_df)
-        # 添加 event_date 分区列
+        # Add event_date partition column
         cleaned_df["event_date"] = pd.to_datetime(cleaned_df["event_timestamp"]).dt.date
 
-        # 4. 去重
+        # 4. Deduplicate
         logger.info("Deduplicating...")
         deduper = Deduplicator()
         deduped_df, duplicates_df = deduper.deduplicate(cleaned_df)
@@ -82,9 +97,9 @@ def main():
             logger.info(f"Duplicates logged to {dup_log}")
         metrics.increment("silver_rows", len(deduped_df))
 
-        # 5. 写入 Silver
+        # 5. Write Silver layer
         silver_path = Path(config["storage"]["base_path"]) / config["storage"]["silver_subpath"]
-        # 按 event_date 分区写入
+        # Partition by event_date
         for date, group in deduped_df.groupby("event_date"):
             date_str = date.strftime("%Y-%m-%d")
             part_path = silver_path / f"event_date={date_str}"
@@ -92,27 +107,27 @@ def main():
             group.to_parquet(part_path / "data.parquet", index=False)
             logger.info(f"Silver data written to {part_path}")
 
-        # 6. 构建 Gold
+        # 6. Build Gold layer
         logger.info("Building Gold layer...")
         builder = GoldBuilder()
         fact_df = builder.build_fact_table(deduped_df)
         dims = builder.build_dimensions(deduped_df)
         wide_df = builder.build_wide_table(fact_df, dims)
 
-        # 写入 Gold
+        # Write Gold outputs
         gold_base = Path(config["storage"]["base_path"]) / config["storage"]["gold_subpath"]
-        # Fact
+        # Fact table (partitioned)
         for date, group in fact_df.groupby("event_date"):
             date_str = date.strftime("%Y-%m-%d")
             fact_path = gold_base / "fact_daily_events" / f"event_date={date_str}"
             fact_path.mkdir(parents=True, exist_ok=True)
             group.to_parquet(fact_path / "data.parquet", index=False)
-        # Dims
+        # Dimension tables (full snapshot, non-partitioned)
         for dim_name, dim_df in dims.items():
             dim_path = gold_base / dim_name
             dim_path.mkdir(parents=True, exist_ok=True)
             dim_df.to_parquet(dim_path / "data.parquet", index=False)
-        # Wide
+        # Wide table (partitioned)
         if not wide_df.empty:
             for date, group in wide_df.groupby("event_date"):
                 date_str = date.strftime("%Y-%m-%d")
@@ -122,7 +137,7 @@ def main():
 
         metrics.increment("gold_rows", len(fact_df))
 
-        # 保存指标
+        # Save metrics
         logger.info("Saving metrics...")
         metrics.save(config["metrics"]["output_file"])
         logger.info("Pipeline completed successfully.")
@@ -135,4 +150,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

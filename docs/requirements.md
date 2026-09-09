@@ -1,62 +1,62 @@
-以下是针对 **Principal Data Engineer (P5) Take-Home 技术评估** 文档的详细需求总结。该任务旨在评估候选人在数据架构、Python编程、数据质量、编排、CI/CD、治理及成本安全等方面的实战判断力与技术深度。
+The following is a detailed requirements summary for the **Principal Data Engineer (P5) Take-Home Technical Assessment** document. This task is designed to evaluate the candidate's practical judgment and technical depth in data architecture, Python programming, data quality, orchestration, CI/CD, governance, and cost/security.
 
-### 0. 场景背景（Scenario）
+### 0. Scenario Background
 
-- 你正在为一个**新数据产品**构建 **"可复用管道模式（reusable pipeline pattern）"** 的第一个版本。
-- 未来源系统将包括：**文件（files）、API、数据库（databases）、事件流（event streams）**。
-- 管道需支持 **dev → test → prod** 的受控环境晋升（controlled promotion）。
-- **设计定位**：模式化、可复用的参考实现，而非一次性脚本。所有架构决策需体现这一定位。
+- You are building the first version of a **"reusable pipeline pattern"** for a **new data product**.
+- Future source systems will include: **files, APIs, databases, event streams**.
+- The pipeline must support **dev → test → prod** controlled promotion.
+- **Design positioning**: a patterned, reusable reference implementation, not a one-off script. All architectural decisions must reflect this positioning.
 
-### 🎯 核心目标与约束
+### 🎯 Core Goals and Constraints
 
-* **角色定位：** Principal Data Engineer (P5)，重点考察设计可靠管道、代码结构、权衡取舍及跨团队沟通扩展的能力，而非追求完美语法或全生产化系统。
-* **时间预算：** 建议 **2-3小时**。若未完成所有项，需记录后续计划及原因。
-* **核心理念：** 生产级思维（Production-Minded）、模块化设计、明确的数据契约、自动化质量检查、安全敏感数据处理、成本感知及可维护交付。
+* **Role:** Principal Data Engineer (P5). The focus is on the ability to design reliable pipelines, code structure, trade-off analysis, and cross-team communication and scaling — not on perfect syntax or a fully productionized system.
+* **Time budget:** Recommended **2-3 hours**. If not all items are completed, record follow-up plans and reasons.
+* **Core principles:** Production-minded, modular design, explicit data contracts, automated quality checks, secure sensitive-data handling, cost awareness, and maintainable delivery.
 
-
----
-
-### 📦 提交物规范
-
-1. **格式：** Git 仓库或压缩包。
-2. **README.md（必须包含）：**
-   * 本地运行/验证步骤。
-   * 假设条件与设计笔记。
-   * 权衡取舍分析。
-   * 仓库结构与数据流说明。
-   * 安全、隐私、成本、可观测性策略。
-   * 生产就绪的后续改进计划。
-3. **数据要求：** 使用代表性样本数据或生成的模拟数据；**严禁**包含凭证、密钥或真实客户/患者数据；若使用合成数据需明确声明。
 
 ---
 
-### ✅ 六大必做交付模块详解
+### 📦 Submission Specifications
 
-#### A. 数据架构与设计 (权重 20%)
+1. **Format:** Git repository or compressed archive.
+2. **README.md (must include):**
+   * Local run/validation steps.
+   * Assumptions and design notes.
+   * Trade-off analysis.
+   * Repository structure and data flow description.
+   * Security, privacy, cost, and observability strategies.
+   * Production readiness follow-up improvement plan.
+3. **Data requirements:** Use representative sample data or generated mock data; **strictly prohibited** from including credentials, keys, or real customer/patient data; if synthetic data is used, this must be explicitly stated.
 
-* **分层设计：** 采用 Raw/Bronze → Cleaned/Silver → Curated/Gold 或等效模式，明确各层消费者。
-* **维度建模意识**：facts / dimensions 划分、宽表（wide tables）、聚合（aggregations）、领域数据产品（data products）思路。
-* **摄取策略：** 说明批处理、增量或流式摄取的处理方式。
-* **异常处理：** 明确 Schema 演进、迟到数据、重复记录及重处理机制。
-* **可审计性：** 支持溯源、追踪和重放。
-* **安全与成本：** 说明敏感数据保护措施；通过分区、聚类、文件大小优化、生命周期策略或计算优化控制成本。
-* **设计要求：** 关注点分离（摄取/转换/验证/消费）、可复用设计、明确的数据量/延迟/新鲜度假设、托管vs自管服务的权衡讨论、现代 Lakehouse/Warehouse 模式意识。
+---
 
-#### B. Python 编程作业 (权重 25% - **核心必做**)
+### ✅ Six Required Delivery Modules
 
-* **语言要求：****必须使用 Python** 作为主语言（可用 pandas, PySpark 等）。SQL/dbt 仅作辅助，不可替代 Python。
-* **功能实现：**
-  * 读取结构化文件（CSV/JSON/Parquet）。
-  * 验证必填字段与数据类型。
-  * 清洗、标准化数据。
-  * 基于明确业务规则去重。
-  * 输出至少一个面向分析的 Curated 数据集。
-  * 包含有意义的日志和执行输出。
-  * 完善的错误处理（无效输入、缺失文件、Schema错误、畸形记录）。
-  * **代码质量：** 职责分离、可读性强、避免硬编码/魔法数字、适当使用类型提示、单元测试友好、边缘情况处理、简洁优于过度工程。
-  * 必须提供**可运行的（runnable）** Python 脚本、包（package）或命令行工具（CLI）之一。"本地一条命令可跑通"是硬性交付标准，而非功能清单的软性描述。
-  * 示例输入数据结构
-  出题方给出的默认数据模板（JSON）：
+#### A. Data Architecture and Design (Weight 20%)
+
+* **Layered design:** Adopt Raw/Bronze → Cleaned/Silver → Curated/Gold or an equivalent pattern, clearly identifying consumers for each layer.
+* **Dimensional modeling awareness:** facts / dimensions partitioning, wide tables, aggregations, domain data products.
+* **Ingestion strategy:** Describe batch, incremental, or streaming ingestion approaches.
+* **Exception handling:** Define schema evolution, late-arriving data, duplicate records, and reprocessing mechanisms.
+* **Auditability:** Support lineage, tracing, and replay.
+* **Security and cost:** Describe sensitive-data protection measures; control cost through partitioning, clustering, file-size optimization, lifecycle policies, or compute optimization.
+* **Design requirements:** Separation of concerns (ingestion/transformation/validation/consumption), reusable design, explicit data volume/latency/freshness assumptions, managed vs. self-managed service trade-off discussion, modern Lakehouse/Warehouse pattern awareness.
+
+#### B. Python Programming Assignment (Weight 25% - **Core Required**)
+
+* **Language requirement:** **Must use Python** as the primary language (pandas, PySpark, etc. may be used). SQL/dbt is auxiliary only and cannot replace Python.
+* **Feature implementation:**
+  * Read structured files (CSV/JSON/Parquet).
+  * Validate required fields and data types.
+  * Clean and standardize data.
+  * Deduplicate based on explicit business rules.
+  * Output at least one analysis-oriented Curated dataset.
+  * Include meaningful logging and execution output.
+  * Comprehensive error handling (invalid input, missing files, schema errors, malformed records).
+  * **Code quality:** Separation of responsibilities, readability, avoid hardcoding/magic numbers, appropriate use of type hints, unit-test friendly, edge-case handling, simplicity over over-engineering.
+  * Must provide a **runnable** Python script, package, or CLI tool. "A single local command that runs end-to-end" is a hard delivery standard, not a soft description in a feature list.
+  * Example input data structure
+  The default data template (JSON) provided by the examiner:
 
   ```json
   {
@@ -71,72 +71,72 @@
   }
   ```
 
-#### C. 数据质量、契约与测试 (权重 20%)
+#### C. Data Quality, Contracts, and Testing (Weight 20%)
 
-* **验证规则：** 定义必填字段、唯一性、空值、枚举值、引用完整性、时间戳有效性等检查。
-* **异常处置：** 明确无效记录的处理策略（隔离、拒绝、告警或快速失败）。
-* **测试要求：** 至少包含一个 Python 单元测试 + 额外的数据测试/伪测试。
-* **集成描述：** 说明质量检查如何在 CI/CD 及定时调度中运行。
-* 可选工具清单 `pytest`, `dbt tests`, 
-* 自定义验证代码（custom validation code
-* 数据契约 / Schema Registry 模式（data contracts / schema registry patterns）
+* **Validation rules:** Define required fields, uniqueness, null checks, enum values, referential integrity, timestamp validity, etc.
+* **Exception handling:** Define a processing strategy for invalid records (quarantine, reject, alert, or fail fast).
+* **Testing requirements:** Include at least one Python unit test + additional data tests/pseudo-tests.
+* **Integration description:** Describe how quality checks run in CI/CD and scheduled jobs.
+* Optional tool list: `pytest`, `dbt tests`,
+* Custom validation code
+* Data contracts / schema registry patterns
 
-#### D. 编排与运维设计 (权重 15%)
+#### D. Orchestration and Operations Design (Weight 15%)
 
-* **形式：** 提供编排示例或伪工作流（Airflow, Step Functions, GitLab CI 等均可）。
-* **内容要求：**
-  * 展示阶段依赖（摄取→验证→转换→发布→监控）。
-  * 说明重试机制、幂等性及故障处理。
-  * 解释安全回填/重处理流程。
-  * 描述新鲜度及 SLA/SLO 监控方式。
-  * 包含血缘/元数据采集方案。
+* **Form:** Provide an orchestration example or pseudo-workflow (Airflow, Step Functions, GitLab CI, etc.).
+* **Content requirements:**
+  * Show stage dependencies (ingestion → validation → transformation → publish → monitoring).
+  * Describe retry mechanisms, idempotency, and failure handling.
+  * Explain safe backfill / reprocessing flows.
+  * Describe freshness and SLA/SLO monitoring.
+  * Include lineage / metadata collection plan.
 
-#### E. CI/CD 与交付实践 (权重 15%)
+#### E. CI/CD and Delivery Practices (Weight 15%)
 
-* **形式：**`.gitlab-ci.yml` 或伪流水线定义（无需完全可执行，骨架+理由即可）。
-* **阶段要求：** Format/Lint → Python Lint & Unit Test → 数据质量/契约检查 → Build/Package → Deploy/Promote。
-* **关键要素：**
-  * 区分 MR 与默认分支行为。
-  * 生产部署前至少设置一个受控门禁。
-  * 明确阻断晋升的失败条件。
-  * 环境配置管理与密钥保护方案。
+* **Form:** `.gitlab-ci.yml` or pseudo-pipeline definition (need not be fully executable; skeleton + rationale suffices).
+* **Stage requirements:** Format/Lint → Python Lint & Unit Test → Data quality/contract check → Build/Package → Deploy/Promote.
+* **Key elements:**
+  * Distinguish MR vs. default-branch behavior.
+  * Set at least one controlled gate before production deployment.
+  * Explicitly define failure conditions that block promotion.
+  * Environment configuration management and secret protection.
 
-#### F. README 与设计阐述 (权重 5%)
+#### F. README and Design Narrative (Weight 5%)
 
-* 除基础运行说明外，需重点阐述：数据流、质量检查失败行为、安全隐私考量、成本优化思路、可观测性与血缘策略、以及未来生产化路径。
-
----
-
-### ⚖️ 评估维度权重表
-
-
-| 评估领域                        | 权重 | 核心关注点                                     |
-| :------------------------------ | :--- | :--------------------------------------------- |
-| Python 编程、转换实现与代码质量 | 25%  | 模块化、可读性、测试、幂等性、简洁性           |
-| 数据架构与管道设计              | 20%  | 分层清晰、可复用、权衡分析、现代技术栈意识     |
-| 数据质量、测试与可靠性          | 20%  | 嵌入式检查、异常处理、指标监控、溯源能力       |
-| 编排、CI/CD 与运维就绪          | 15%  | 依赖管理、重试/幂等、安全回填、环境隔离        |
-| 安全、治理与隐私                | 10%  | 最小权限、加密、脱敏、审计追踪                 |
-| 成本与性能优化                  | 5%   | 增量处理、分区/聚类、存储生命周期、性价比平衡  |
-| 文档与沟通                      | 5%   | 假设明确、权衡清晰、面向技术与非技术受众的表达 |
+* Beyond basic run instructions, focus on: data flow, quality-check failure behavior, security/privacy considerations, cost optimization, observability and lineage strategy, and the future productionization path.
 
 ---
 
-### 💡 可选加分项 (Stretch Items)
+### ⚖️ Evaluation Dimension Weight Table
 
-*虽非必须，但可增强竞争力：*
 
-* dbt 模型 + 测试 + 文档生成
-* Great Expectations 等数据质量框架
-* Apache Iceberg 表设计 / CDC 增量处理
-* OpenLineage/DataHub 血缘集成
-* 新鲜度/体积/耗时/错误率的可观测指标
-* 成本估算或计算优化笔记
-* 数据契约 / Schema Registry 示例
-* 容器化 / 可复现本地开发环境
-* 更丰富的单元测试 / 静态类型检查 / 打包结构
-* 策略检查 / 访问控制 / 敏感数据掩码示例
+| Evaluation Area                          | Weight | Core Focus Points                               |
+| :--------------------------------------- | :----- | :---------------------------------------------- |
+| Python programming, transformation, and code quality | 25%    | Modularity, readability, testing, idempotency, simplicity |
+| Data architecture and pipeline design    | 20%    | Clear layering, reusability, trade-off analysis, modern tech-stack awareness |
+| Data quality, testing, and reliability   | 20%    | Embedded checks, exception handling, metric monitoring, lineage capability |
+| Orchestration, CI/CD, and ops readiness  | 15%    | Dependency management, retry/idempotency, safe backfill, environment isolation |
+| Security, governance, and privacy        | 10%    | Least privilege, encryption, masking, audit trail |
+| Cost and performance optimization        | 5%     | Incremental processing, partitioning/clustering, storage lifecycle, cost-performance balance |
+| Documentation and communication          | 5%     | Explicit assumptions, clear trade-offs, expression for both technical and non-technical audiences |
 
-### ⏭️ 后续面试准备提示
+---
 
-下一轮面试将围绕你的提交物展开，请准备好深入讨论：架构权衡、数据建模决策、Python 代码结构、质量策略、故障恢复、CI/CD 方法、安全治理、成本优化，以及该方案如何扩展以支持组织级规模化。这既是技术深度的检验，也是 Principal 级别工程判断力的展示机会。
+### 💡 Optional Stretch Items
+
+*Not required, but can enhance competitiveness:*
+
+* dbt models + tests + documentation generation
+* Great Expectations or similar data quality frameworks
+* Apache Iceberg table design / CDC incremental processing
+* OpenLineage/DataHub lineage integration
+* Observability metrics for freshness/volume/duration/error rate
+* Cost estimation or compute optimization notes
+* Data contracts / schema registry examples
+* Containerization / reproducible local development environment
+* Richer unit tests / static type checking / packaging structure
+* Policy checks / access control / sensitive-data masking examples
+
+### ⏭️ Follow-up Interview Preparation Tips
+
+The next interview round will revolve around your submission. Be prepared to discuss in depth: architectural trade-offs, data modeling decisions, Python code structure, quality strategy, failure recovery, CI/CD approach, security governance, cost optimization, and how the solution scales to support organization-level growth. This is both a test of technical depth and an opportunity to demonstrate Principal-level engineering judgment.

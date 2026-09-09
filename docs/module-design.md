@@ -1,102 +1,101 @@
-# 功能模块设计（接口契约与职责定义）
+# Functional Module Design (Interface Contracts and Responsibility Definitions)
 
-> **设计原则**：严格的关注点分离（Separation of Concerns）。每个模块只负责一件事，通过标准化的 DataFrame 契约进行通信。所有配置（路径、验证阈值）由配置中心（`common/config`）统一管理，严禁硬编码。
+> **Design principle**: Strict Separation of Concerns. Each module is responsible for one thing only and communicates via standardized DataFrame contracts. All configuration (paths, validation thresholds) is managed centrally by the configuration center (`common/config`); hardcoding is strictly prohibited.
 
-## 1. 模块总览
+## 1. Module Overview
 
-| 模块目录 | 脚本文件 | 核心职责 | 对外暴露的接口（功能/类） |
-| :--- | :--- | :--- | :--- |
-| `ingestion/` | `reader.py` | 适配不同文件格式（JSON/CSV/Parquet），读取原始数据并附加溯源列 | `read_input(file_path)` |
-| `validation/` | `schema_validator.py` | 执行严格的数据契约校验（字段存在性、类型、枚举、格式） | `validate_schema(df)` |
-| `transformation/` | `cleaner.py` | 数据清洗（时间戳标准化、货币归一化、异常值标记） | `standardize_timestamps(df)`, `normalize_currency(df)` |
-| `transformation/` | `deduplicator.py` | 基于业务主键（`event_id`）去重，保留最新记录 | `deduplicate(df)` |
-| `curation/` | `builder.py` | 构建金层星型模型（事实表、维度表、宽表） | `build_fact_table(df)`, `build_dimensions(df)`, `build_wide_table(df)` |
-| `common/` | `config.py` | 加载 YAML 配置文件，注入环境变量 | `load_config(env)` |
-| `common/` | `logger.py` | 提供结构化日志（JSON 格式）和审计指标收集 | `get_logger()`, `collect_metrics()` |
-| `cli/` | `cli.py` | 命令行入口，解析参数，串联整个管道流程 | `main()` |
+| Module directory   | Script file        | Core responsibility                                                      | Exposed interface (function/class)                        |
+| :---               | :---               | :---                                                                     | :---                                                      |
+| `ingestion/`       | `reader.py`        | Adapt to different file formats (JSON/CSV/Parquet), read raw data and append lineage columns | `read_input(file_path)`                                   |
+| `validation/`      | `schema_validator.py` | Execute strict data contract validation (field existence, type, enum, format) | `validate_schema(df)`                                     |
+| `transformation/`  | `cleaner.py`       | Data cleaning (timestamp standardization, currency normalization, anomaly flagging) | `standardize_timestamps(df)`, `normalize_currency(df)`    |
+| `transformation/`  | `deduplicator.py`  | Deduplicate by business key (`event_id`), keep the newest record        | `deduplicate(df)`                                         |
+| `curation/`        | `builder.py`       | Build Gold-layer star schema (fact table, dimension tables, wide table) | `build_fact_table(df)`, `build_dimensions(df)`, `build_wide_table(df)` |
+| `common/`          | `config.py`        | Load YAML config files, inject environment variables                    | `load_config(env)`                                        |
+| `common/`          | `logger.py`        | Provide structured logging (JSON format) and audit metric collection    | `get_logger()`, `collect_metrics()`                       |
+| `cli/`             | `cli.py`           | CLI entry point, parse arguments, orchestrate the full pipeline flow    | `main()`                                                  |
 
 ---
 
-## 2. 模块接口契约（输入/输出定义）
+## 2. Module Interface Contracts (Input/Output Definitions)
 
 ### 2.1 `ingestion/reader.py`
-- **功能描述**：根据传入文件路径的后缀（`.json`, `.csv`, `.parquet`）自动选择读取引擎。读取后，必须为每一行保留原始 JSON 字符串（存入 `_raw_json` 列），以便在 Bronze 层实现完全可审计的回放。
-- **输入**：文件路径（字符串或 Path 对象）。
-- **输出**：包含原始数据及 `_raw_json` 列的 Pandas DataFrame。
-- **异常处理**：若文件后缀不支持或文件不存在，抛出明确异常，由 CLI 层捕获并记录。
+- **Description**: Auto-selects the read engine based on the file path suffix (`.json`, `.csv`, `.parquet`). After reading, each row must retain its original JSON string (stored in the `_raw_json` column) to enable fully auditable replay in the Bronze layer.
+- **Input**: File path (string or Path object).
+- **Output**: Pandas DataFrame containing the raw data and a `_raw_json` column.
+- **Exception handling**: If the file suffix is unsupported or the file does not exist, a clear exception is raised, caught and logged by the CLI layer.
 
 ### 2.2 `validation/schema_validator.py`
-- **功能描述**：基于配置文件（`config/schema.yaml`）中定义的 8 个必填字段执行校验。采用**严格模式（Strict Mode）**：
-  - 拒绝所有未在契约中定义的额外字段（直接丢弃）。
-  - 校验字段是否缺失、类型是否兼容（如字符串、数值）、格式是否正确（如 UUID、ISO 时间戳）。
-- **输入**：原始 DataFrame。
-- **输出**：返回两个 DataFrame 的元组 `(valid_df, invalid_df)`。`invalid_df` 附带 `error_reason` 列，说明具体违规项。
-- **失败策略**：无效记录写入 `errors/bad_schema/`，**不阻塞**有效数据的处理。
+- **Description**: Validates against the 8 required fields defined in `config/schema.yaml`. Uses **Strict Mode**:
+  - Rejects all extra fields not defined in the contract (directly dropped).
+  - Validates whether fields are missing, types are compatible (e.g. string, numeric), and formats are correct (e.g. UUID, ISO timestamp).
+- **Input**: Raw DataFrame.
+- **Output**: Returns a tuple of two DataFrames `(valid_df, invalid_df)`. `invalid_df` includes an `error_reason` column describing the specific violation.
+- **Failure policy**: Invalid records are written to `errors/bad_schema/` and **do not block** the processing of valid data.
 
 ### 2.3 `transformation/cleaner.py`
-- **功能描述**：
-  - **时间标准化**：将 `event_timestamp` 和 `ingestion_timestamp` 强制转为 UTC 时区的时间戳（若解析失败，置为空值并标记）。
-  - **货币归一化**：将 `currency` 字段统一转为大写，非标准 ISO 码（如 USD、EUR）自动修正为 `USD` 并添加 `_is_invalid_currency` 布尔标记列。
-  - **数值检查**：检查 `amount` 是否 ≥ 0，若为负数则标记异常（但不阻断写入）。
-- **输入**：校验通过的 DataFrame。
-- **输出**：清洗完成、带有额外标记列（如 `_is_invalid_currency`）的 DataFrame。
-- **特殊处理**：若发生类型转换失败（如金额字段混入字母），需自动生成 `_raw_<field>` 列保留原始字符串，并修改 `_validation_status` 为 `type_mismatch`。
+- **Description**:
+  - **Timestamp standardization**: Force-convert `event_timestamp` and `ingestion_timestamp` to UTC timestamps (on parse failure, set to null and flag).
+  - **Currency normalization**: Convert the `currency` field to uppercase; non-standard ISO codes (e.g. not USD, EUR) are auto-corrected to `USD` and an `_is_invalid_currency` boolean flag column is added.
+  - **Numeric check**: Check whether `amount` is ≥ 0; if negative, flag as anomalous (but do not block the write).
+- **Input**: Validated DataFrame.
+- **Output**: Cleaned DataFrame with additional flag columns (e.g. `_is_invalid_currency`).
+- **Special handling**: If a type conversion fails (e.g. letters mixed into the amount field), a `_raw_<field>` column is automatically generated to retain the original string, and `_validation_status` is set to `type_mismatch`.
 
 ### 2.4 `transformation/deduplicator.py`
-- **功能描述**：按 `event_id` 去重。当出现重复 ID 时，依据 `ingestion_timestamp` 字段保留**最新**的一条记录。
-- **输入**：清洗后的 DataFrame。
-- **输出**：去重后的 DataFrame。
-- **副作用**：被剔除的重复记录需写入 `logs/duplicates.log`（包含重复 ID 和时间戳），便于事后审计。
+- **Description**: Deduplicates by `event_id`. When duplicate IDs appear, the record with the **latest** `ingestion_timestamp` is retained.
+- **Input**: Cleaned DataFrame.
+- **Output**: Deduplicated DataFrame.
+- **Side effect**: Superseded duplicate records are written to `logs/duplicates.log` (including duplicate ID and timestamp) for post-hoc audit.
 
-### 2.5 `curation/builder.py`（金层构建）
-- **功能描述**：将银层明细数据聚合为面向分析的数据产品。
-  - **事实表**：按 `event_date`、`customer_id`、`event_type` 分组，计算 `event_count`、`total_amount`、`avg_amount`。
-  - **维度表**：从银层提取 `dim_customer`（仅 `customer_id`，未来可扩展）和 `dim_event_type`（仅 `event_type`）。
-  - **宽表**：将事实表与维度表进行左连接，生成单张非规范化宽表，供 BI 工具直接查询。
-- **输入**：银层 DataFrame。
-- **输出**：三个独立的 DataFrame（`fact_df`、`dims_dict`、`wide_df`）。
+### 2.5 `curation/builder.py` (Gold Layer Construction)
+- **Description**: Aggregates Silver-layer detail data into analysis-oriented data products.
+  - **Fact table**: Groups by `event_date`, `customer_id`, `event_type` and computes `event_count`, `total_amount`, `avg_amount`.
+  - **Dimension tables**: Extracts `dim_customer` (only `customer_id`, extensible in the future) and `dim_event_type` (only `event_type`) from the Silver layer.
+  - **Wide table**: Left-joins the fact table with dimension tables to produce a single denormalized wide table for direct BI queries.
+- **Input**: Silver-layer DataFrame.
+- **Output**: Three independent DataFrames (`fact_df`, `dims_dict`, `wide_df`).
 
 ### 2.6 `common/config.py`
-- **功能描述**：读取 `config/{env}.yaml`，将 YAML 内容解析为 Python 字典。支持从环境变量覆盖敏感配置（如存储路径前缀）。
-- **输入**：环境标识（`dev`、`test`、`prod`）。
-- **输出**：配置字典（包含输入/输出路径、验证阈值、告警 Webhook 地址等）。
+- **Description**: Reads `config/{env}.yaml` and parses the YAML content into a Python dict. Supports overriding sensitive configuration (e.g. storage path prefix) via environment variables.
+- **Input**: Environment identifier (`dev`, `test`, `prod`).
+- **Output**: Configuration dict (containing input/output paths, validation thresholds, alert webhook URL, etc.).
 
-### 2.7 管道入口 `cli.py`
-- **功能描述**：解析命令行参数（`--env` 和 `--input` 文件路径），按顺序调用各模块，构成完整 ETL。
-- **执行顺序（DAG）**：
-  1. 加载配置。
-  2. 调用 `ingestion` 读取数据。
-  3. 调用 `validation` 分割有效/无效数据。
-  4. 调用 `cleaner` 和 `deduplicator` 处理有效数据。
-  5. 写入银层（按 `event_date` 分区，Parquet 格式）。
-  6. 调用 `builder` 生成金层数据，并写入对应目录。
-  7. 收集并输出 `metrics.json`（总行数、通过数、失败数、耗时）。
-- **幂等性保证**：写入银层和金层时均采用“覆盖特定分区”模式，确保重复运行同一日期不会产生重复数据。
-
----
-
-## 3. 配置与契约管理（非代码部分）
-
-### 3.1 配置文件结构（YAML 模板）
-- `config/dev.yaml`、`config/test.yaml`、`config/prod.yaml`。
-- **核心配置项**：
-  - `storage.base_path`：数据存储根目录（本地或 S3）。
-  - `validation.schema_path`：指向 `schema.yaml` 的路径。
-  - `logging.level`：日志级别（INFO/DEBUG）。
-  - `alert.slack_webhook`：告警回调地址（仅生产环境配置）。
-
-### 3.2 数据契约（Schema Registry）
-- `config/schema.yaml` 明确定义字段、类型、是否必填、枚举值白名单、正则模式。
-- 未来扩展时，修改此 YAML 即可生效，无需改动核心 Python 逻辑。
+### 2.7 Pipeline Entry `cli.py`
+- **Description**: Parses CLI arguments (`--env` and `--input` file path), calls each module in sequence, forming the complete ETL.
+- **Execution order (DAG)**:
+  1. Load configuration.
+  2. Call `ingestion` to read data.
+  3. Call `validation` to split valid/invalid data.
+  4. Call `cleaner` and `deduplicator` to process valid data.
+  5. Write to Silver layer (partitioned by `event_date`, Parquet format).
+  6. Call `builder` to generate Gold-layer data and write to the corresponding directory.
+  7. Collect and output `metrics.json` (total rows, passed, failed, duration).
+- **Idempotency guarantee**: Both Silver and Gold writes use "overwrite specific partition" mode, ensuring that re-running the same date does not produce duplicate data.
 
 ---
 
-## 4. 跨模块通信规范
-- **数据载体**：所有模块之间通过 **Pandas DataFrame** 传递数据。
-- **元数据传递**：模块可通过 DataFrame 的 `attrs` 属性传递轻量级元数据（如处理时间戳、源文件名），避免依赖全局变量。
-- **错误传递**：校验或清洗模块不抛出异常中断流程，而是通过返回的 `invalid_df` 或标记列（如 `_validation_status`）将问题数据传递给下游或隔离区。
+## 3. Configuration and Contract Management (Non-code)
 
-## 5. 测试扩展点设计
-- 所有模块的接口均以 DataFrame 为输入/输出，不依赖具体文件路径，便于编写单元测试（`pytest`）。
-- 在 `common/` 中提供 `test_helpers.py`，用于生成标准化的模拟数据（Fixture），确保测试环境可复现。
+### 3.1 Configuration File Structure (YAML Template)
+- `config/dev.yaml`, `config/test.yaml`, `config/prod.yaml`.
+- **Core config items**:
+  - `storage.base_path`: Data storage root directory (local or S3).
+  - `validation.schema_path`: Path to `schema.yaml`.
+  - `logging.level`: Log level (INFO/DEBUG).
+  - `alert.slack_webhook`: Alert callback URL (only configured in production).
 
+### 3.2 Data Contract (Schema Registry)
+- `config/schema.yaml` explicitly defines fields, types, required flags, enum value whitelists, and regex patterns.
+- For future extensions, modifying this YAML takes effect without changing core Python logic.
+
+---
+
+## 4. Cross-module Communication Specification
+- **Data carrier**: All modules pass data via **Pandas DataFrame**.
+- **Metadata passing**: Modules can pass lightweight metadata (e.g. processing timestamp, source filename) via the DataFrame's `attrs` attribute, avoiding reliance on global variables.
+- **Error passing**: Validation or cleaning modules do not raise exceptions to interrupt the flow; instead, they pass problem data downstream or to the quarantine area via the returned `invalid_df` or flag columns (e.g. `_validation_status`).
+
+## 5. Test Extension Point Design
+- All module interfaces use DataFrame as input/output, not depending on specific file paths, making unit testing (`pytest`) straightforward.
+- A `test_helpers.py` is provided in `common/` for generating standardized mock data (fixtures), ensuring a reproducible test environment.

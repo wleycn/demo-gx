@@ -1,30 +1,31 @@
-# Pipeline 项目
+# Pipeline Project
 
-## 本地运行步骤
+## Local Run Steps
 
-1. 安装依赖：`pip install -r requirements.txt`
-2. 生成样本数据：`python scripts/generate_sample_data.py`
-3. 运行管道：`python pipeline/cli.py --input sample_data.json --env dev`
+1. Install dependencies: `pip install -r requirements.txt`
+2. Generate sample data: `python scripts/generate_sample_data.py`
+3. Run the pipeline: `python pipeline/cli.py --input sample_data.json --env dev`
 
-## 设计笔记
+## Design Notes
 
-详见 `docs/` 目录。
+See the `docs/` directory for details.
 
-## 权衡取舍
+## Trade-offs
 
-- 使用 Pandas 单机处理，适用于 <10GB 数据。
-- 分区覆盖写入保证幂等性。
-- 严格模式拒绝未知字段，维护数据契约。
+- Uses Pandas for single-machine processing, suitable for <10GB data.
+- Partition overwrite writes ensure idempotency.
+- Strict mode rejects unknown fields to maintain data contracts.
 
-## 生产就绪改进计划
+## Production Readiness Improvement Plan
 
-- 迁移到 PySpark 处理更大数据。
-- 集成 Great Expectations 进行数据质量验证。
-- 使用 Airflow 编排调度。
-- 增加 OpenLineage 血缘追踪。
+- Migrate to PySpark for larger data volumes.
+- Integrate Great Expectations for data quality validation.
+- Use Airflow for orchestration and scheduling.
+- Add OpenLineage for lineage tracking.
 
 ---
-现在，所有代码和配置文件都已提供。请将以上内容保存到对应文件中。确保目录结构如下：
+All code and configuration files are now provided. Save the above content
+to the corresponding files. Ensure the directory structure is as follows:
 
 project_root/
 ├── pipeline/
@@ -61,8 +62,11 @@ project_root/
 ├── requirements.txt
 └── README.md
 
-测试命令：
-生成数据：python scripts/generate_sample_data.py
-运行管道：python pipeline/cli.py --input sample_data.json --env dev
-运行测试：pytest tests/
-请检查，如果需要调整，告诉我。
+Test commands:
+Generate data: python scripts/generate_sample_data.py
+Run the pipeline: python pipeline/cli.py --input sample_data.json --env dev
+Run tests: pytest tests/
+
+
+git repo:
+https://github.com/wleycn/demo-gx

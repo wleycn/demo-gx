@@ -13,5 +13,4 @@ metrics:
   output_file: "metrics.json"
 
 alert:
-  slack_webhook: ""  # 留空，仅生产配置
-
+  slack_webhook: ""  # left empty; only configured in production
