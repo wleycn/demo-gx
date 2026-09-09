@@ -9,6 +9,8 @@ import pandas as pd
 from pathlib import Path
 import json
 
+from common.time_utils import parse_utc_mixed
+
 
 def read_input(file_path: str) -> pd.DataFrame:
     """Read a structured input file into a DataFrame.
@@ -43,9 +45,15 @@ def read_input(file_path: str) -> pd.DataFrame:
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Unsupported file type: {suffix}")
-    # Add the raw JSON column for audit purposes
-    # Note: for each DataFrame row, convert the row to a JSON string
-    df["_raw_json"] = df.apply(lambda row: row.to_json(), axis=1)
+    # Add the raw JSON column for audit purposes. If the input already
+    # carries an internal column name (_raw_json), preserve the user column
+    # under a distinct name instead of silently overwriting it
+    # (dev-review: input-column collision).
+    if "_raw_json" in df.columns:
+        df = df.rename(columns={"_raw_json": "_raw_json_user"})
+    # date_format="iso": without it, datetime columns serialize to epoch
+    # milliseconds and replay silently lands in 1970 (dev-review critical)
+    df["_raw_json"] = df.apply(lambda row: row.to_json(date_format="iso"), axis=1)
     return df
 
 
@@ -92,7 +100,7 @@ def write_bronze(raw_df: pd.DataFrame, bronze_base: Path) -> int:
         df["source_system"] = "unknown"
     now_date = pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d")
     if "ingestion_timestamp" in df.columns:
-        ts = pd.to_datetime(df["ingestion_timestamp"], utc=True, errors="coerce", format="mixed")
+        ts = parse_utc_mixed(df["ingestion_timestamp"])
         df["_ingestion_dt"] = now_date
         valid_dt = ts.notna()
         df.loc[valid_dt, "_ingestion_dt"] = ts[valid_dt].dt.strftime("%Y-%m-%d")
@@ -103,6 +111,6 @@ def write_bronze(raw_df: pd.DataFrame, bronze_base: Path) -> int:
         part_dir = bronze_base / str(source) / f"dt={dt}"
         part_dir.mkdir(parents=True, exist_ok=True)
         out = group.drop(columns=["_ingestion_dt"])
-        out.to_json(part_dir / "events.json", orient="records", lines=True, force_ascii=False)
+        out.to_json(part_dir / "events.json", orient="records", lines=True, force_ascii=False, date_format="iso")
         written += len(group)
     return written

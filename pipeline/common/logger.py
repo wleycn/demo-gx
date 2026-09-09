@@ -43,9 +43,10 @@ class JsonFormatter(logging.Formatter):
 def setup_logging(level: str = "INFO", log_file: str | None = None) -> logging.Logger:
     """Configure and return the ``pipeline`` logger.
 
-    The logger writes to stdout and, optionally, appends to a file.  The
-    function is idempotent: calling it multiple times will not duplicate
-    handlers.
+    Writes to stdout and, optionally, appends to a file.  Idempotent per
+    handler TYPE: calling again with a ``log_file`` after an earlier
+    no-file call still adds the missing file handler (dev-review: a bare
+    ``not logger.handlers`` guard would silently skip it).
 
     Args:
         level (str): Logging level name (e.g. ``"INFO"``, ``"DEBUG"``).
@@ -59,19 +60,18 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> logging.L
     """
     logger = logging.getLogger("pipeline")
     logger.setLevel(level.upper())
-    # Idempotent: skip if handlers already exist, avoiding duplicate output
-    if not logger.handlers:
-        formatter = JsonFormatter()
+    formatter = JsonFormatter()
+    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
         stream_handler = logging.StreamHandler(sys.stdout)
         stream_handler.setFormatter(formatter)
         logger.addHandler(stream_handler)
-        if log_file:
-            path = Path(log_file)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            file_handler = logging.FileHandler(path, encoding="utf-8")
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-        logger.propagate = False
+    if log_file and not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+        path = Path(log_file)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(path, encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    logger.propagate = False
     return logger
 
 

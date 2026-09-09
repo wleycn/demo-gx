@@ -17,7 +17,7 @@ data:
 	$(PYTHON) scripts/generate_sample_data.py
 
 ## Run the full pipeline (override env: ENV=test make run)
-run:
+run: data
 	$(PYTHON) pipeline/cli.py --input $(INPUT) --env $(ENV)
 
 ## Run the pytest suite

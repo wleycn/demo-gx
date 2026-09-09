@@ -30,10 +30,10 @@ def test_validation_passes(schema_config):
         "source_system": "web",
         "customer_id": "cust_001",
         "event_type": "purchase",
-        "event_timestamp": "2026-01-01T00:00:00Z",
+        "event_timestamp": (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=1)).isoformat(),
         "amount": 100.0,
         "currency": "USD",
-        "ingestion_timestamp": "2026-01-01T00:00:00Z"
+        "ingestion_timestamp": (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=1)).isoformat()
     }])
     validator = SchemaValidator(schema_config)
     valid, invalid = validator.validate(df)
@@ -47,10 +47,10 @@ def test_validation_fails_missing_field(schema_config):
         "source_system": "web",
         "customer_id": "cust_001",
         "event_type": "purchase",
-        "event_timestamp": "2026-01-01T00:00:00Z",
+        "event_timestamp": (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=1)).isoformat(),
         "amount": 100.0,
         "currency": "USD",
-        "ingestion_timestamp": "2026-01-01T00:00:00Z"
+        "ingestion_timestamp": (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=1)).isoformat()
     }])
     validator = SchemaValidator(schema_config)
     valid, invalid = validator.validate(df)
@@ -75,7 +75,7 @@ def test_validation_fails_future_timestamp(schema_config):
         "event_timestamp": future,
         "amount": 100.0,
         "currency": "USD",
-        "ingestion_timestamp": "2026-01-01T00:00:00Z"
+        "ingestion_timestamp": (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=1)).isoformat()
     }])
     validator = SchemaValidator(schema_config)
     valid, invalid = validator.validate(df)
@@ -91,10 +91,10 @@ def _valid_row(**overrides):
         "source_system": "web",
         "customer_id": "cust_001",
         "event_type": "purchase",
-        "event_timestamp": "2026-01-01T00:00:00Z",
+        "event_timestamp": (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=1)).isoformat(),
         "amount": 100.0,
         "currency": "USD",
-        "ingestion_timestamp": "2026-01-01T00:00:00Z",
+        "ingestion_timestamp": (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=1)).isoformat(),
     }
     row.update(overrides)
     return row
@@ -187,3 +187,48 @@ def test_validation_fails_dict_string_field(schema_config):
     assert len(valid) == 0
     assert len(invalid) == 1
     assert "not a scalar string" in invalid.iloc[0]["error_reason"]
+
+
+def test_validation_fails_negative_amount(schema_config):
+    """amount below the schema minimum must be quarantined."""
+    df = pd.DataFrame([_valid_row(amount=-1.0)])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 0
+    assert "below minimum" in invalid.iloc[0]["error_reason"]
+
+
+def test_validation_fails_enum_violation(schema_config):
+    """A source_system outside the enum must be quarantined."""
+    df = pd.DataFrame([_valid_row(source_system="desktop")])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 0
+    assert "not in enum" in invalid.iloc[0]["error_reason"]
+
+
+def test_validation_fails_event_type_too_long(schema_config):
+    """event_type beyond max_length must be quarantined."""
+    df = pd.DataFrame([_valid_row(event_type="x" * 65)])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 0
+    assert "max length" in invalid.iloc[0]["error_reason"]
+
+
+def test_validation_fails_unparseable_timestamp(schema_config):
+    """A timestamp string that cannot be parsed must be quarantined."""
+    df = pd.DataFrame([_valid_row(event_timestamp="not-a-date")])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 0
+    assert "parse failed" in invalid.iloc[0]["error_reason"]
+
+
+def test_validation_passes_exact_two_decimal_amount(schema_config):
+    """Boundary: 10.0 (2 decimals) passes; only >2 decimals are rejected."""
+    df = pd.DataFrame([_valid_row(amount=10.0)])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 1
+    assert len(invalid) == 0

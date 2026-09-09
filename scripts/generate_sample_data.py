@@ -33,9 +33,11 @@ def generate_sample_data(num_records=100, output_path="sample_data.json"):
             to ``"sample_data.json"``.
     """
     records = []
+    random.seed(42)  # reproducible sample (dev-review: CI smoke must be stable)
     now = datetime.utcnow()
     systems = ["web", "mobile", "api"]
-    # XXX is used to test invalid currency handling
+    # XXX passes the schema's ^[A-Z]{3}$ format check but is not in the
+    # cleaner whitelist → it exercises the normalize-to-USD + flag path
     currencies = ["USD", "EUR", "GBP", "CNY", "JPY", "XXX"]
     event_types = ["purchase", "view", "click", "signup", "login"]
     for _ in range(num_records):

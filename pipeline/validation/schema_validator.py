@@ -8,8 +8,11 @@ and invalid partitions with per-row error reasons.
 
 import pandas as pd
 import re
+import json
 from datetime import datetime
 import uuid
+
+from common.time_utils import parse_utc_mixed
 
 
 class SchemaValidator:
@@ -72,19 +75,27 @@ class SchemaValidator:
         # error column) so they are not mistaken for extra schema fields
         extra_fields = actual_fields - self.expected_fields - {"_raw_json", "_error_reason"}
         if extra_fields:
-            # Rows carrying any extra-field value violate the strict
-            # contract: quarantine them (strict mode rejects unknown fields)
-            extra_mask = df[list(extra_fields)].notna().any(axis=1)
-            # A column of entirely-null extras still proves the unknown keys
-            # were present in the input (row-level null vs missing key is
-            # indistinguishable after read_json); treat it as a contract
-            # breach too (round-2 QC #3)
+            # Strict mode: reject rows whose ORIGINAL record carries any
+            # undeclared key. Row-level key presence is judged from the
+            # preserved raw JSON when available — a null extra value and a
+            # missing key are indistinguishable after pandas read_json, so
+            # column-level notna() is only a fallback (dev-review: batch-
+            # dependent judging). Fallback used by unit tests without _raw_json.
+            if "_raw_json" in df.columns:
+                def _has_extra_key(raw: str) -> bool:
+                    try:
+                        return bool(set(json.loads(raw)) & extra_fields)
+                    except Exception:
+                        return False
+                extra_mask = df["_raw_json"].map(_has_extra_key).astype(bool)
+            else:
+                extra_mask = df[list(extra_fields)].notna().any(axis=1)
             if not extra_mask.any():
                 invalid_mask = invalid_mask | True
-                df["_error_reason"] = df["_error_reason"] + f" Extra fields (null values): {extra_fields};"
+                df["_error_reason"] = df["_error_reason"] + f" Extra fields (present in input): {extra_fields};"
             else:
                 invalid_mask = invalid_mask | extra_mask
-                df.loc[extra_mask, "_error_reason"] = df.loc[extra_mask, "_error_reason"].fillna("") + f" Extra fields: {extra_fields}"
+                df.loc[extra_mask, "_error_reason"] = df.loc[extra_mask, "_error_reason"].fillna("") + f" Extra fields: {extra_fields};"
             # Drop extra field columns (keep only standard fields + _raw_json)
             df = df.drop(columns=list(extra_fields))
 
@@ -164,13 +175,8 @@ class SchemaValidator:
                 # Attempt to parse as datetime and check parseability
                 # Back up the original string first, in case parsing fails
                 df[f"_raw_{field}"] = df[field]  # backup original value
-                try:
-                    # format="mixed": a column may legitimately mix timezones
-                    # / precisions; without it pandas parses only the first
-                    # format and NaTs the rest (round-2 QC #5)
-                    dt_series = pd.to_datetime(df[field], utc=True, errors="coerce", format="mixed")
-                except:
-                    dt_series = pd.Series([pd.NaT] * len(df), index=df.index)
+                # Shared parsing policy: mixed formats tolerated, no raise
+                dt_series = parse_utc_mixed(df[field])
                 # Rows where parsing failed (original non-null but result NaT)
                 failed_parse = df[field].notna() & dt_series.isna()
                 if failed_parse.any():

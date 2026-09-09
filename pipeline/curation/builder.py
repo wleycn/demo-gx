@@ -82,6 +82,6 @@ class GoldBuilder:
             pandas.DataFrame: A denormalized wide table containing all
             fact and dimension columns.
         """
-        wide = fact_df.merge(dims["dim_customer"], on="customer_id", how="left")
-        wide = wide.merge(dims["dim_event_type"], on="event_type", how="left")
+        wide = fact_df.merge(dims["dim_customer"], on="customer_id", how="left", validate="many_to_one")
+        wide = wide.merge(dims["dim_event_type"], on="event_type", how="left", validate="many_to_one")
         return wide

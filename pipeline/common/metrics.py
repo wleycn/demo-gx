@@ -5,7 +5,7 @@ and timing information, then persists them to a JSON file.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -24,7 +24,7 @@ class MetricsCollector:
         when :meth:`save` is called.
         """
         self.metrics = {
-            "start_time": datetime.utcnow().isoformat(),
+            "start_time": datetime.now(timezone.utc).isoformat(),
             "input_rows": 0,
             "valid_rows": 0,
             "invalid_rows": 0,
@@ -74,7 +74,7 @@ class MetricsCollector:
         Args:
             output_path (str): Path to the output JSON file.
         """
-        self.metrics["end_time"] = datetime.utcnow().isoformat()
+        self.metrics["end_time"] = datetime.now(timezone.utc).isoformat()
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
             json.dump(self.metrics, f, indent=2)
