@@ -62,6 +62,20 @@ def main():
         write_bronze(raw_df, bronze_base)
         metrics.increment("bronze_rows", len(raw_df))
 
+        # 1c. Optional event-date backfill scope: when --event-date is given,
+        #     process only rows whose event_timestamp falls on that date
+        #     (safe backfill per data-design §4). Bronze above always keeps
+        #     the full arriving batch for replay.
+        if args.event_date:
+            target_date = pd.to_datetime(args.event_date).date()
+            evt_date = pd.to_datetime(raw_df["event_timestamp"], utc=True, errors="coerce").dt.date
+            raw_df = raw_df[evt_date == target_date]
+            logger.info(f"--event-date {args.event_date}: processing {len(raw_df)} scoped rows")
+            if raw_df.empty:
+                logger.warning(f"No rows with event_date={args.event_date}, stopping.")
+                metrics.save(config["metrics"]["output_file"])
+                return
+
         # 2. Validate schema
         logger.info("Validating schema...")
         schema_cfg = load_schema()
@@ -74,7 +88,24 @@ def main():
         if not invalid_df.empty:
             errors_path = Path(config["storage"]["base_path"]) / config["storage"]["errors_subpath"] / "bad_schema"
             errors_path.mkdir(parents=True, exist_ok=True)
-            invalid_df.to_json(errors_path / f"{pd.Timestamp.now('UTC').isoformat()}_errors.json", orient="records", lines=True, date_format="iso")
+            # Envelope per data-design §3.4: original_json / error_type /
+            # error_details / ingestion_timestamp. The coarse error_type is
+            # derived from the validator's per-rule error_reason.
+            def _classify(reason: str) -> str:
+                type_hints = ("not numeric", "not string", "parse failed")
+                return "type_coercion_failed" if any(h in reason for h in type_hints) else "schema_mismatch"
+            now_ts = pd.Timestamp.now("UTC").isoformat()
+            if "_raw_json" in invalid_df.columns:
+                original = invalid_df["_raw_json"].astype(str)
+            else:
+                original = invalid_df.apply(lambda r: r.to_json(), axis=1)
+            envelope = pd.DataFrame({
+                "original_json": original,
+                "error_type": invalid_df["error_reason"].map(_classify),
+                "error_details": invalid_df["error_reason"].str.strip(),
+                "ingestion_timestamp": now_ts,
+            })
+            envelope.to_json(errors_path / f"{now_ts}_errors.json", orient="records", lines=True, force_ascii=False)
             logger.warning(f"Invalid records written to {errors_path}")
 
         if valid_df.empty:
@@ -103,6 +134,9 @@ def main():
                 duplicates_df.to_csv(f, index=False, header=False)
             logger.info(f"Duplicates logged to {dup_log}")
         metrics.increment("silver_rows", len(deduped_df))
+        # data-design §3.2: _processed_timestamp is added automatically at
+        # write time (pipeline processing timestamp, UTC)
+        deduped_df["_processed_timestamp"] = pd.Timestamp.now(tz="UTC")
 
         # 5. Write Silver layer
         silver_path = Path(config["storage"]["base_path"]) / config["storage"]["silver_subpath"]

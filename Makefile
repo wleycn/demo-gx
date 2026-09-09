@@ -24,6 +24,6 @@ run:
 test:
 	$(PYTHON) -m pytest tests/ -v
 
-## Remove all run artifacts (data/, logs/, metrics.json, sample_data.json)
+## Remove all run artifacts (data/, test/data/, logs/, metrics.json, sample_data.json)
 clean:
-	rm -rf data logs metrics.json sample_data.json
+	rm -rf data test/data logs metrics.json sample_data.json

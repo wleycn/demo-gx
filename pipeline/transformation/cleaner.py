@@ -30,8 +30,13 @@ class DataCleaner:
         """
         for col in ["event_timestamp", "ingestion_timestamp"]:
             if col in df.columns:
-                # Back up the original string value
-                df[f"_raw_{col}"] = df[col].astype(str)
+                # Back up the original string value only if the validator has
+                # not already preserved it (the validator backs up the raw
+                # pre-parse value; overwriting here would replace the raw
+                # string with the normalized datetime string)
+                raw_col = f"_raw_{col}"
+                if raw_col not in df.columns:
+                    df[raw_col] = df[col].astype(str)
                 try:
                     dt_series = pd.to_datetime(df[col], utc=True, errors="coerce")
                 except:

@@ -65,20 +65,22 @@ class SchemaValidator:
         # Initialize error-reason column (always present to avoid downstream
         # read/write errors on a non-existent column)
         df["_error_reason"] = ""
+        invalid_mask = pd.Series(False, index=df.index)
         # 1. Check for extra (unknown) fields
         actual_fields = set(df.columns)
         # Exclude internal columns (_raw_json audit column, _error_reason
         # error column) so they are not mistaken for extra schema fields
         extra_fields = actual_fields - self.expected_fields - {"_raw_json", "_error_reason"}
         if extra_fields:
-            # Mark rows where any extra field has a non-null value
+            # Rows carrying any extra-field value violate the strict
+            # contract: quarantine them (strict mode rejects unknown fields)
             extra_mask = df[list(extra_fields)].notna().any(axis=1)
+            invalid_mask = invalid_mask | extra_mask
             df.loc[extra_mask, "_error_reason"] = df.loc[extra_mask, "_error_reason"].fillna("") + f" Extra fields: {extra_fields}"
             # Drop extra field columns (keep only standard fields + _raw_json)
             df = df.drop(columns=list(extra_fields))
 
         # 2. Per-field validation
-        invalid_mask = pd.Series(False, index=df.index)
         for field, rules in self.field_rules.items():
             if field not in df.columns:
                 # Missing required field
@@ -116,17 +118,19 @@ class SchemaValidator:
                     invalid_mask = invalid_mask | not_in_enum
                     df.loc[not_in_enum, "_error_reason"] = df.loc[not_in_enum, "_error_reason"].fillna("") + f" Field {field} not in enum;"
             elif expected_type == "number":
-                # Check whether the column is numeric
+                # Coerce to numeric without raising: unconvertible values
+                # become NaN and are quarantined row-by-row below (a failed
+                # coercion must never crash the whole batch).
                 if not pd.api.types.is_numeric_dtype(series):
-                    # Attempt conversion
-                    try:
-                        df[field] = pd.to_numeric(series)
-                    except:
-                        invalid_mask = invalid_mask | True
-                        df.loc[series.index, "_error_reason"] = df.loc[series.index, "_error_reason"].fillna("") + f" Field {field} not numeric;"
-                # Minimum value
+                    df[field] = pd.to_numeric(df[field], errors="coerce")
+                # Rows that were originally non-null but failed coercion
+                non_numeric = df[field].isna() & series.notna()
+                if non_numeric.any():
+                    invalid_mask = invalid_mask | non_numeric
+                    df.loc[non_numeric, "_error_reason"] = df.loc[non_numeric, "_error_reason"].fillna("") + f" Field {field} not numeric;"
+                # Minimum value (column is numeric now, so NaN comparisons are safe)
                 if "minimum" in rules:
-                    below_min = df[field] < rules["minimum"]
+                    below_min = df[field].notna() & (df[field] < rules["minimum"])
                     invalid_mask = invalid_mask | below_min
                     df.loc[below_min, "_error_reason"] = df.loc[below_min, "_error_reason"].fillna("") + f" Field {field} below minimum;"
             elif expected_type == "timestamp":
