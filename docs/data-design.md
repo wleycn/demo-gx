@@ -47,7 +47,7 @@ The diagram below shows the complete path from input to output, including the ha
 │ (JSON/CSV/  │
 │ Parquet)    │
 └──────┬──────┘
-│ ingestion.read()
+│ ingestion.read_input()
 ▼
 ┌─────────────────────┐
 │ Append raw_json col │ ← preserve original row for audit
@@ -55,7 +55,7 @@ The diagram below shows the complete path from input to output, including the ha
 │
 ▼
 ┌─────────────────────────────────┐
-│ validation.validate_schema()    │ ← strictly validate 8 required fields, reject extra fields
+│ SchemaValidator.validate()    │ ← strictly validate 8 required fields, reject extra fields
 └──────────┬──────────┬───────────┘
 │ │
 Pass │ │ Fail
@@ -67,14 +67,14 @@ Pass │ │ Fail
 │ └─────────────────────┘
 ▼
 ┌─────────────────────────────────┐
-│ transformation.clean()          │ ← timestamp UTC standardization, currency normalization
+│ DataCleaner (timestamps/currency/amount)          │ ← timestamp UTC standardization, currency normalization
 │ Generate raw* cols (if type     │ ← set validation_status
 │ conversion fails)               │
 └──────────┬──────────────────────┘
 │
 ▼
 ┌─────────────────────────────────┐
-│ transformation.deduplicate()    │ ← deduplicate by event_id, keep latest ingestion_timestamp
+│ Deduplicator.deduplicate()    │ ← deduplicate by event_id, keep latest ingestion_timestamp
 │ Duplicate records written to    │
 │ duplicates.log                  │
 └──────────┬──────────────────────┘
@@ -99,6 +99,10 @@ Pass │ │ Fail
 └─────────────────┘ └──────────────┘ └──────────────────┘
 ```
 
+
+> Diagram function names are conceptual abbreviations — the real APIs are
+> `read_input` / `write_bronze`, `SchemaValidator.validate`, `DataCleaner.*`,
+> `Deduplicator.deduplicate`, `GoldBuilder.*` (see §3 and module-design §1).
 
 **Key branch descriptions**:
 
@@ -140,8 +144,9 @@ date derived from `ingestion_timestamp`) — see the layout in §1.
 | `currency`            | string | Currency code (original)                 | May be invalid (e.g. `XXX`) — not yet normalized      |
 | `ingestion_timestamp` | string | Ingestion time (ISO-8601, raw)           | Source of the `dt` partition key                      |
 
-> Values are stored **as ingested**; the `dt` partition is derived from the
-> first 10 characters of `ingestion_timestamp`. Contrast with the Iceberg
+> Values are stored **as ingested**; the `dt` partition is the UTC date the
+> `ingestion_timestamp` parses to (rows whose timestamp is missing or
+> unparseable fall back to the run date). Contrast with the Iceberg
 > production shape in §6.1.
 
 ---
@@ -164,9 +169,9 @@ date derived from `ingestion_timestamp`) — see the layout in §1.
 | `_raw_json`           | `string`              | Full original record as JSON (audit)               | Added by `reader.read_input`; carried for row-level replay        |
 | `_raw_event_timestamp`| `string`              | Original raw `event_timestamp` string              | Backed up by the validator before parse; never overwritten        |
 | `_raw_ingestion_timestamp`| `string`           | Original raw `ingestion_timestamp` string          | Backed up by the validator before parse; never overwritten        |
-| `_raw_amount`         | `string`              | Backup of the original amount value                | Written by the cleaner on every row (pre-coercion value)          |
+| `_raw_amount`         | `double`              | Backup of the amount after the validator's numeric coercion (pre-cleaner value; NOT the original input string — non-numeric amounts never reach Silver) | Written by the cleaner on every row                                                    |
 | `_is_invalid_currency`| `boolean`             | Whether currency was corrected                    | `true` means original value was invalid, changed to `USD`     |
-| `_validation_status`  | `string`              | Validation status                                 | `'passed'` or `'type_mismatch'`                               |
+| `_validation_status`  | `string`              | Validation status                                 | Always `'passed'` in the current implementation (`type_mismatch` is a reserved value; the flag-and-pass yellow path is not enabled) |
 | `_processed_timestamp`| `timestamp(us, UTC)`  | Pipeline processing time                          | Automatically added at write time                             |
 
 ---
@@ -215,10 +220,18 @@ Each error file uses **JSON Lines** format, one error object per line, containin
 
 ## 4. Data Freshness and Reprocessing Mechanism
 
-- **Batch window**: The pipeline is designed to run once daily, processing the previous day's (UTC) `event_timestamp` data by default. A specific historical date can be specified via the `--event-date YYYY-MM-DD` CLI argument for flexible backfill.
-- **Idempotency guarantee**: Silver and Gold layer writes use **partition overwrite** mode (`mode='overwrite'`). Re-running the same date fully overwrites that partition, ensuring consistent results without duplicate data.
-- **Late data strategy**: If a record's `event_timestamp` belongs to a past date (e.g. data arriving 3 days late), the pipeline writes it to the corresponding historical partition without discarding it. This behavior relies on the partition overwrite mechanism, and the Bronze layer retains the original JSON for replay at any time.
-- **Safe backfill**: By specifying `--event-date`, only the data for a specific date is reprocessed without affecting other partitions, enabling precise remediation.
+- **Batch window**: The pipeline processes **the full input batch** and
+  distributes rows to Silver partitions by their `event_timestamp` date —
+  there is no default "previous day" filter. `--event-date YYYY-MM-DD` is the
+  **only** single-day scoping mechanism (a row whose timestamp does not parse
+  is kept in scope so the validator can quarantine it, not silently dropped).
+- **Idempotency guarantee**: Silver and Gold writes are **file-level
+  idempotent overwrites** (each date partition's `data.parquet` is rewritten
+  per run; semantics match partition-overwrite for same-batch re-runs).
+  Empty partitions from earlier batches are not pruned — a full clean re-run
+  (`make clean`) removes all artifacts.
+- **Late data strategy**: If a record's `event_timestamp` belongs to a past date (e.g. data arriving 3 days late), the pipeline writes it to the corresponding historical partition without discarding it. This behavior relies on the overwrite mechanism, and the Bronze layer retains the original JSON for replay at any time.
+- **Safe backfill**: By specifying `--event-date`, only the data for a specific date is reprocessed; Bronze archives the full arriving batch and Gold is always rebuilt from the full on-disk Silver snapshot, so backfilling one date never disturbs other partitions or shrinks the dimension tables.
 
 ---
 
@@ -292,7 +305,7 @@ CREATE TABLE IF NOT EXISTS silver.events (
     currency            STRING,
     ingestion_timestamp TIMESTAMP,
     event_date          DATE,
-    _validation_status  STRING,  -- 'ok' / 'type_mismatch'
+    _validation_status  STRING,  -- 'passed' (type_mismatch reserved, yellow path disabled)
     _raw_amount         STRING   -- original value kept on coercion failure
 )
 USING iceberg

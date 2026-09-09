@@ -9,10 +9,10 @@ without `make`.
 | # | Command | What it does |
 |---|---------|--------------|
 | 1 | `make setup` | First run only: create `.venv` and install dependencies |
-| 2 | `make data` | Generate `sample_data.json` (106 records incl. injected anomalies) |
+| 2 | `make data` | Generate `sample_data.json` (107 records incl. injected anomalies) |
 | 3 | `make run` | Run the pipeline (default env `dev`; override: `ENV=test make run`) |
 | 4 | `make test` | Run the pytest suite |
-| 5 | `make clean` | Remove run artifacts (`data/`, `logs/`, `metrics.json`, `sample_data.json`) for a clean re-run |
+| 5 | `make clean` | Remove run artifacts (`data/`, `test/data/`, `data_prod/`, `logs/`, `metrics.json`, `sample_data.json`) for a clean re-run |
 
 Manual equivalents (no `make`):
 

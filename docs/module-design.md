@@ -43,10 +43,12 @@
 - **Output**: Cleaned DataFrame with additional flag columns (e.g. `_is_invalid_currency`).
 
 ### 2.4 `transformation/deduplicator.py`
-- **Description**: Deduplicates by `event_id`. When duplicate IDs appear, the record with the **latest** `ingestion_timestamp` is retained. On an exact tie (identical `ingestion_timestamp`) the **last-occurring row** in the input file wins (keep-last); no extra tiebreaker is defined.
+- **Description**: Deduplicates by `event_id`. When duplicate IDs appear, the record with the **latest** `ingestion_timestamp` is retained. On an exact tie (identical `ingestion_timestamp`) the **last-occurring row** in the input file wins (keep-last; the sort is stable); no extra tiebreaker is defined.
 - **Input**: Cleaned DataFrame.
-- **Output**: Deduplicated DataFrame.
-- **Side effect**: Superseded duplicate records are written to `data/errors/duplicates.log` (via the `storage.errors_subpath` config) for post-hoc audit.
+- **Output**: A pair `(deduplicated_df, duplicates_df)` — the deduplicated rows
+  and the superseded duplicates for audit logging. The module itself performs
+  no I/O; cli.py (see §2.7) writes the duplicates to
+  `data/errors/duplicates.log`.
 
 ### 2.5 `curation/builder.py` (Gold Layer Construction)
 - **Description**: Aggregates Silver-layer detail data into analysis-oriented data products.
@@ -69,7 +71,8 @@
   2b. Call `ingestion.write_bronze` to archive the full arriving batch (Bronze landing zone).
   2c. If `--event-date` is given, scope processing to rows whose `event_timestamp` falls on that date (safe backfill).
   3. Call `SchemaValidator.validate` to split valid/invalid data (invalid → `errors/bad_schema/`).
-  4. Call `DataCleaner` and `Deduplicator` to process valid data.
+  4. Call `DataCleaner` and `Deduplicator` to process valid data; cli.py
+     writes the deduplicator's superseded rows to `data/errors/duplicates.log`.
   5. Write to Silver layer (partitioned by `event_date`, Parquet format; `_processed_timestamp` added at write time).
   6. Call `GoldBuilder` to generate Gold-layer data and write to the corresponding directory.
   7. Save `metrics.json` (row counts; file location from `metrics.output_file` config).

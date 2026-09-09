@@ -24,6 +24,7 @@ def generate_sample_data(num_records=100, output_path="sample_data.json"):
     3. A record with an invalid ``source_system``.
     4. A record with a future ``event_timestamp``.
     5. Two records sharing a duplicate ``event_id``.
+    6. A record with a non-numeric ``amount`` (type-coercion failure).
 
     Args:
         num_records (int): Number of valid random records to generate.
@@ -62,6 +63,8 @@ def generate_sample_data(num_records=100, output_path="sample_data.json"):
     dup_id = str(uuid.uuid4())
     records.append({"event_id": dup_id, "source_system": "web", "customer_id": "cust_555", "event_type": "signup", "event_timestamp": (now - timedelta(hours=1)).isoformat(), "amount": 0, "currency": "USD", "ingestion_timestamp": now.isoformat()})
     records.append({"event_id": dup_id, "source_system": "web", "customer_id": "cust_555", "event_type": "signup", "event_timestamp": (now - timedelta(hours=2)).isoformat(), "amount": 0, "currency": "USD", "ingestion_timestamp": (now - timedelta(hours=1)).isoformat()})
+    # 6. Non-numeric amount (exercises error_type=type_coercion_failed)
+    records.append({"event_id": str(uuid.uuid4()), "source_system": "api", "customer_id": "cust_444", "event_type": "purchase", "event_timestamp": now.isoformat(), "amount": "not_a_number", "currency": "USD", "ingestion_timestamp": now.isoformat()})
 
     with open(output_path, "w") as f:
         for rec in records:

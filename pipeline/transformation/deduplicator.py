@@ -33,8 +33,10 @@ class Deduplicator:
         # Ensure ingestion_timestamp is a datetime column
         if not pd.api.types.is_datetime64_any_dtype(df["ingestion_timestamp"]):
             df["ingestion_timestamp"] = pd.to_datetime(df["ingestion_timestamp"], utc=True, errors="coerce")
-        # Sort by ingestion_timestamp so the last row per event_id is the newest
-        df_sorted = df.sort_values("ingestion_timestamp")
+        # Sort by ingestion_timestamp so the last row per event_id is the newest.
+        # Stable sort: on an exact timestamp tie the last-occurring input row
+        # wins (documented keep-last semantics, round-2 writer QC #7)
+        df_sorted = df.sort_values("ingestion_timestamp", kind="stable")
         # Mark duplicates (keep the last occurrence)
         duplicated_mask = df_sorted.duplicated(subset=["event_id"], keep="last")
         duplicates = df_sorted[duplicated_mask].copy()

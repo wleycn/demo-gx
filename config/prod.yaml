@@ -1,5 +1,5 @@
 storage:
-  base_path: "./data"
+  base_path: "./data_prod"
   bronze_subpath: "bronze"
   silver_subpath: "silver"
   gold_subpath: "gold"

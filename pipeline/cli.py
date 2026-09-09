@@ -68,8 +68,13 @@ def main():
         #     the full arriving batch for replay.
         if args.event_date:
             target_date = pd.to_datetime(args.event_date).date()
-            evt_date = pd.to_datetime(raw_df["event_timestamp"], utc=True, errors="coerce").dt.date
-            raw_df = raw_df[evt_date == target_date]
+            # format="mixed" matches the validator so mixed-format columns are
+            # scoped by their real date, not silently NaT-excluded
+            evt_date = pd.to_datetime(raw_df["event_timestamp"], utc=True, errors="coerce", format="mixed").dt.date
+            # Rows whose timestamp does not parse have no event date: keep
+            # them so the validator quarantines them instead of dropping them
+            # silently outside the scope (round-2 writer QC #10)
+            raw_df = raw_df[(evt_date == target_date) | evt_date.isna()]
             logger.info(f"--event-date {args.event_date}: processing {len(raw_df)} scoped rows")
             if raw_df.empty:
                 logger.warning(f"No rows with event_date={args.event_date}, stopping.")
