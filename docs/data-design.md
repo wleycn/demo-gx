@@ -27,7 +27,9 @@ data/
 └── errors/ # Anomalous data quarantine area
 ├── bad_schema/ # Missing fields/extra fields/format errors
 │ └── {timestamp}_errors.json
-├── type_mismatch/ # Type conversion failures (with _raw columns)
+├── type_mismatch/ # (Reserved) dedicated type-conversion quarantine;
+│   #   currently type failures are filed under bad_schema/ with
+│   #   error_type=type_coercion_failed (see §3.4)
 │ └── {timestamp}_errors.json
 └── duplicates.log # Deduplication record log (plain text, appended)
 ```
@@ -101,14 +103,50 @@ Pass │ │ Fail
 **Key branch descriptions**:
 
 - **Bad data flow (red path)**: During the `validation` stage, if a record is missing required fields, has a type mismatch, or contains extra fields, it is quarantined to `errors/bad_schema/` with an `error_reason` column attached. The pipeline **continues processing** the remaining valid data without interruption.
-- **Type change flow (yellow path)**: During the `clean` stage, if a numeric field such as `amount` cannot be converted to a number, the original value is preserved in the `_raw_amount` column and `_validation_status` is set to `'type_mismatch'`. Such records still enter Silver and trigger a log alert.
+- **Type change flow**: Type/format violations (non-numeric `amount`,
+  timestamp parse failures) are **quarantined at the `validation` stage**
+  together with schema violations; they do not reach Silver. The
+  validator's `error_reason` distinguishes them
+  (`error_type=type_coercion_failed`, see §3.4). A separate "flag and pass
+  to Silver" yellow path was considered in the design but is not enabled:
+  the single-machine demo chooses fail-safe isolation over carrying
+  suspect rows downstream.
 - **Deduplication flow**: For duplicate `event_id` values, only the record with the latest `ingestion_timestamp` is kept; the rest are written to `duplicates.log` (including original values and duplicate timestamps) for post-hoc review.
 
 ---
 
 ## 3. Data Structure Definitions (Precise Schema)
 
-### 3.1 Silver Layer (Cleaned Parquet Schema)
+### 3.1 Bronze Layer (Raw JSON-Lines Schema)
+
+**Storage**: one `events.json` per partition — JSON Lines, one raw event per
+line, archived **as ingested**: no cleaning, no quality judgement. Values
+keep their JSON types (pandas round-trips a JSON integer like `10` as
+`10.0`), and rows that are later quarantined at the Silver gate are still
+present here (Bronze is the factual landing zone for replay and
+audit).
+
+**Partition keys**: `source_system` (top-level directory) + `dt` (ingestion
+date derived from `ingestion_timestamp`) — see the layout in §1.
+
+| Field name            | Type   | Description                              | Constraint/Notes                                      |
+| :---                  | :---   | :---                                     | :---                                                  |
+| `event_id`            | string | Unique event ID                          | UUID v4 format                                        |
+| `source_system`       | string | Source system (**partition key**)        | Any raw value — no enum check at this layer           |
+| `customer_id`         | string | Customer ID                              | —                                                     |
+| `event_type`          | string | Event type                               | —                                                     |
+| `event_timestamp`     | string | Event occurrence time (ISO-8601, raw)    | Kept as the original string                           |
+| `amount`              | number | Amount (original)                        | May be invalid (e.g. negative) — not yet validated    |
+| `currency`            | string | Currency code (original)                 | May be invalid (e.g. `XXX`) — not yet normalized      |
+| `ingestion_timestamp` | string | Ingestion time (ISO-8601, raw)           | Source of the `dt` partition key                      |
+
+> Values are stored **as ingested**; the `dt` partition is derived from the
+> first 10 characters of `ingestion_timestamp`. Contrast with the Iceberg
+> production shape in §6.1.
+
+---
+
+### 3.2 Silver Layer (Cleaned Parquet Schema)
 
 **Partition key**: `event_date` (the date extracted from `event_timestamp`, typed as `date`)
 
@@ -123,14 +161,17 @@ Pass │ │ Fail
 | `currency`            | `string`              | Currency code                                     | ISO 4217 three-letter code; invalid values corrected to `USD` |
 | `ingestion_timestamp` | `timestamp(us, UTC)`  | Ingestion time (from source system or processing) | Must be ≤ current time                                        |
 | `event_date`          | `date`                | **Partition column**                              | Derived from `event_timestamp`                                |
-| `_raw_amount`         | `string`              | (Optional) original amount string                 | Populated only when amount type conversion fails              |
+| `_raw_json`           | `string`              | Full original record as JSON (audit)               | Added by `reader.read_input`; carried for row-level replay        |
+| `_raw_event_timestamp`| `string`              | Original raw `event_timestamp` string              | Backed up by the validator before parse; never overwritten        |
+| `_raw_ingestion_timestamp`| `string`           | Original raw `ingestion_timestamp` string          | Backed up by the validator before parse; never overwritten        |
+| `_raw_amount`         | `string`              | Backup of the original amount value                | Written by the cleaner on every row (pre-coercion value)          |
 | `_is_invalid_currency`| `boolean`             | Whether currency was corrected                    | `true` means original value was invalid, changed to `USD`     |
 | `_validation_status`  | `string`              | Validation status                                 | `'passed'` or `'type_mismatch'`                               |
 | `_processed_timestamp`| `timestamp(us, UTC)`  | Pipeline processing time                          | Automatically added at write time                             |
 
 ---
 
-### 3.2 Gold Layer Structure (Star Schema)
+### 3.3 Gold Layer Structure (Star Schema)
 
 #### Fact table: `fact_daily_events`
 | Field name     | Type     | Description                                  |
@@ -159,7 +200,7 @@ Left-joins `fact_daily_events` with `dim_customer` and `dim_event_type`, contain
 
 ---
 
-### 3.3 Error Record Schema (`errors/` directory)
+### 3.4 Error Record Schema (`errors/` directory)
 
 Each error file uses **JSON Lines** format, one error object per line, containing the following fields:
 
@@ -184,7 +225,11 @@ Each error file uses **JSON Lines** format, one error object per line, containin
 ## 5. Lineage and Observability (Design Highlights)
 
 - **Lineage tracking**: The path of each record from Bronze (raw JSON) to Silver (Parquet) to Gold (aggregation table) is traceable via `_processed_timestamp` and partition keys. OpenLineage can be integrated in the future for finer-grained field-level lineage.
-- **Run metrics**: At the end of each run, `logs/metrics_{timestamp}.json` is output with total input rows, validation pass count, validation fail count, deduplication removal count, and per-stage durations, for monitoring and SLA evaluation.
+- **Run metrics**: At the end of each run a `metrics.json` file (location
+  from the `metrics.output_file` config) is output with total input rows,
+  bronze rows, validation pass/fail counts, duplicates removed, and
+  Silver/Gold row counts plus start/end times. Per-stage durations are not
+  yet collected.
 - **Data freshness monitoring**: In the orchestration layer (e.g. Airflow), a sensor can be configured to check whether the latest Silver partition's `event_date` matches the current date; if the delay exceeds a threshold, an alert is triggered.
 
 ---
@@ -220,7 +265,7 @@ CREATE TABLE IF NOT EXISTS bronze.events (
     _raw_json           STRING   -- full original record for replay/audit
 )
 USING iceberg
-PARTITIONED BY (days(ingestion_timestamp))
+PARTITIONED BY (source_system, days(ingestion_timestamp))
 TBLPROPERTIES (
     'format-version' = '2',
     'write.format.default' = 'parquet',

@@ -49,46 +49,30 @@ See the `docs/` directory for details.
 - Use Airflow for orchestration and scheduling.
 - Add OpenLineage for lineage tracking.
 
----
-All code and configuration files are now provided. Save the above content
-to the corresponding files. Ensure the directory structure is as follows:
+## Repository Layout
 
 ```text
-project_root/
-├── pipeline/
-│   ├── __init__.py
-│   ├── cli.py
-│   ├── ingestion/
-│   │   ├── __init__.py
-│   │   └── reader.py
-│   ├── validation/
-│   │   ├── __init__.py
-│   │   └── schema_validator.py
-│   ├── transformation/
-│   │   ├── __init__.py
-│   │   ├── cleaner.py
-│   │   └── deduplicator.py
-│   ├── curation/
-│   │   ├── __init__.py
-│   │   └── builder.py
-│   └── common/
-│       ├── __init__.py
-│       ├── config.py
-│       ├── logger.py
-│       └── metrics.py
-├── config/
-│   ├── dev.yaml
-│   ├── test.yaml
-│   ├── prod.yaml
-│   └── schema.yaml
-├── tests/
-│   ├── __init__.py
-│   └── test_validation.py
-├── scripts/
-│   └── generate_sample_data.py
+demo-gx/
+├── pipeline/                 # Python packages (namespace packages, no __init__.py)
+│   ├── cli.py                # Entry point: orchestrates read → Bronze → validate → clean → dedup → Silver → Gold
+│   ├── ingestion/reader.py   # read_input() + write_bronze()
+│   ├── validation/schema_validator.py   # SchemaValidator (strict contract validation)
+│   ├── transformation/cleaner.py        # DataCleaner
+│   ├── transformation/deduplicator.py   # Deduplicator
+│   ├── curation/builder.py              # GoldBuilder (fact / dims / wide)
+│   └── common/               # config.py, logger.py, metrics.py
+├── config/                   # dev.yaml / test.yaml / prod.yaml + schema.yaml (data contract)
+├── docs/                     # architecture.md, data-design.md, module-design.md, requirements.md, raw/
+├── tests/test_validation.py # pytest contract edge-case suite
+├── scripts/generate_sample_data.py
+├── Makefile                  # setup / data / run / test / clean
+├── .gitlab-ci.yml            # CI skeleton (test → data-quality → promote)
+├── .gitattributes            # line-ending policy (md=CRLF, code=LF)
 ├── requirements.txt
 └── README.md
 ```
+
+Run artifacts (`data/`, `test/data/`, `logs/`, `metrics.json`, `sample_data.json`) are generated and git-ignored.
 
 git repo:
 https://github.com/wleycn/demo-gx

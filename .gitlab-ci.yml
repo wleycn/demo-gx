@@ -1,0 +1,45 @@
+# demo-gx CI pipeline (GitLab CI skeleton)
+# Stages mirror docs/architecture.md §9: test → data-quality → promote.
+# A real deployment would add environment secrets and storage config.
+
+stages:
+  - test
+  - data-quality
+  - deploy
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.pip-cache"
+
+cache:
+  paths:
+    - .pip-cache/
+
+unit-test:
+  stage: test
+  image: python:3.11
+  before_script:
+    - pip install --cache-dir "$PIP_CACHE_DIR" -r requirements.txt
+  script:
+    - python -m pytest tests/ -v
+
+data-quality:
+  stage: data-quality
+  image: python:3.11
+  before_script:
+    - pip install --cache-dir "$PIP_CACHE_DIR" -r requirements.txt
+  script:
+    # End-to-end smoke: generate sample data and run the pipeline (test env)
+    - python scripts/generate_sample_data.py
+    - python pipeline/cli.py --input sample_data.json --env test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+promote:
+  stage: deploy
+  image: python:3.11
+  script:
+    - echo "Controlled promotion gate: dev -> test -> prod (manual trigger)."
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -6,14 +6,15 @@
 
 | Module directory   | Script file        | Core responsibility                                                      | Exposed interface (function/class)                        |
 | :---               | :---               | :---                                                                     | :---                                                      |
-| `ingestion/`       | `reader.py`        | Adapt to different file formats (JSON/CSV/Parquet), read raw data and append lineage columns | `read_input(file_path)`                                   |
-| `validation/`      | `schema_validator.py` | Execute strict data contract validation (field existence, type, enum, format) | `validate_schema(df)`                                     |
-| `transformation/`  | `cleaner.py`       | Data cleaning (timestamp standardization, currency normalization, anomaly flagging) | `standardize_timestamps(df)`, `normalize_currency(df)`    |
-| `transformation/`  | `deduplicator.py`  | Deduplicate by business key (`event_id`), keep the newest record        | `deduplicate(df)`                                         |
-| `curation/`        | `builder.py`       | Build Gold-layer star schema (fact table, dimension tables, wide table) | `build_fact_table(df)`, `build_dimensions(df)`, `build_wide_table(df)` |
-| `common/`          | `config.py`        | Load YAML config files, inject environment variables                    | `load_config(env)`                                        |
-| `common/`          | `logger.py`        | Provide structured logging (JSON format) and audit metric collection    | `get_logger()`, `collect_metrics()`                       |
-| `cli/`             | `cli.py`           | CLI entry point, parse arguments, orchestrate the full pipeline flow    | `main()`                                                  |
+| `ingestion/`       | `reader.py`        | Read raw data (JSON/CSV/Parquet) + append `_raw_json` audit column; archive arriving records to Bronze | `read_input(file_path)`, `write_bronze(raw_df, bronze_base)` |
+| `validation/`      | `schema_validator.py` | Strict data-contract validation (field existence, type, enum, pattern, min, future time) | class `SchemaValidator` → `validate(df) -> (valid_df, invalid_df)` |
+| `transformation/`  | `cleaner.py`       | Cleaning: timestamp UTC standardization, currency normalization, amount numeric check | class `DataCleaner` → `standardize_timestamps(df)`, `normalize_currency(df)`, `check_amount(df)` |
+| `transformation/`  | `deduplicator.py`  | Deduplicate by business key (`event_id`), keep the newest record        | class `Deduplicator` → `deduplicate(df)`                    |
+| `curation/`        | `builder.py`       | Build Gold star schema (fact, dimensions, wide table)                   | class `GoldBuilder` → `build_fact_table(df)`, `build_dimensions(df)`, `build_wide_table(fact_df, dims)` |
+| `common/`          | `config.py`        | Load YAML env configs / schema contract; env-var override               | `load_config(env)`, `load_schema()`                         |
+| `common/`          | `logger.py`        | Structured JSON logging                                                  | `setup_logging(level, log_file)`, `get_logger(name)`        |
+| `common/`          | `metrics.py`       | Run metrics collection and persistence                                   | class `MetricsCollector` → `increment/set/add_error/save`   |
+| `pipeline/`        | `cli.py`           | CLI entry point, parse arguments, orchestrate the full pipeline flow    | `main()`                                                  |
 
 ---
 
@@ -35,18 +36,17 @@
 
 ### 2.3 `transformation/cleaner.py`
 - **Description**:
-  - **Timestamp standardization**: Force-convert `event_timestamp` and `ingestion_timestamp` to UTC timestamps (on parse failure, set to null and flag).
-  - **Currency normalization**: Convert the `currency` field to uppercase; non-standard ISO codes (e.g. not USD, EUR) are auto-corrected to `USD` and an `_is_invalid_currency` boolean flag column is added.
-  - **Numeric check**: Check whether `amount` is ≥ 0; if negative, flag as anomalous (but do not block the write).
+  - **Timestamp standardization**: Force-convert `event_timestamp` and `ingestion_timestamp` to UTC datetimes. The validator has already backed up the raw string into `_raw_<col>`; the cleaner only fills the backup if it is absent.
+  - **Currency normalization**: Upper-case the `currency` field; codes outside the demo whitelist `{USD, EUR, GBP, CNY, JPY}` are corrected to `USD` and flagged via the `_is_invalid_currency` boolean column (the whitelist is a demo subset of ISO-4217).
+  - **Numeric check**: Coerce `amount` to numeric. Negative and non-numeric values are already quarantined by the validator (`minimum` / `not numeric` rules) before this stage.
 - **Input**: Validated DataFrame.
 - **Output**: Cleaned DataFrame with additional flag columns (e.g. `_is_invalid_currency`).
-- **Special handling**: If a type conversion fails (e.g. letters mixed into the amount field), a `_raw_<field>` column is automatically generated to retain the original string, and `_validation_status` is set to `type_mismatch`.
 
 ### 2.4 `transformation/deduplicator.py`
 - **Description**: Deduplicates by `event_id`. When duplicate IDs appear, the record with the **latest** `ingestion_timestamp` is retained.
 - **Input**: Cleaned DataFrame.
 - **Output**: Deduplicated DataFrame.
-- **Side effect**: Superseded duplicate records are written to `logs/duplicates.log` (including duplicate ID and timestamp) for post-hoc audit.
+- **Side effect**: Superseded duplicate records are written to `data/errors/duplicates.log` (via the `storage.errors_subpath` config) for post-hoc audit.
 
 ### 2.5 `curation/builder.py` (Gold Layer Construction)
 - **Description**: Aggregates Silver-layer detail data into analysis-oriented data products.
@@ -62,16 +62,18 @@
 - **Output**: Configuration dict (containing input/output paths, validation thresholds, alert webhook URL, etc.).
 
 ### 2.7 Pipeline Entry `cli.py`
-- **Description**: Parses CLI arguments (`--env` and `--input` file path), calls each module in sequence, forming the complete ETL.
+- **Description**: Parses CLI arguments (`--env`, `--input`, optional `--event-date`), calls each module in sequence, forming the complete ETL.
 - **Execution order (DAG)**:
   1. Load configuration.
-  2. Call `ingestion` to read data.
-  3. Call `validation` to split valid/invalid data.
-  4. Call `cleaner` and `deduplicator` to process valid data.
-  5. Write to Silver layer (partitioned by `event_date`, Parquet format).
-  6. Call `builder` to generate Gold-layer data and write to the corresponding directory.
-  7. Collect and output `metrics.json` (total rows, passed, failed, duration).
-- **Idempotency guarantee**: Both Silver and Gold writes use "overwrite specific partition" mode, ensuring that re-running the same date does not produce duplicate data.
+  2. Call `ingestion.read_input` to read the batch.
+  2b. Call `ingestion.write_bronze` to archive the full arriving batch (Bronze landing zone).
+  2c. If `--event-date` is given, scope processing to rows whose `event_timestamp` falls on that date (safe backfill).
+  3. Call `SchemaValidator.validate` to split valid/invalid data (invalid → `errors/bad_schema/`).
+  4. Call `DataCleaner` and `Deduplicator` to process valid data.
+  5. Write to Silver layer (partitioned by `event_date`, Parquet format; `_processed_timestamp` added at write time).
+  6. Call `GoldBuilder` to generate Gold-layer data and write to the corresponding directory.
+  7. Save `metrics.json` (row counts; file location from `metrics.output_file` config).
+- **Idempotency guarantee**: Bronze/Silver/Gold writes use "overwrite specific partition" mode, ensuring that re-running the same date does not produce duplicate data (a production Bronze would append instead).
 
 ---
 
@@ -83,7 +85,7 @@
   - `storage.base_path`: Data storage root directory (local or S3).
   - `validation.schema_path`: Path to `schema.yaml`.
   - `logging.level`: Log level (INFO/DEBUG).
-  - `alert.slack_webhook`: Alert callback URL (only configured in production).
+  - `alert.slack_webhook`: Alert callback URL — **reserved, not yet wired to any alert consumer** (all envs ship it empty).
 
 ### 3.2 Data Contract (Schema Registry)
 - `config/schema.yaml` explicitly defines fields, types, required flags, enum value whitelists, and regex patterns.
@@ -93,9 +95,9 @@
 
 ## 4. Cross-module Communication Specification
 - **Data carrier**: All modules pass data via **Pandas DataFrame**.
-- **Metadata passing**: Modules can pass lightweight metadata (e.g. processing timestamp, source filename) via the DataFrame's `attrs` attribute, avoiding reliance on global variables.
+- **Metadata passing**: DataFrame `attrs` is a documented option for lightweight metadata (processing timestamp, source filename); the current implementation does not rely on it.
 - **Error passing**: Validation or cleaning modules do not raise exceptions to interrupt the flow; instead, they pass problem data downstream or to the quarantine area via the returned `invalid_df` or flag columns (e.g. `_validation_status`).
 
 ## 5. Test Extension Point Design
 - All module interfaces use DataFrame as input/output, not depending on specific file paths, making unit testing (`pytest`) straightforward.
-- A `test_helpers.py` is provided in `common/` for generating standardized mock data (fixtures), ensuring a reproducible test environment.
+- `tests/test_validation.py` covers the contract edge cases (happy path, missing required field, future timestamp, non-numeric amount, extra field, non-v4 UUID).

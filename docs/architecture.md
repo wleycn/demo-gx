@@ -33,35 +33,38 @@ This pipeline is designed strictly based on the JSON event template provided in 
 | Field              | Type              | Validation Rule                        | Error Handling                           |
 |--------------------|-------------------|----------------------------------------|------------------------------------------|
 | event_id           | string            | UUID v4 format, non-null               | Missing/format error → quarantine to errors/bad_schema/ |
-| source_system      | string            | Enum [web, mobile, api]                | Invalid value → quarantine + alert       |
+| source_system      | string            | Enum [web, mobile, api]                | Invalid value → quarantine (alert reserved, not wired) |
 | customer_id        | string            | Non-null string                        | Missing → quarantine                     |
 | event_type         | string            | Non-null, length ≤ 64                  | Too long/null → quarantine               |
 | event_timestamp    | string (ISO8601)  | Parseable as UTC, ≤ current time       | Parse failure/future time → quarantine   |
 | amount             | number            | ≥ 0, precision ≤ 2 decimal places      | Negative/out of range → quarantine       |
-| currency           | string            | ISO 4217 three-letter code             | Invalid code → default USD + flag        |
+| currency           | string            | Three-letter code (demo whitelist {USD, EUR, GBP, CNY, JPY}; subset of ISO 4217) | Code outside whitelist → default USD + flag        |
 | ingestion_timestamp| string (ISO8601)  | Parseable as UTC, ≤ current time       | Parse failure/future time → quarantine   |
 
 
 ## 4. Data Flow
 
 ```text
-[Input file] → ingestion.read()
+[Input file] → ingestion.read_input()
 ↓
-validation.validate_schema() → failed records written to errors/ and alerted
+ingestion.write_bronze() → archive full arriving batch (Bronze, partitioned by source/dt)
 ↓
-transformation.clean() → fill missing, standardize formats
-transformation.deduplicate() → deduplicate by event_id, keep newest
+validation: SchemaValidator.validate() → valid rows continue; invalid → errors/bad_schema/ (+ alert reserved)
 ↓
-Write to Silver (Parquet) → partition by event_date
+transformation: DataCleaner (timestamps UTC, currency, amount) → Deduplicator.deduplicate() (keep newest)
 ↓
-curation.build_gold() → generate daily aggregation (total amount, event count) and wide table
+Write to Silver (Parquet) → partition by event_date (+ _processed_timestamp)
+↓
+curation: GoldBuilder → daily fact aggregation + dimensions + wide table
 ↓
 Write to Gold (Parquet) → for downstream queries
 ```
 
 ### Schema Evolution Compatibility
 - **New fields**: automatically pass through to Silver/Gold, do not block the pipeline, only marked as "new" in metadata
-- **Type changes**: trigger WARNING log + Slack alert, but preserve original value in `_raw_<field>` column, ensuring downstream is not interrupted
+- **Type changes**: type/format violations are quarantined at validation
+  (e.g. `not numeric`, parse failure); a `WARNING` is logged. Slack alert is
+  **reserved, not wired**.
 - **Field deprecation**: retained for 90 days then removed from Gold layer; Silver layer permanently retains the original field
 
 ## 5. Technology Selection and Trade-offs
@@ -75,8 +78,8 @@ Write to Gold (Parquet) → for downstream queries
 | Output format | Parquet (columnar, high compression, analytics-friendly) | Balances performance and cost                                                       |
 | Config management | YAML (environment-specific)        | Sensitive info injected via environment variables                                   |
 | Testing       | pytest + custom data quality checks    | Meets unit test + data test requirements                                            |
-| Orchestration | Airflow (pseudo-code blueprint provided) | Industry standard, supports dependencies/retry/backfill                            |
-| CI/CD         | GitLab CI (.gitlab-ci.yml skeleton provided) | Required by the assignment                                                          |
+| Orchestration | Airflow (blueprint in module-design §2.7; no runnable DAG in repo) | Industry standard, supports dependencies/retry/backfill                            |
+| CI/CD         | GitLab CI (.gitlab-ci.yml at repo root) | Required by the assignment                                                          |
 
 ### Runtime Environment Constraint (Explicit Design Decision)
 
@@ -91,8 +94,8 @@ single-machine environment without access to a big-data cluster**. That
 constraint is an explicit design decision, not an accident:
 
 - The executable engine is **Pandas on a single machine**, sized for the
-  declared volume assumption (< 10 GB per batch, memory-bounded via chunked
-  reads). The pipeline runs end-to-end locally with `pandas` only.
+  declared volume assumption (< 10 GB per batch). The pipeline runs
+  end-to-end locally with `pandas` only.
 - Module boundaries communicate exclusively through **DataFrame contracts**
   (no global state, no file-path coupling), so the Pandas implementation is a
   faithful stand-in for a Spark implementation — each stage can be
@@ -112,8 +115,8 @@ The Gold layer adopts a Star Schema to support domain data product delivery:
 - **Fact Table**: `fact_daily_events`
   Grain: per day per user per event type; measures: event_count, total_amount, avg_amount
 - **Dimension Tables**:
-  - `dim_customer`: user_id, first_seen_date, lifetime_value_segment
-  - `dim_event_type`: event_type, category, business_owner
+  - `dim_customer`: customer_id, first_seen_date
+  - `dim_event_type`: event_type
 - **Wide Table (Denormalized View)**: `wide_daily_user_events`
   Pre-joined Fact + Dimensions, for direct BI queries, reducing runtime Join overhead
 
@@ -136,7 +139,8 @@ The Gold layer adopts a Star Schema to support domain data product delivery:
   - Silver layer partitioned by `event_date` for query pruning.
   - Gold layer uses aggregation and wide tables to reduce downstream compute cost.
   - Storage lifecycle configured (Bronze retained 30 days, Silver permanent, Gold on-demand).
-  - Single-machine pandas processing controls memory usage (chunked reading of large files).
+  - Single-machine pandas processing keeps the demo runnable within the
+    <10 GB volume assumption.
 
 ## 8. Observability
 
