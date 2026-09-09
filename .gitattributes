@@ -1,0 +1,10 @@
+# Line-ending policy:
+# - Markdown stays CRLF (Windows viewers render correctly)
+# - Code/config files stay LF (cross-platform engineering standard)
+*.md        text eol=crlf
+*.py        text eol=lf
+*.yaml      text eol=lf
+*.ini       text eol=lf
+*.txt       text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
