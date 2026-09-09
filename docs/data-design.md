@@ -238,9 +238,11 @@ Each error file uses **JSON Lines** format, one error object per line, containin
 ## 5. Lineage and Observability (Design Highlights)
 
 - **Lineage tracking**: The path of each record from Bronze (raw JSON) to Silver (Parquet) to Gold (aggregation table) is traceable via `_processed_timestamp` and partition keys. OpenLineage can be integrated in the future for finer-grained field-level lineage.
-- **Run metrics**: At the end of each run a `metrics.json` file (location
-  from the `metrics.output_file` config) is output with total input rows,
-  bronze rows, validation pass/fail counts, duplicates removed, and
+- **Run metrics**: At the end of each run a `metrics.json` file is output
+  under the environment's storage dir (config `metrics.output_file`, resolved
+  relative to `storage.base_path` — dev `data/metrics.json`, test
+  `test/data/metrics.json`, prod `data_prod/metrics.json`) with total input
+  rows, bronze rows, validation pass/fail counts, duplicates removed, and
   Silver/Gold row counts plus start/end times. Per-stage durations are not
   yet collected.
 - **Data freshness monitoring**: In the orchestration layer (e.g. Airflow), a sensor can be configured to check whether the latest Silver partition's `event_date` matches the current date; if the delay exceeds a threshold, an alert is triggered.

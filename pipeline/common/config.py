@@ -38,7 +38,23 @@ def load_config(env: str = "dev") -> dict:
     # e.g. if STORAGE_BASE_PATH is set, override the configured base path
     if os.getenv("STORAGE_BASE_PATH"):
         config["storage"]["base_path"] = os.getenv("STORAGE_BASE_PATH")
+    # Anchor artifact paths (metrics file, log file) under the environment's
+    # storage base path so each env keeps its own artifacts and the repo root
+    # stays clean (dev → data/, test → test/data/, prod → data_prod/).
+    _anchor_to_base(config, "metrics", "output_file")
+    _anchor_to_base(config, "logging", "file")
     return config
+
+
+def _anchor_to_base(config: dict, section: str, key: str) -> None:
+    """Rewrite a relative path in ``config[section][key]`` to live under
+    ``storage.base_path`` (absolute paths pass through unchanged)."""
+    value = config.get(section, {}).get(key)
+    if not value:
+        return
+    path = Path(value)
+    if not path.is_absolute():
+        config[section][key] = str(Path(config["storage"]["base_path"]) / path)
 
 
 def load_schema() -> dict:

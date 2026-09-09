@@ -13,7 +13,7 @@ import random
 from pathlib import Path
 
 
-def generate_sample_data(num_records=100, output_path="sample_data.json"):
+def generate_sample_data(num_records=100, output_path="data/sample_data.json"):
     """Generate sample event records and write them as JSON Lines.
 
     Produces ``num_records`` valid random records, then appends several
@@ -30,7 +30,8 @@ def generate_sample_data(num_records=100, output_path="sample_data.json"):
         num_records (int): Number of valid random records to generate.
             Defaults to 100.
         output_path (str): Path to the output JSON Lines file.  Defaults
-            to ``"sample_data.json"``.
+            to ``"data/sample_data.json"`` (under the git-ignored artifact
+            directory, keeping the repo root clean).
     """
     records = []
     random.seed(42)  # reproducible sample (dev-review: CI smoke must be stable)
@@ -68,6 +69,7 @@ def generate_sample_data(num_records=100, output_path="sample_data.json"):
     # 6. Non-numeric amount (exercises error_type=type_coercion_failed)
     records.append({"event_id": str(uuid.uuid4()), "source_system": "api", "customer_id": "cust_444", "event_type": "purchase", "event_timestamp": now.isoformat(), "amount": "not_a_number", "currency": "USD", "ingestion_timestamp": now.isoformat()})
 
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
         for rec in records:
             f.write(json.dumps(rec) + "\n")

@@ -145,7 +145,7 @@ The Gold layer adopts a Star Schema to support domain data product delivery:
 ## 8. Observability
 
 - Structured logging (JSON format), recording processing time, row count, error count.
-- Output statistics (total rows, passed, failed, deduplicated) to `metrics.json`.
+- Output statistics (total rows, passed, failed, deduplicated) to `metrics.json` under the env's storage base path.
 - Future integration with OpenLineage for lineage tracking.
 
 ## 9. Environment Promotion and CI/CD Adaptation

@@ -9,10 +9,10 @@ without `make`.
 | # | Command | What it does |
 |---|---------|--------------|
 | 1 | `make setup` | First run only: create `.venv` and install dependencies |
-| 2 | `make data` | Generate `sample_data.json` (107 records incl. injected anomalies) |
+| 2 | `make data` | Generate `data/sample_data.json` (107 records incl. injected anomalies) |
 | 3 | `make run` | Run the pipeline (default env `dev`; override: `ENV=test make run`) |
 | 4 | `make test` | Run the pytest suite |
-| 5 | `make clean` | Remove run artifacts (`data/`, `test/data/`, `data_prod/`, `logs/`, `metrics.json`, `sample_data.json`) for a clean re-run |
+| 5 | `make clean` | Remove ALL run artifacts (`data/`, `test/data/`, `data_prod/` — samples/metrics/logs live inside) for a clean re-run |
 
 Manual equivalents (no `make`):
 
@@ -23,7 +23,7 @@ python3 -m venv .venv
 # 2. Generate data
 .venv/bin/python scripts/generate_sample_data.py
 # 3. Run the pipeline
-.venv/bin/python pipeline/cli.py --input sample_data.json --env dev
+.venv/bin/python pipeline/cli.py --input data/sample_data.json --env dev
 # 4. Run tests
 .venv/bin/python -m pytest tests/
 ```
@@ -72,7 +72,8 @@ demo-gx/
 └── README.md
 ```
 
-Run artifacts (`data/`, `test/data/`, `logs/`, `metrics.json`, `sample_data.json`) are generated and git-ignored.
+Run artifacts (sample input, Bronze/Silver/Gold, metrics, logs) live under
+the environment storage dirs (`data/`, `test/data/`, `data_prod/`) and are git-ignored.
 
 git repo:
 https://github.com/wleycn/demo-gx

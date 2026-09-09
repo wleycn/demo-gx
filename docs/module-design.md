@@ -75,7 +75,8 @@
      writes the deduplicator's superseded rows to `data/errors/duplicates.log`.
   5. Write to Silver layer (partitioned by `event_date`, Parquet format; `_processed_timestamp` added at write time).
   6. Call `GoldBuilder` to generate Gold-layer data and write to the corresponding directory.
-  7. Save `metrics.json` (row counts; file location from `metrics.output_file` config).
+  7. Save `metrics.json` (row counts; path = `metrics.output_file` config,
+     resolved under the env's `storage.base_path`).
 - **Idempotency guarantee**: Bronze/Silver/Gold writes use "overwrite specific partition" mode, ensuring that re-running the same date does not produce duplicate data (a production Bronze would append instead).
 
 ---

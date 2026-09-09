@@ -2,7 +2,7 @@
 # Usage: make setup | data | run | test | clean
 
 PYTHON := .venv/bin/python
-INPUT  := sample_data.json
+INPUT  := data/sample_data.json
 ENV    ?= dev
 
 .PHONY: setup data run test clean
@@ -12,7 +12,7 @@ setup:
 	python3 -m venv .venv
 	$(PYTHON) -m pip install -r requirements.txt
 
-## Generate sample input data (sample_data.json)
+## Generate sample input data (data/sample_data.json)
 data:
 	$(PYTHON) scripts/generate_sample_data.py
 
@@ -24,6 +24,7 @@ run: data
 test:
 	$(PYTHON) -m pytest tests/ -v
 
-## Remove all run artifacts (data/, test/data/, data_prod/, logs/, metrics.json, sample_data.json)
+## Remove ALL run artifacts (data/, test/data/, data_prod/ cover samples,
+## metrics, and logs which all live under the env storage dirs)
 clean:
-	rm -rf data test/data data_prod logs metrics.json sample_data.json
+	rm -rf data test/data data_prod
