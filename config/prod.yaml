@@ -1,0 +1,17 @@
+storage:
+  base_path: "./data"
+  bronze_subpath: "bronze"
+  silver_subpath: "silver"
+  gold_subpath: "gold"
+  errors_subpath: "errors"
+
+logging:
+  level: "INFO"
+  file: "logs/pipeline.log"
+
+metrics:
+  output_file: "metrics.json"
+
+alert:
+  slack_webhook: ""  # 留空，仅生产配置
+

@@ -1,0 +1,30 @@
+fields:
+  event_id:
+    type: string
+    required: true
+    pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+  source_system:
+    type: string
+    required: true
+    enum: ["web", "mobile", "api"]
+  customer_id:
+    type: string
+    required: true
+  event_type:
+    type: string
+    required: true
+    max_length: 64
+  event_timestamp:
+    type: timestamp
+    required: true
+  amount:
+    type: number
+    required: true
+    minimum: 0
+  currency:
+    type: string
+    required: true
+    pattern: "^[A-Z]{3}$"
+  ingestion_timestamp:
+    type: timestamp
+    required: true
