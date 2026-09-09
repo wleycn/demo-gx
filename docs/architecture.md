@@ -44,6 +44,7 @@ This pipeline is designed strictly based on the JSON event template provided in 
 
 ## 4. Data Flow
 
+```text
 [Input file] → ingestion.read()
 ↓
 validation.validate_schema() → failed records written to errors/ and alerted
@@ -56,6 +57,7 @@ Write to Silver (Parquet) → partition by event_date
 curation.build_gold() → generate daily aggregation (total amount, event count) and wide table
 ↓
 Write to Gold (Parquet) → for downstream queries
+```
 
 ### Schema Evolution Compatibility
 - **New fields**: automatically pass through to Silver/Gold, do not block the pipeline, only marked as "new" in metadata
@@ -75,6 +77,34 @@ Write to Gold (Parquet) → for downstream queries
 | Testing       | pytest + custom data quality checks    | Meets unit test + data test requirements                                            |
 | Orchestration | Airflow (pseudo-code blueprint provided) | Industry standard, supports dependencies/retry/backfill                            |
 | CI/CD         | GitLab CI (.gitlab-ci.yml skeleton provided) | Required by the assignment                                                          |
+
+### Runtime Environment Constraint (Explicit Design Decision)
+
+The **target production shape** of this pipeline is a big-data execution
+framework (e.g. Spark on a managed cluster) over a Lakehouse table format
+(e.g. Apache Iceberg) — see the Iceberg reference SQL in `docs/data-design.md`
+§6. The source systems, Bronze/Silver/Gold layering, and promotion model are
+all designed against that shape.
+
+This reference implementation is nevertheless **developed and validated in a
+single-machine environment without access to a big-data cluster**. That
+constraint is an explicit design decision, not an accident:
+
+- The executable engine is **Pandas on a single machine**, sized for the
+  declared volume assumption (< 10 GB per batch, memory-bounded via chunked
+  reads). The pipeline runs end-to-end locally with `pandas` only.
+- Module boundaries communicate exclusively through **DataFrame contracts**
+  (no global state, no file-path coupling), so the Pandas implementation is a
+  faithful stand-in for a Spark implementation — each stage can be
+  re-implemented against `pyspark.sql.DataFrame` without re-architecting the
+  pipeline.
+- The migration surface is kept explicit (see §10); Iceberg DDL assets are
+  prepared in `docs/data-design.md` §6 so the target shape is runnable the
+  moment a big-data environment is available.
+
+This mirrors a common production reality: **design and data contracts target
+the big-data shape; local development and demo runs execute on a smaller
+engine.**
 
 ### Dimensional Modeling Strategy
 The Gold layer adopts a Star Schema to support domain data product delivery:

@@ -15,6 +15,10 @@ See the `docs/` directory for details.
 - Uses Pandas for single-machine processing, suitable for <10GB data.
 - Partition overwrite writes ensure idempotency.
 - Strict mode rejects unknown fields to maintain data contracts.
+- Runtime constraint: the target production shape is a big-data framework
+  (Spark + Iceberg); this repo is validated locally on Pandas because no
+  cluster environment is available. Design & Iceberg SQL assets reflect the
+  big-data shape — see docs/architecture.md §5 and docs/data-design.md §6.
 
 ## Production Readiness Improvement Plan
 

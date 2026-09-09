@@ -3,6 +3,7 @@
 ## 1. Physical Data Paths (Storage Layout)
 
 Adopts an **environment-isolated** directory structure. Local development uses `./data` as the root directory; production can map to S3/ADLS (via configuration switching).
+
 ```text
 data/
 ├── bronze/ # Raw JSON archive (immutable)
@@ -37,6 +38,7 @@ data/
 ## 2. Detailed Data Flow (with Exception Branches)
 
 The diagram below shows the complete path from input to output, including the handling flow for bad data and special cases.
+
 ```text
 ┌─────────────┐
 │ Input file  │
@@ -186,3 +188,150 @@ Each error file uses **JSON Lines** format, one error object per line, containin
 - **Data freshness monitoring**: In the orchestration layer (e.g. Airflow), a sensor can be configured to check whether the latest Silver partition's `event_date` matches the current date; if the delay exceeds a threshold, an alert is triggered.
 
 ---
+
+## 6. Production Table Format Reference — Apache Iceberg (SQL Assets)
+
+The Bronze/Silver/Gold layouts in §1 are **directory + file** layouts — what
+the single-machine demo writes today. In the target big-data environment
+(see `docs/architecture.md` §5) the same layers are managed as **Iceberg
+tables**: the data files remain Parquet, but a catalog + metadata layer adds
+ACID transactions, partition evolution, snapshot isolation, and time travel.
+
+The SQL below is prepared as a **production asset**. It is not executable in
+this repository's current environment (it requires Spark + the Iceberg
+runtime + a catalog); it documents the target shape and is ready to run once
+a big-data environment is available. Dialect: Spark SQL + Iceberg.
+
+### 6.1 Bronze — raw archive (append-only, immutable)
+
+```sql
+-- Catalog: HadoopCatalog pointed at a warehouse directory
+CREATE DATABASE IF NOT EXISTS bronze;
+
+CREATE TABLE IF NOT EXISTS bronze.events (
+    event_id            STRING,
+    source_system       STRING,
+    customer_id         STRING,
+    event_type          STRING,
+    event_timestamp     TIMESTAMP,
+    amount              DECIMAL(18,2),
+    currency            STRING,
+    ingestion_timestamp TIMESTAMP,
+    _raw_json           STRING   -- full original record for replay/audit
+)
+USING iceberg
+PARTITIONED BY (days(ingestion_timestamp))
+TBLPROPERTIES (
+    'format-version' = '2',
+    'write.format.default' = 'parquet',
+    'history.expire.max-snapshot-age-ms' = '2592000000'  -- 30-day Bronze retention
+);
+
+-- Append-only ingest (Bronze is immutable: never UPDATE/DELETE here)
+INSERT INTO bronze.events
+SELECT ... FROM source_staging_table;
+```
+
+### 6.2 Silver — cleaned detail (upsert by business key, idempotent refresh)
+
+```sql
+CREATE DATABASE IF NOT EXISTS silver;
+
+CREATE TABLE IF NOT EXISTS silver.events (
+    event_id            STRING,
+    source_system       STRING,
+    customer_id         STRING,
+    event_type          STRING,
+    event_timestamp     TIMESTAMP,
+    amount              DECIMAL(18,2),
+    currency            STRING,
+    ingestion_timestamp TIMESTAMP,
+    event_date          DATE,
+    _validation_status  STRING,  -- 'ok' / 'type_mismatch'
+    _raw_amount         STRING   -- original value kept on coercion failure
+)
+USING iceberg
+PARTITIONED BY (days(event_timestamp))
+TBLPROPERTIES ('format-version' = '2');
+
+-- Deduplicated refresh of one date partition (retry-safe, ACID):
+-- DELETE + INSERT inside one Iceberg transaction
+DELETE FROM silver.events
+WHERE event_date = '2026-09-09';
+
+INSERT INTO silver.events
+SELECT ... FROM bronze.events
+WHERE days(ingestion_timestamp) = DATE '2026-09-09'
+QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY event_id ORDER BY ingestion_timestamp DESC
+) = 1;
+
+-- Alternative for incremental upsert (CDC-style): keep the newest record
+MERGE INTO silver.events t
+USING bronze.events_delta s
+ON t.event_id = s.event_id
+WHEN MATCHED AND s.ingestion_timestamp > t.ingestion_timestamp
+    THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;
+```
+
+### 6.3 Gold — curated star schema (idempotent overwrite per partition)
+
+```sql
+CREATE DATABASE IF NOT EXISTS gold;
+
+CREATE TABLE IF NOT EXISTS gold.fact_daily_events (
+    event_date   DATE,
+    customer_id  STRING,
+    event_type   STRING,
+    event_count  BIGINT,
+    total_amount DECIMAL(18,2),
+    avg_amount   DECIMAL(18,2)
+)
+USING iceberg
+PARTITIONED BY (days(event_date));
+
+-- Partition-overwrite write (equivalent of the demo's idempotent mode)
+INSERT OVERWRITE gold.fact_daily_events
+SELECT event_date, customer_id, event_type,
+       COUNT(*)          AS event_count,
+       SUM(amount)       AS total_amount,
+       AVG(amount)       AS avg_amount
+FROM silver.events
+WHERE event_date = DATE '2026-09-09'
+GROUP BY event_date, customer_id, event_type;
+
+-- Dimension tables (dim_customer, dim_event_type) and the denormalized
+-- wide table follow the same pattern; dims use full-snapshot refresh.
+```
+
+### 6.4 Analytics reads — snapshot isolation and time travel
+
+```sql
+-- Snapshot as of a wall-clock time (consistent point-in-time read)
+SELECT event_type, SUM(total_amount)
+FROM gold.fact_daily_events
+TIMESTAMP AS OF '2026-09-10 00:00:00'
+GROUP BY event_type;
+
+-- Explicit snapshot version
+SELECT * FROM silver.events VERSION AS OF 12345678901234567;
+
+-- Incremental consumption: only new snapshots since the last watermark
+SELECT * FROM silver.events
+WHERE _snapshot_id IN (
+    SELECT snapshot_id FROM silver.events.snapshots
+    WHERE committed_at > TIMESTAMP '2026-09-10 00:00:00'
+);
+```
+
+### 6.5 Mapping to the demo implementation
+
+| Demo (this repo, Pandas)              | Production equivalent (Iceberg/Spark)              |
+| :------------------------------------ | :------------------------------------------------- |
+| `data/bronze/{source}/dt=.../events.json` | `bronze.events` table, append-only, 30-day retention |
+| `data/silver/event_date=.../data.parquet` | `silver.events` table, `DELETE+INSERT` / `MERGE INTO` |
+| `data/gold/fact_daily_events/...`     | `gold.fact_daily_events` table, `INSERT OVERWRITE`  |
+| partition-overwrite (idempotency)     | Iceberg transactions + snapshot isolation           |
+| `_raw_json` audit column              | full Bronze replay via snapshot/time travel         |
+
