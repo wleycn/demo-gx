@@ -43,7 +43,7 @@
 - **Output**: Cleaned DataFrame with additional flag columns (e.g. `_is_invalid_currency`).
 
 ### 2.4 `transformation/deduplicator.py`
-- **Description**: Deduplicates by `event_id`. When duplicate IDs appear, the record with the **latest** `ingestion_timestamp` is retained.
+- **Description**: Deduplicates by `event_id`. When duplicate IDs appear, the record with the **latest** `ingestion_timestamp` is retained. On an exact tie (identical `ingestion_timestamp`) the **last-occurring row** in the input file wins (keep-last); no extra tiebreaker is defined.
 - **Input**: Cleaned DataFrame.
 - **Output**: Deduplicated DataFrame.
 - **Side effect**: Superseded duplicate records are written to `data/errors/duplicates.log` (via the `storage.errors_subpath` config) for post-hoc audit.

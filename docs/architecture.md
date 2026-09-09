@@ -151,7 +151,7 @@ The Gold layer adopts a Star Schema to support domain data product delivery:
 ## 9. Environment Promotion and CI/CD Adaptation
 
 - Switch configuration files via the `--env` parameter (`config/dev.yaml`, `test.yaml`, `prod.yaml`).
-- CI pipeline stages: lint → unit tests → data quality tests → build → deploy to dev, with manual approval before promotion to test/prod.
+- CI pipeline stages (see the `.gitlab-ci.yml` skeleton at the repo root): unit tests → data-quality end-to-end smoke → manual promote gate. Lint and build stages are not yet defined in the skeleton.
 - During deployment, only code and configuration are updated; data storage paths are isolated by environment (e.g. `s3://bucket/dev/silver/`).
 
 

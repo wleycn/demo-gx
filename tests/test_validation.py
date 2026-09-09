@@ -132,3 +132,58 @@ def test_validation_fails_non_v4_uuid(schema_config):
     assert len(valid) == 0
     assert len(invalid) == 1
     assert "pattern mismatch" in invalid.iloc[0]["error_reason"]
+
+
+def test_validation_passes_mixed_timestamp_formats(schema_config):
+    """A column mixing timezones/precisions must parse every row (format='mixed')."""
+    df = pd.DataFrame([
+        _valid_row(event_id="123e4567-e89b-42d3-a456-426614174010",
+                   event_timestamp="2026-01-01T00:00:00Z"),
+        _valid_row(event_id="223e4567-e89b-42d3-a456-426614174011",
+                   event_timestamp="2026-01-01T00:00:00+08:00"),
+        _valid_row(event_id="323e4567-e89b-42d3-a456-426614174012",
+                   event_timestamp="2026-01-01T00:00:00.123456"),
+    ])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(invalid) == 0
+    assert len(valid) == 3
+
+
+def test_validation_fails_amount_too_precise(schema_config):
+    """amount with >2 decimal places violates the max_decimals contract."""
+    df = pd.DataFrame([_valid_row(amount=10.999)])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 0
+    assert len(invalid) == 1
+    assert "decimal places" in invalid.iloc[0]["error_reason"]
+
+
+def test_validation_fails_infinite_amount(schema_config):
+    """An amount that coerces to infinity must be quarantined, not summed."""
+    df = pd.DataFrame([_valid_row(amount="1e309")])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 0
+    assert len(invalid) == 1
+    assert "not finite" in invalid.iloc[0]["error_reason"]
+
+
+def test_validation_fails_extra_null_field(schema_config):
+    """Strict mode: an undeclared key with a null value is still a breach."""
+    df = pd.DataFrame([_valid_row(surprise=None)])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 0
+    assert len(invalid) == 1
+
+
+def test_validation_fails_dict_string_field(schema_config):
+    """A compound (dict) value must not pass as a string via str() repr."""
+    df = pd.DataFrame([_valid_row(customer_id={"$oid": "abc"})])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 0
+    assert len(invalid) == 1
+    assert "not a scalar string" in invalid.iloc[0]["error_reason"]

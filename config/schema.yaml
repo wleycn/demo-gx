@@ -21,6 +21,7 @@ fields:
     type: number
     required: true
     minimum: 0
+    max_decimals: 2
   currency:
     type: string
     required: true

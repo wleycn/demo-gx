@@ -38,7 +38,7 @@ class DataCleaner:
                 if raw_col not in df.columns:
                     df[raw_col] = df[col].astype(str)
                 try:
-                    dt_series = pd.to_datetime(df[col], utc=True, errors="coerce")
+                    dt_series = pd.to_datetime(df[col], utc=True, errors="coerce", format="mixed")
                 except:
                     dt_series = pd.Series([pd.NaT] * len(df), index=df.index)
                 # Mark conversion failures

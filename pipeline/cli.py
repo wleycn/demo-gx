@@ -59,8 +59,8 @@ def main():
         #     so rows later quarantined are still preserved for replay/audit)
         logger.info("Writing Bronze archive...")
         bronze_base = Path(config["storage"]["base_path"]) / config["storage"]["bronze_subpath"]
-        write_bronze(raw_df, bronze_base)
-        metrics.increment("bronze_rows", len(raw_df))
+        bronze_written = write_bronze(raw_df, bronze_base)
+        metrics.increment("bronze_rows", bronze_written)
 
         # 1c. Optional event-date backfill scope: when --event-date is given,
         #     process only rows whose event_timestamp falls on that date
@@ -148,11 +148,20 @@ def main():
             group.to_parquet(part_path / "data.parquet", index=False)
             logger.info(f"Silver data written to {part_path}")
 
-        # 6. Build Gold layer
+        # 6. Build Gold layer — ALWAYS from the on-disk Silver snapshot, never
+        #    from the in-memory batch: dims and wide are full snapshots, so a
+        #    --event-date scoped (backfill) run must not rebuild them from the
+        #    scoped subset or rows/first_seen_date would be lost (round-2 QC #7).
         logger.info("Building Gold layer...")
+        silver_base = Path(config["storage"]["base_path"]) / config["storage"]["silver_subpath"]
+        silver_files = sorted(silver_base.glob("event_date=*/data.parquet"))
+        if silver_files:
+            gold_input = pd.concat([pd.read_parquet(f) for f in silver_files], ignore_index=True)
+        else:
+            gold_input = deduped_df.iloc[0:0]
         builder = GoldBuilder()
-        fact_df = builder.build_fact_table(deduped_df)
-        dims = builder.build_dimensions(deduped_df)
+        fact_df = builder.build_fact_table(gold_input)
+        dims = builder.build_dimensions(gold_input)
         wide_df = builder.build_wide_table(fact_df, dims)
 
         # Write Gold outputs

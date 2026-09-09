@@ -206,7 +206,7 @@ Each error file uses **JSON Lines** format, one error object per line, containin
 
 | Field name            | Type              | Description                                                                        |
 | :---                  | :---              | :---                                                                               |
-| `original_json`       | `string`          | The complete JSON string of the original input line                                |
+| `original_json`       | `string`          | JSON rebuild of the offending row (pandas round-trip; keys missing from the raw line render as `null` — see Bronze §3.1 "as ingested" note) |
 | `error_type`          | `string`          | Error type: `schema_mismatch` / `type_coercion_failed`                             |
 | `error_details`       | `string`          | Specific reason, e.g. `"field 'event_id' missing"` or `"amount cannot be parsed as number"` |
 | `ingestion_timestamp` | `string` (ISO8601)| The time the pipeline processed this record                                       |

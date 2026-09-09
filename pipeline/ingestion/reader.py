@@ -49,7 +49,7 @@ def read_input(file_path: str) -> pd.DataFrame:
     return df
 
 
-def write_bronze(raw_df: pd.DataFrame, bronze_base: Path) -> None:
+def write_bronze(raw_df: pd.DataFrame, bronze_base: Path) -> int:
     """Archive raw records to the Bronze layer (JSON Lines, partitioned).
 
     Bronze is the immutable landing zone: **every** arrived record —
@@ -75,17 +75,34 @@ def write_bronze(raw_df: pd.DataFrame, bronze_base: Path) -> None:
             column is excluded from the archive.
         bronze_base (pathlib.Path): Root path of the Bronze layer, e.g.
             ``Path("data") / "bronze"``.
+
+    Returns:
+        int: The number of records actually written to disk (the caller
+        should report this count in metrics rather than assuming the full
+        input batch was archived).
     """
     df = raw_df.drop(columns=["_raw_json"], errors="ignore").copy()
-    # Derive the ingestion date partition from the ISO-8601 prefix
-    if "ingestion_timestamp" in df.columns:
-        df["_ingestion_dt"] = df["ingestion_timestamp"].astype(str).str[:10]
+    # Partition keys must never drop a record: Bronze archives EVERY
+    # arriving row, so a missing source/ingestion timestamp falls back to a
+    # dedicated partition instead of being silently lost (groupby drops NaN
+    # keys by default — round-2 QC #8).
+    if "source_system" in df.columns:
+        df["source_system"] = df["source_system"].fillna("unknown")
     else:
-        df["_ingestion_dt"] = pd.Timestamp.now(tz="UTC").date().isoformat()
-    if "source_system" not in df.columns:
         df["source_system"] = "unknown"
-    for (source, dt), group in df.groupby(["source_system", "_ingestion_dt"]):
+    now_date = pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d")
+    if "ingestion_timestamp" in df.columns:
+        ts = pd.to_datetime(df["ingestion_timestamp"], utc=True, errors="coerce", format="mixed")
+        df["_ingestion_dt"] = now_date
+        valid_dt = ts.notna()
+        df.loc[valid_dt, "_ingestion_dt"] = ts[valid_dt].dt.strftime("%Y-%m-%d")
+    else:
+        df["_ingestion_dt"] = now_date
+    written = 0
+    for (source, dt), group in df.groupby(["source_system", "_ingestion_dt"], dropna=False):
         part_dir = bronze_base / str(source) / f"dt={dt}"
         part_dir.mkdir(parents=True, exist_ok=True)
         out = group.drop(columns=["_ingestion_dt"])
         out.to_json(part_dir / "events.json", orient="records", lines=True, force_ascii=False)
+        written += len(group)
+    return written

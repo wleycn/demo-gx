@@ -75,8 +75,16 @@ class SchemaValidator:
             # Rows carrying any extra-field value violate the strict
             # contract: quarantine them (strict mode rejects unknown fields)
             extra_mask = df[list(extra_fields)].notna().any(axis=1)
-            invalid_mask = invalid_mask | extra_mask
-            df.loc[extra_mask, "_error_reason"] = df.loc[extra_mask, "_error_reason"].fillna("") + f" Extra fields: {extra_fields}"
+            # A column of entirely-null extras still proves the unknown keys
+            # were present in the input (row-level null vs missing key is
+            # indistinguishable after read_json); treat it as a contract
+            # breach too (round-2 QC #3)
+            if not extra_mask.any():
+                invalid_mask = invalid_mask | True
+                df["_error_reason"] = df["_error_reason"] + f" Extra fields (null values): {extra_fields};"
+            else:
+                invalid_mask = invalid_mask | extra_mask
+                df.loc[extra_mask, "_error_reason"] = df.loc[extra_mask, "_error_reason"].fillna("") + f" Extra fields: {extra_fields}"
             # Drop extra field columns (keep only standard fields + _raw_json)
             df = df.drop(columns=list(extra_fields))
 
@@ -92,6 +100,13 @@ class SchemaValidator:
             # Type validation
             expected_type = rules.get("type")
             if expected_type == "string":
+                # Reject compound values (dict/list/tuple): only scalars are
+                # acceptable strings — str() repr of a dict must not pass as
+                # a customer id (round-2 QC #9)
+                non_scalar = series.apply(lambda v: isinstance(v, (dict, list, tuple)))
+                if non_scalar.any():
+                    invalid_mask = invalid_mask | non_scalar
+                    df.loc[non_scalar, "_error_reason"] = df.loc[non_scalar, "_error_reason"].fillna("") + f" Field {field} not a scalar string;"
                 # Ensure the column is string-typed
                 if not pd.api.types.is_string_dtype(series):
                     # Attempt conversion
@@ -133,12 +148,27 @@ class SchemaValidator:
                     below_min = df[field].notna() & (df[field] < rules["minimum"])
                     invalid_mask = invalid_mask | below_min
                     df.loc[below_min, "_error_reason"] = df.loc[below_min, "_error_reason"].fillna("") + f" Field {field} below minimum;"
+                # Non-finite values (inf after coercion) must not pollute sums
+                non_finite = df[field].isin([float("inf"), float("-inf")])
+                if non_finite.any():
+                    invalid_mask = invalid_mask | non_finite
+                    df.loc[non_finite, "_error_reason"] = df.loc[non_finite, "_error_reason"].fillna("") + f" Field {field} not finite;"
+                # Precision: at most N decimal places when schema declares it
+                if "max_decimals" in rules:
+                    scaled = df[field] * 10 ** rules["max_decimals"]
+                    too_precise = df[field].notna() & ((scaled - scaled.round()).abs() > 1e-6)
+                    if too_precise.any():
+                        invalid_mask = invalid_mask | too_precise
+                        df.loc[too_precise, "_error_reason"] = df.loc[too_precise, "_error_reason"].fillna("") + f" Field {field} exceeds {rules['max_decimals']} decimal places;"
             elif expected_type == "timestamp":
                 # Attempt to parse as datetime and check parseability
                 # Back up the original string first, in case parsing fails
                 df[f"_raw_{field}"] = df[field]  # backup original value
                 try:
-                    dt_series = pd.to_datetime(df[field], utc=True, errors="coerce")
+                    # format="mixed": a column may legitimately mix timezones
+                    # / precisions; without it pandas parses only the first
+                    # format and NaTs the rest (round-2 QC #5)
+                    dt_series = pd.to_datetime(df[field], utc=True, errors="coerce", format="mixed")
                 except:
                     dt_series = pd.Series([pd.NaT] * len(df), index=df.index)
                 # Rows where parsing failed (original non-null but result NaT)
