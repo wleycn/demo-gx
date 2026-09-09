@@ -27,6 +27,7 @@ See the `docs/` directory for details.
 All code and configuration files are now provided. Save the above content
 to the corresponding files. Ensure the directory structure is as follows:
 
+```text
 project_root/
 ├── pipeline/
 │   ├── __init__.py
@@ -61,6 +62,7 @@ project_root/
 │   └── generate_sample_data.py
 ├── requirements.txt
 └── README.md
+```
 
 Test commands:
 Generate data: python scripts/generate_sample_data.py

@@ -17,6 +17,7 @@
 
 ## 3. Module Partitioning (Separation of Concerns)
 
+```text
 pipeline/
 ├── ingestion/ # Read raw data (supports JSON/CSV/Parquet)
 ├── validation/ # Schema validation + quality rules (null/enum/type)
@@ -24,6 +25,7 @@ pipeline/
 ├── curation/ # Build aggregation/Gold (summarize by customer/event_type)
 ├── common/ # Logging, config, exception handling, audit
 └── cli.py # Unified entry point (supports --env dev/test/prod)
+```
 
 ### Source Schema Alignment
 This pipeline is designed strictly based on the JSON event template provided in the requirements document. Core fields and validation rules are as follows:

@@ -3,6 +3,7 @@
 ## 1. Physical Data Paths (Storage Layout)
 
 Adopts an **environment-isolated** directory structure. Local development uses `./data` as the root directory; production can map to S3/ADLS (via configuration switching).
+```text
 data/
 ├── bronze/ # Raw JSON archive (immutable)
 │ └── {source_system}/ # Subdirectory per source system
@@ -28,6 +29,7 @@ data/
 ├── type_mismatch/ # Type conversion failures (with _raw columns)
 │ └── {timestamp}_errors.json
 └── duplicates.log # Deduplication record log (plain text, appended)
+```
 
 
 ---
@@ -35,6 +37,7 @@ data/
 ## 2. Detailed Data Flow (with Exception Branches)
 
 The diagram below shows the complete path from input to output, including the handling flow for bad data and special cases.
+```text
 ┌─────────────┐
 │ Input file  │
 │ (JSON/CSV/  │
@@ -90,6 +93,7 @@ Pass │ │ Fail
 │ events          │ │ dim_event_   │ │ events           │
 │ (partitioned)   │ │ type         │ │ (partitioned)    │
 └─────────────────┘ └──────────────┘ └──────────────────┘
+```
 
 
 **Key branch descriptions**:
