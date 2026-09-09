@@ -56,7 +56,7 @@ class GoldBuilder:
         dim_customer = df[["customer_id"]].drop_duplicates().reset_index(drop=True)
         # Add first_seen_date (currently the minimum event_date available)
         if "event_date" in df.columns:
-            first_seen = df.groupby("customer_id")["event_date"].min().reset_index()
+            first_seen = df.groupby("customer_id")["event_date"].min().reset_index(name="first_seen_date")
             dim_customer = dim_customer.merge(first_seen, on="customer_id", how="left")
         # Dimension table: event_type
         dim_event_type = df[["event_type"]].drop_duplicates().reset_index(drop=True)

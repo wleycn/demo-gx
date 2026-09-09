@@ -57,3 +57,28 @@ def test_validation_fails_missing_field(schema_config):
     assert len(valid) == 0
     assert len(invalid) == 1
     assert "Missing required field" in invalid.iloc[0]["error_reason"]
+
+
+def test_validation_fails_future_timestamp(schema_config):
+    """A record stamped in the future should be quarantined as invalid.
+
+    The schema contract requires ``event_timestamp <= current time``
+    (see docs/architecture.md); future-dated records are data-quality
+    violations and must not pass into Silver.
+    """
+    future = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(days=1)).isoformat()
+    df = pd.DataFrame([{
+        "event_id": "123e4567-e89b-12d3-a456-426614174000",
+        "source_system": "web",
+        "customer_id": "cust_001",
+        "event_type": "purchase",
+        "event_timestamp": future,
+        "amount": 100.0,
+        "currency": "USD",
+        "ingestion_timestamp": "2026-01-01T00:00:00Z"
+    }])
+    validator = SchemaValidator(schema_config)
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 0
+    assert len(invalid) == 1
+    assert "in future" in invalid.iloc[0]["error_reason"]

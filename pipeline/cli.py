@@ -16,7 +16,7 @@ import pandas as pd
 from common.config import load_config, load_schema
 from common.logger import setup_logging, get_logger
 from common.metrics import MetricsCollector
-from ingestion.reader import read_input
+from ingestion.reader import read_input, write_bronze
 from validation.schema_validator import SchemaValidator
 from transformation.cleaner import DataCleaner
 from transformation.deduplicator import Deduplicator
@@ -55,6 +55,13 @@ def main():
         metrics.increment("input_rows", len(raw_df))
         logger.info(f"Read {len(raw_df)} rows")
 
+        # 1b. Archive every raw record to Bronze (before any quality gate,
+        #     so rows later quarantined are still preserved for replay/audit)
+        logger.info("Writing Bronze archive...")
+        bronze_base = Path(config["storage"]["base_path"]) / config["storage"]["bronze_subpath"]
+        write_bronze(raw_df, bronze_base)
+        metrics.increment("bronze_rows", len(raw_df))
+
         # 2. Validate schema
         logger.info("Validating schema...")
         schema_cfg = load_schema()
@@ -67,7 +74,7 @@ def main():
         if not invalid_df.empty:
             errors_path = Path(config["storage"]["base_path"]) / config["storage"]["errors_subpath"] / "bad_schema"
             errors_path.mkdir(parents=True, exist_ok=True)
-            invalid_df.to_json(errors_path / f"{pd.Timestamp.utcnow().isoformat()}_errors.json", orient="records", lines=True)
+            invalid_df.to_json(errors_path / f"{pd.Timestamp.now('UTC').isoformat()}_errors.json", orient="records", lines=True, date_format="iso")
             logger.warning(f"Invalid records written to {errors_path}")
 
         if valid_df.empty:

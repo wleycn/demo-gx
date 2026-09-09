@@ -142,17 +142,15 @@ class SchemaValidator:
                 if failed_parse.any():
                     invalid_mask = invalid_mask | failed_parse
                     df.loc[failed_parse, "_error_reason"] = df.loc[failed_parse, "_error_reason"].fillna("") + f" Field {field} timestamp parse failed;"
-                # Check whether the value is <= current time (optional; here we
-                # only validate, not block, but could log a warning).
-                # We only handle parse failures here; future timestamps are
-                # flagged as warnings but not marked invalid?  Per the design,
-                # future timestamps should be quarantined.
-                # For simplicity, should invalid_mask include future times?
-                # An additional condition could be added.
-                # Here we only handle parse failures.  Other business rules
-                # can be applied in the cleaner, or added here.
-                # For separation of concerns, business rules go in the cleaner;
-                # this module performs only basic type validation.
+                # Reject future timestamps: the schema contract requires
+                # "<= current time" (see docs/architecture.md source-schema
+                # table); a record stamped in the future is quarantined here
+                # together with parse failures rather than silently passing.
+                now_utc = pd.Timestamp.now(tz="UTC")
+                in_future = dt_series > now_utc  # NaT > now is False
+                if in_future.any():
+                    invalid_mask = invalid_mask | in_future
+                    df.loc[in_future, "_error_reason"] = df.loc[in_future, "_error_reason"].fillna("") + f" Field {field} in future;"
                 df[field] = dt_series  # converted UTC datetime
             # Other types...
         # Handle null values for required fields
