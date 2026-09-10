@@ -19,6 +19,8 @@ Manual equivalents (no `make`):
 ```bash
 # 1. Setup (first run only)
 python3 -m venv .venv
+# activate venv (option)
+source .venv/bin/activate
 .venv/bin/pip install -r requirements.txt
 # 2. Generate data
 .venv/bin/python scripts/generate_sample_data.py
@@ -41,6 +43,7 @@ See the `docs/` directory for details.
   (Spark + Iceberg); this repo is validated locally on Pandas because no
   cluster environment is available. Design & Iceberg SQL assets reflect the
   big-data shape — see docs/architecture.md §5 and docs/data-design.md §6.
+
 
 ## Production Readiness Improvement Plan
 
@@ -75,5 +78,7 @@ demo-gx/
 Run artifacts (sample input, Bronze/Silver/Gold, metrics, logs) live under
 the environment storage dirs (`data/`, `test/data/`, `data_prod/`) and are git-ignored.
 
-git repo:
+
+
+## git repo:
 https://github.com/wleycn/demo-gx

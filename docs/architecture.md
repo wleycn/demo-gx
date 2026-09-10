@@ -160,4 +160,4 @@ The Gold layer adopts a Star Schema to support domain data product delivery:
 - Migrate from Pandas to PySpark for larger data volumes.
 - Introduce Great Expectations or dbt for data contract validation.
 - Adopt Apache Iceberg for schema evolution and time travel.
-- Add stream processing (e.g. Kafka + Spark Structured Streaming).
+- Add stream processing (e.g. Kafka + Spark Structured Streaming/Flink).
