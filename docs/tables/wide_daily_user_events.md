@@ -1,4 +1,5 @@
 # Table Contract: wide_daily_user_events
+
 ## Layer
 
 Gold (curated)
@@ -35,6 +36,6 @@ Not applicable. Built by left-joining the fact table with dimension tables. Sour
 ## Lifecycle
 
 - **Write mode**: partition-scoped overwrite (idempotent).
-- **Source**: built from the fact table and dimension tables. The fact table is always built from the full on-disk Silver snapshot.
+- **Source**: built from the fact table and dimension tables; the fact table in turn reads the full on-disk Silver snapshot. Rule: DATA-DESIGN.md section 2.4.
 - **Retention**: no retention policy. All partitions persist until manually cleaned.
 - **Join semantics**: left join with `validate="many_to_one"` to ensure each fact row maps to at most one dimension row. A dimension miss produces `NaN` in the dimension columns, not a dropped row.

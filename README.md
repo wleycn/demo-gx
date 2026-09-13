@@ -52,9 +52,10 @@ demo-gx/
 │   ├── tables/               # Per-table contracts (one file per table)
 │   ├── changes/              # Per-module change logs
 │   ├── rules/                # Engineering rules (structure / coding / flow / acceptance)
-│   └── raw/                  # Original assessment document
+│   └── archive/              # Superseded documents and the original assessment prompt
 ├── tests/                    # pytest suite (27 tests)
 ├── scripts/generate_sample_data.py
+├── scripts/hooks/pre-commit  # Pre-commit gate hook (copy into .git/hooks)
 ├── Makefile                  # setup / data / run / test / clean
 ├── .gitlab-ci.yml            # CI skeleton (test -> data-quality -> promote)
 ├── .gitattributes            # Line-ending policy (md=CRLF, code=LF)
@@ -63,6 +64,23 @@ demo-gx/
 ```
 
 Run artifacts (sample input, Bronze/Silver/Gold, metrics, logs) live under the environment storage dirs (`data/`, `test/data/`, `data_prod/`) and are git-ignored.
+
+## Pre-commit Gate
+
+The gate script lives in the shared toolchain, so the hook is installed once per clone:
+
+```bash
+mkdir -p .git/hooks && cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+```
+
+The gate blocks a commit when any of these three checks fails:
+
+- credential scan
+- test suite
+- `AGENTS.md` structure check
+
+The test command uses the project venv (`.venv/bin/python -m pytest -q`), so no external interpreter is required.
+The hook source lives in `scripts/hooks/pre-commit`, which keeps it reviewable and reproducible.
 
 ## Documentation
 

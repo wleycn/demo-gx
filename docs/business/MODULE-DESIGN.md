@@ -1,4 +1,5 @@
 # Module Design
+
 ## 1. Module Overview
 
 Each module is responsible for one thing only and communicates via standardized DataFrame contracts. All configuration (paths, validation thresholds) is managed centrally by `common/config`. Hardcoding is prohibited.
@@ -17,12 +18,13 @@ Each module is responsible for one thing only and communicates via standardized 
 | `pipeline/` | `cli.py` | CLI entry point: parse arguments, orchestrate the full pipeline | `main()` |
 
 ## 2. Module Interface Contracts
+
 ### 2.1 ingestion/reader.py
 
 **Description**: Auto-selects the read engine based on the file path suffix (`.json`, `.csv`, `.parquet`). After reading, each row retains its original JSON string in the `_raw_json` column for audit and replay.
 **Input**: file path (string or Path object).
 **Output**: Pandas DataFrame containing the raw data and a `_raw_json` column.
-**Exception handling**: if the file suffix is unsupported or the file does not exist, a clear exception is raised, caught and logged by the CLI layer.
+**Exception handling**: a missing file or an unsupported suffix raises immediately (fail fast, never a silent skip). The CLI logs the error and exits non-zero. Retry is the orchestration layer's responsibility, not the CLI's.
 **`write_bronze`**: archives every raw record to Bronze, partitioned by `source_system` and ingestion date. The `_raw_json` column is excluded from the archive. Missing `source_system` falls back to `unknown`; missing `ingestion_timestamp` falls back to the run date. Returns the count of records written.
 
 ### 2.2 validation/schema_validator.py
@@ -49,7 +51,7 @@ Each module is responsible for one thing only and communicates via standardized 
 
 ### 2.4 transformation/deduplicator.py
 
-**Description**: deduplicates by `event_id`. When duplicate IDs appear, the record with the latest `ingestion_timestamp` is retained. On an exact tie (identical `ingestion_timestamp`), the last-occurring row in the input file wins (keep-last; stable sort). No extra tiebreaker is defined.
+**Description**: deduplicates by `event_id`, keeping the record with the latest `ingestion_timestamp`. The tie-break rule is a data invariant; see DATA-DESIGN.md section 1.
 **Input**: cleaned DataFrame.
 **Output**: pair `(deduplicated_df, duplicates_df)`. The module performs no I/O. The CLI writes superseded duplicates to `errors/duplicates.log`.
 
@@ -61,7 +63,7 @@ Each module is responsible for one thing only and communicates via standardized 
 - **Dimension tables**: extracts `dim_customer` (unique customer IDs with `first_seen_date`) and `dim_event_type` (unique event types) from the Silver layer.
 - **Wide table**: left-joins the fact table with dimension tables to produce a single denormalized wide table for direct BI queries.
 
-**Input**: Silver-layer DataFrame (always read from the full on-disk Silver snapshot by the CLI, never from the in-memory batch).
+**Input**: Silver-layer DataFrame. The CLI passes the full on-disk Silver snapshot (see DATA-DESIGN.md section 2.4), never the in-memory batch.
 **Output**: three independent DataFrames (`fact_df`, `dims_dict`, `wide_df`).
 
 ### 2.6 common/config.py
@@ -91,17 +93,18 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 5. Call `SchemaValidator.validate` to split valid and invalid data. Invalid records are written to `errors/bad_schema/` with an error envelope.
 6. Call `DataCleaner` and `Deduplicator` to process valid data. Superseded duplicates are written to `errors/duplicates.log`.
 7. Write to Silver layer (partitioned by `event_date`, Parquet format). Add `_processed_timestamp` at write time.
-8. Call `GoldBuilder` to generate Gold-layer data. Gold is always built from the full on-disk Silver snapshot.
+8. Call `GoldBuilder` to generate Gold-layer data from the full on-disk Silver snapshot (see DATA-DESIGN.md section 2.4).
 9. Save `metrics.json`.
 
 **Idempotency**: Bronze, Silver, and Gold writes use partition-scoped overwrite mode. Re-running the same date does not produce duplicate data.
 
 ## 3. Configuration Management
+
 ### 3.1 Configuration Files
 
 - `config/dev.yaml`, `config/test.yaml`, `config/prod.yaml`.
 - Core config items:
-  - `storage.base_path`: data storage root directory (dev: `./data`, test: `./test/data`, prod: `./data_prod`).
+  - `storage.base_path`: data storage root directory. INTERFACE-DESIGN.md section 3.1 lists the root for each environment.
   - `storage.bronze_subpath` / `silver_subpath` / `gold_subpath` / `errors_subpath`: subdirectory names under the base path.
   - `logging.level`: log level (INFO/DEBUG).
   - `logging.file`: log file path, anchored under the storage base path.
@@ -116,6 +119,7 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 ## 4. Cross-Module Communication
 
 - **Data carrier**: all modules pass data via Pandas DataFrame.
+- **Metadata passing**: DataFrame `attrs` is a documented option for lightweight metadata such as the processing timestamp or the source filename. The current implementation does not rely on it: that metadata travels in explicit columns, for example `_processed_timestamp`.
 - **Error passing**: validation and cleaning modules do not raise exceptions to interrupt the flow. They pass problem data downstream or to the quarantine area via the returned `invalid_df` or flag columns.
 - **No global state**: modules do not share global variables. All configuration flows through `common/config`.
 

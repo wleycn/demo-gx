@@ -77,6 +77,7 @@ The `AGENTS.md` section 10 deviation table points to the eight anchors below.
 ---
 
 ## Design Decisions and Rejected Alternatives
+
 ### Decision: Pandas single-machine instead of PySpark
 
 **Chosen**: Pandas on a single machine.

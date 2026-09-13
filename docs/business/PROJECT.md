@@ -2,6 +2,12 @@
 
 A Pandas-based single-machine lakehouse reference implementation for the Principal Data Engineer (P5) take-home assessment. It processes JSON event data through a three-layer pipeline: Bronze (raw archive) to Silver (cleaned detail) to Gold (curated star schema).
 
+## Design Goals
+
+- A **reusable, extensible** reference implementation that supports file, API, database, and event-stream source systems.
+- **dev to test to prod** environment promotion driven by configuration switching.
+- **Production-minded**: quality checks, error isolation, auditing, and cost awareness.
+
 ## Technology Stack
 
 | Component | Choice | Rationale |
@@ -14,7 +20,7 @@ A Pandas-based single-machine lakehouse reference implementation for the Princip
 | CI | GitLab CI (`.gitlab-ci.yml`) | Required by the assignment |
 | Orchestration | Makefile + CLI; Airflow blueprint only | No runnable DAG in this repo |
 
-The target production shape is Spark on Iceberg. This repo develops and validates locally on Pandas because no big-data cluster is available. Module boundaries communicate through DataFrame contracts (no global state, no file-path coupling), so each stage can be re-implemented against `pyspark.sql.DataFrame` without re-architecting the pipeline. See KNOWN-ISSUE for the full list of deviations from the production shape.
+The target production shape is Spark on Iceberg; this repo develops and validates locally on Pandas because no big-data cluster is available. KNOWN-ISSUE.md holds the decision record and the full list of deviations from the production shape.
 
 ## Directory Layout
 
@@ -52,6 +58,19 @@ Run artifacts (sample input, Bronze/Silver/Gold, metrics, logs) live under envir
 - **Environment config**: `config/{dev,test,prod}.yaml` controls storage paths, logging, metrics, and alert endpoints. Each environment writes to its own directory: dev to `data/`, test to `test/data/`, prod to `data_prod/`.
 - **AI constraints**: `AGENTS.md` at the project root defines red lines and behavior rules for AI coding tools.
 
+## Security and Privacy
+
+- **Sensitive fields** such as `customer_id` can be configured for masking or hashing. The mask is applied at the Silver layer, so Gold never holds the raw value.
+- **Credentials** come from environment variables or a secret manager (for example Vault). They never appear in code, config files, or logs.
+- **Audit records**: each run records its input source, output paths, and row counts, so a past run can be reconstructed.
+
+## Cost and Storage Lifecycle
+
+- **Query pruning**: the Silver layer is partitioned by `event_date`, so a query reads only the partitions it needs.
+- **Cheaper downstream compute**: Gold exposes aggregations and a denormalized wide table, so BI and ML jobs do not rescan detail data.
+- **Storage lifecycle**: Bronze is retained for 30 days, Silver permanently, Gold on demand.
+- **Single-machine fit**: Pandas keeps the demo runnable inside the stated volume assumption of under 10 GB per batch.
+
 ## Verification Commands
 
 ```bash
@@ -63,23 +82,6 @@ make test
 .venv/bin/python pipeline/cli.py --input data/sample_data.json --env dev
 .venv/bin/python -m pytest tests/ -q
 ```
-
-## Pre-commit Gate
-
-The gate script lives in the shared toolchain, so the hook is installed once per clone:
-
-```bash
-mkdir -p .git/hooks && cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
-```
-
-The gate blocks a commit when any of these three checks fails:
-
-- credential scan
-- test suite
-- `AGENTS.md` structure check
-
-The test command uses the project venv (`.venv/bin/python -m pytest -q`), so no external interpreter is required.
-The hook source lives in `scripts/hooks/pre-commit`, which keeps it reviewable and reproducible.
 
 ## Document Navigation
 

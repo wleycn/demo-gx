@@ -51,6 +51,7 @@ Defined in `config/schema.yaml`. All 8 fields are required.
 Strict mode rejects unknown fields not in this list.
 
 ## 3. Output Path Shapes
+
 ### 3.1 Environment Storage Roots
 
 | Environment | `storage.base_path` | Config file |
@@ -94,8 +95,11 @@ Fact and wide tables are partitioned by `event_date`. Dimension tables are full 
 ```text
 {base_path}/errors/
 ├── bad_schema/{timestamp}_errors.json    # JSON Lines
+├── type_mismatch/                        # Reserved, currently empty
 └── duplicates.log                        # Plain text, appended
 ```
+
+`type_mismatch/` is reserved for a dedicated type-conversion quarantine. It stays empty today: type failures are filed under `bad_schema/` with `error_type=type_coercion_failed`.
 
 ### 3.6 Metrics and Logs
 

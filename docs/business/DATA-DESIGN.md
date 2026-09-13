@@ -1,7 +1,14 @@
 # Data Flow and Data Structure Design
+
 ## 1. End-to-End Data Flow
 
 The pipeline reads a JSON file and distributes each record through three layers. Invalid records are quarantined at the validation gate and never reach Silver or Gold.
+
+| Layer | Name | Storage format | Consumer | Description |
+|---|---|---|---|---|
+| Bronze | Raw archive | JSON Lines, partitioned by `source_system/dt` | Data engineers, audit | Immutable landing zone, full lineage |
+| Silver | Cleaned detail | Parquet, partitioned by `event_date` | Data scientists, analysts | Validated, deduplicated, standardized rows |
+| Gold | Curated | Parquet, partitioned by `event_date`, plus full-snapshot dimensions | BI reports, ML features | Subject-oriented aggregation and dimensional model |
 
 ```text
 [Input file (JSON/CSV/Parquet)]
@@ -52,14 +59,15 @@ The pipeline reads a JSON file and distributes each record through three layers.
 ### Key Flow Branches
 
 **Bad data path**: Records that fail validation (missing required fields, type mismatch, extra fields, future timestamp) are quarantined to `errors/bad_schema/` with an error envelope. The pipeline continues processing valid data without interruption.
-**Type change path**: Type and format violations (non-numeric amount, timestamp parse failures) are quarantined at the validation stage together with schema violations. They do not reach Silver. The validator's error reason distinguishes them with `error_type=type_coercion_failed`. A separate "flag and pass to Silver" path was considered in the design but is not enabled: the single-machine demo chooses fail-safe isolation over carrying suspect rows downstream.
+**Type change path**: Type and format violations (non-numeric amount, timestamp parse failures) are quarantined at the validation stage together with schema violations. They do not reach Silver. The validator's error reason distinguishes them with `error_type=type_coercion_failed`. A separate "flag and pass to Silver" path is not enabled; the decision and its rationale are recorded in KNOWN-ISSUE.md under "Fail-safe isolation over flag-and-pass".
 **Deduplication path**: For duplicate `event_id` values, only the record with the latest `ingestion_timestamp` is kept. On an exact tie (identical `ingestion_timestamp`), the last-occurring row in the input file wins (keep-last; stable sort). Superseded duplicates are written to `errors/duplicates.log` for post-hoc review.
-**Backfill path**: When `--event-date YYYY-MM-DD` is given, only rows whose `event_timestamp` falls on that date are processed. Rows whose timestamp does not parse are kept in scope so the validator can quarantine them. Bronze always archives the full arriving batch. Gold is always rebuilt from the full on-disk Silver snapshot, so backfilling one date never disturbs other partitions or shrinks dimension tables.
+**Backfill path**: When `--event-date YYYY-MM-DD` is given, only rows whose `event_timestamp` falls on that date are processed. Rows whose timestamp does not parse are kept in scope so the validator can quarantine them. Bronze always archives the full arriving batch. Gold is rebuilt from the full on-disk Silver snapshot; section 2.4 explains why that makes a partial run safe.
 
 ## 2. Data Structure Definitions
+
 ### 2.1 Storage Layout
 
-Environment-isolated directory structure. Local development uses `./data` as root; test uses `./test/data`; prod uses `./data_prod`.
+Environment-isolated directory structure. The root comes from the `storage.base_path` config setting; INTERFACE-DESIGN.md section 3.1 lists the root for each environment.
 
 ```text
 {storage.base_path}/
@@ -127,22 +135,15 @@ The Gold layer adopts a star schema with one fact table, two dimension tables, a
 
 Gold is always rebuilt from the full on-disk Silver snapshot, never from the in-memory batch. This ensures that dimension tables and the wide table are full snapshots, so a backfill run for one date does not lose rows or shrink dimensions.
 
-### 2.5 Error Record Schema
+### 2.5 Error Records
 
-Each error file uses JSON Lines format, one error object per line.
-
-| Field | Type | Description |
-|---|---|---|
-| `original_json` | string | JSON rebuild of the offending row |
-| `error_type` | string | `schema_mismatch` or `type_coercion_failed` |
-| `error_details` | string | Specific reason (e.g. "field 'event_id' missing") |
-| `ingestion_timestamp` | string (ISO-8601) | Pipeline processing time |
+Errors are written to `errors/bad_schema/` as JSON Lines, one error object per line. The envelope fields are an output contract; the field table lives in INTERFACE-DESIGN.md section 4.
 
 ### 2.6 Reprocessing Semantics
 
 - **Batch window**: the pipeline processes the full input batch and distributes rows to Silver partitions by their `event_timestamp` date. There is no default "previous day" filter. `--event-date` is the only single-day scoping mechanism.
 - **Late data**: if a record's `event_timestamp` belongs to a past date, the pipeline writes it to the corresponding historical partition. Bronze retains the original JSON for replay at any time.
-- **Safe backfill**: `--event-date` reprocesses only one date. Bronze archives the full arriving batch. Gold is always rebuilt from the full Silver snapshot, so backfilling one date never disturbs other partitions or shrinks dimensions.
+- **Safe backfill**: `--event-date` reprocesses only one date. Bronze archives the full arriving batch. Gold is rebuilt from the full Silver snapshot; section 2.4 explains why a partial run stays safe.
 
 ### 2.7 Production Table Format Reference (Apache Iceberg)
 
@@ -158,8 +159,15 @@ The mapping between demo and production equivalents:
 | Partition-overwrite (idempotency) | Iceberg transactions plus snapshot isolation |
 | `_raw_json` audit column | Full Bronze replay via snapshot and time travel |
 
-## 3. Lineage and Observability
+### 2.8 Schema Evolution
+
+- **New fields**: pass through to Silver and Gold automatically. They do not block the pipeline and are only marked as new in metadata.
+- **Type changes**: type and format violations are quarantined at the validation gate (`not numeric`, parse failure) and logged as warnings. The Slack alert is reserved, not wired.
+- **Field deprecation**: a deprecated field is retained for 90 days and then removed from Gold. The Silver layer keeps the original field permanently.
+
+## 3. Lineage and Freshness
 
 - **Lineage**: each record's path from Bronze to Silver to Gold is traceable via `_processed_timestamp` and partition keys. OpenLineage integration is a future extension.
-- **Run metrics**: a `metrics.json` file is written under the environment's storage dir at the end of each run. It contains input rows, bronze rows, validation pass and fail counts, duplicates removed, Silver and Gold row counts, plus start and end times. Per-stage durations are not yet collected.
-- **Logging**: structured JSON logging to stdout and `logs/pipeline.log`. Each log line is a JSON object with timestamp, level, logger name, and message.
+- **Data freshness monitoring**: in the orchestration layer (for example Airflow), a sensor can compare the latest Silver partition's `event_date` with the current date. A delay beyond a configured threshold raises an alert.
+
+Run metrics and the log format are output contracts. See INTERFACE-DESIGN.md sections 5 and 3.6.

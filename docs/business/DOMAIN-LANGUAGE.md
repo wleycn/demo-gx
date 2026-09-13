@@ -4,7 +4,7 @@ Project-specific terms used throughout the codebase and documentation. Terms are
 
 | Term | English | Meaning | Where it appears |
 |---|---|---|---|
-| backfill | backfill | Reprocessing data for a specific date by passing `--event-date YYYY-MM-DD` to the CLI. Only rows whose `event_timestamp` falls on that date are processed. Bronze always archives the full batch. | INTERFACE-DESIGN, DATA-DESIGN, cli.py |
+| backfill | backfill | Reprocessing data for a specific date by passing `--event-date YYYY-MM-DD` to the CLI. The processing semantics live in DATA-DESIGN.md section 1. | INTERFACE-DESIGN, cli.py |
 | Bronze | Bronze (raw layer) | The first layer of the lakehouse pipeline. Stores raw input as JSON Lines, immutable, no quality checks. Partitioned by `source_system` and ingestion date. | DATA-DESIGN, MODULE-DESIGN, reader.py |
 | dimension table | dimension table | A Gold-layer table that stores descriptive attributes for a business entity. This project has two: `dim_customer` and `dim_event_type`. Both are full snapshots (non-partitioned). | DATA-DESIGN, builder.py |
 | event_date | event_date | The date portion of `event_timestamp`, used as the partition key for Silver, the Gold fact table, and the wide table. Typed as `date`. | DATA-DESIGN, cli.py, builder.py |

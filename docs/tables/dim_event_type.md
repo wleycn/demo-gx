@@ -1,4 +1,5 @@
 # Table Contract: dim_event_type
+
 ## Layer
 
 Gold (curated)
@@ -29,6 +30,6 @@ None. Full snapshot, non-partitioned. Written as a single `data.parquet` file.
 ## Lifecycle
 
 - **Write mode**: full overwrite. The entire table is rewritten on every run.
-- **Source**: always built from the full on-disk Silver snapshot, never from the in-memory batch.
+- **Source**: built from the full on-disk Silver snapshot. Rule: DATA-DESIGN.md section 2.4.
 - **Retention**: no retention policy. The table is overwritten on each run.
 - **Future extension**: the `category` field is reserved for a business classification but is currently not populated.

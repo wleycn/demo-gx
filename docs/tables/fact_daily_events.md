@@ -1,4 +1,5 @@
 # Table Contract: fact_daily_events
+
 ## Layer
 
 Gold (curated)
@@ -33,6 +34,6 @@ Not applicable. The fact table is an aggregation built from Silver detail data. 
 ## Lifecycle
 
 - **Write mode**: partition-scoped overwrite (idempotent).
-- **Source**: always built from the full on-disk Silver snapshot, never from the in-memory batch. This ensures a backfill run for one date does not lose rows or shrink dimensions.
+- **Source**: built from the full on-disk Silver snapshot, so a backfill run cannot lose rows or shrink dimensions. Rule: DATA-DESIGN.md section 2.4.
 - **Retention**: no retention policy. All partitions persist until manually cleaned.
-- **Reprocessing**: `--event-date` reprocesses one date. Gold is always rebuilt from the full Silver snapshot.
+- **Reprocessing**: `--event-date` reprocesses one date. Gold rebuild semantics: DATA-DESIGN.md section 2.6.
