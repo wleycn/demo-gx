@@ -34,7 +34,8 @@ def generate_sample_data(num_records=100, output_path="data/sample_data.json"):
             directory, keeping the repo root clean).
     """
     records = []
-    random.seed(42)  # reproducible sample (dev-review: CI smoke must be stable)
+    random.seed(42)  # pins the random draws only; event_id (uuid4) and the
+    # timestamps still differ per run, so the sample file is not byte-stable
     now = datetime.utcnow()
     systems = ["web", "mobile", "api"]
     # XXX passes the schema's ^[A-Z]{3}$ format check but is not in the

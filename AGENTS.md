@@ -149,9 +149,9 @@
 | 编排目录 | `dags/` 放任务编排与依赖组装 | 无调度器；编排兼在包内入口 `src/demo_gx/cli.py` | 见下「数据处理骨架适用边界」 |
 | 转换模块划分 | `src/{pkg}/pipelines/{domain}/`，按业务域 | 按管道阶段分模块：`ingestion` / `validation` / `transformation` / `curation` | 见下「数据处理骨架适用边界」 |
 | 契约模型层 | `src/{pkg}/models/` 放 schema 与类型定义 | 字段契约在 `config/schema.yaml`，表契约在 `docs/tables/`；无 Python 模型层 | 见下「数据处理骨架适用边界」 |
-| SQL 资产 | `sql/migrations/` 增量 DDL 与 `sql/transforms/` | 无 SQL 引擎，无 DDL；Parquet 直接落盘 | 见下「数据处理骨架适用边界」 |
+| SQL 资产 | `sql/migrations/` 增量 DDL 与 `sql/transforms/` | 无 `sql/` 资产，无 SQL 引擎；Parquet 直接落盘。Iceberg DDL 只作归档参考，不进执行路径 | 见下「数据处理骨架适用边界」 |
 | 测试目录 | `tests/` 与 `src/` 镜像 | 平铺 `tests/test_{module}.py` | 见下「数据处理骨架适用边界」 |
-| 数据分层命名 | `ods` → `dwd` → `dws` → `ads` | Bronze → Silver → Gold | 见 `docs/business/DOMAIN-LANGUAGE.md` 分层映射 |
+| 数据分层命名 | `ods` → `dwd` → `dws` → `ads` | Bronze → Silver → Gold | 见 `docs/business/DOMAIN-LANGUAGE.md` 术语 `data layer mapping` |
 | 覆盖率门禁 | 有 CI 的项目单测覆盖率 ≥ 80% | 未启用覆盖率工具；底线为「每需求至少一条断言」 | 见 `docs/business/KNOWN-ISSUE.md#coverage-gate-off` |
 | 计算与 catalog 收口 | 由 `catalog.py` 统一会话与表加载 | 无 catalog：本地 Parquet，不存在会话概念 | 见 `docs/business/KNOWN-ISSUE.md#no-catalog` |
 | 快照与压缩策略 | 每张表配置保留期与压缩任务 | 分区目录直接覆盖写，无快照层 | 见 `docs/business/KNOWN-ISSUE.md#no-snapshot-lifecycle` |
@@ -163,12 +163,14 @@
 
 **数据处理骨架适用边界**：数据处理类型的结构骨架假定 Spark 加 Iceberg 加调度器的技术栈。本项目是 Pandas 单机参考实现（选型与被否方案见 `docs/business/PROJECT.md`），骨架中依赖该栈的条目经登记后不适用：
 
-- **不设 `dags/`**：没有调度器。编排兼在包内入口，`python -m demo_gx.cli` 就是调用方式。骨架允许入口合并时只留 `src/`，本项目满足那三条边界。
-- **转换模块按管道阶段划分**：项目只有 events 一个业务域，按域分会得到单元素目录；阶段边界才是真实的可复用边界。
+- **不设 `dags/`**：没有调度器，编排兼在包内入口，`python -m demo_gx.cli` 就是调用方式。骨架的「入口可合并」边界要求三条全满足，本项目**只满足第一条**：入口写死了 `--env` 的三个取值与默认值，不满足第二条；`reader` / `validator` / `cleaner` / `builder` 是被 `tests/` 当库 import 的，第三条也存疑。本项目仍选择合并，理由是只有这一个入口、也没有第二个调用方；代价是入口带命令行副作用，将来拆分要把参数解析与库代码分开。
+- **转换模块按管道阶段划分**：项目只有 events 一个业务域，按域分会得到单元素目录；阶段边界才是真实的可复用边界。`common/` 是跨阶段共享层，不在骨架的列举里但符合 `utils/` 的定位。
 - **不设 `src/demo_gx/models/`**：字段契约的唯一真源是 `config/schema.yaml`，表契约在 `docs/tables/`。另设 Python 模型层会产生第二份定义。
-- **不设 `sql/`**：没有 SQL 引擎也没有 DDL，schema 变更靠 `schema.yaml` 与表契约同步。
-- **测试平铺不镜像 `src/`**：4 个测试文件对应 4 个模块，镜像会为每个文件多加一层目录。
-- **分层沿用 Bronze / Silver / Gold**：与上游 `ods` / `dwd` / `dws` / `ads` 的对应关系记在 `docs/business/DOMAIN-LANGUAGE.md`。
+- **不设 `sql/`**：没有 SQL 引擎，schema 变更靠 `schema.yaml` 与表契约同步。仓库里存在 Iceberg DDL，但只在 `docs/archive/` 作生产形态参考，不进执行路径。
+- **测试平铺不镜像 `src/`**：单文件单模块，镜像会为 4 个测试文件各加一层目录。命名不严格同源模块：`test_validation.py` 对应的是 `validation/schema_validator.py`。
+- **分层沿用 Bronze / Silver / Gold**：与上游 `ods` / `dwd` / `dws` / `ads` 的对应关系记在 `docs/business/DOMAIN-LANGUAGE.md` 的术语 `data layer mapping`。
+
+**未被单测直接覆盖的模块**：`ingestion/reader.py`、`validation/error_envelope.py`、`common/*` 与 `cli.py` 目前只有端到端 smoke 覆盖，没有直接单测。这是 `#coverage-gate-off` 的具体表现。
 
 代价与回退：迁到 Spark 加 Iceberg 时，前四条需要重建目录并在其中重新落位逻辑；后两条是命名与组织差异，回退成本为零。
 

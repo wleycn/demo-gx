@@ -30,3 +30,16 @@
 - **关联**: `CHANGELOG.md` entry for this date / `KNOWN-ISSUE.md#layout-flat-pipeline` / commit hash in `git log`.
 
 > Historical entries in this directory and in `validation.md` / `ingestion.md` name files under `pipeline/`. That was this package's path before 20260914. Entry bodies are append-only and are not rewritten.
+
+## 20260914 · verification-correction — Correct the verification claims in the three entries above
+
+- **动机**: an independent read-only audit of the three entries above found verification claims a reader cannot reproduce as written. Entry bodies stay untouched because this directory is append-only; the corrections are recorded here instead.
+- **范围**: documentation only, plus one comment in `scripts/generate_sample_data.py`. No pipeline code, config, or output shape changed.
+- **行为与契约变化**: none. The audited re-runs confirmed every underlying behaviour; what was wrong was the wording of the evidence.
+- **验证**: four corrections. Each was re-run before being written here.
+  1. **The aggregate hash `13d48407e55bdb13` is not reproducible and is withdrawn.** It was measured against a `data/sample_data.json` that no longer exists: `make run` depends on the `data` target, which regenerates that file, and `scripts/generate_sample_data.py` varies `event_id` (uuid4) and every timestamp per run. The reproducible statement is the invariant, with the fixture held fixed: two runs of `rm -rf test/data && .venv/bin/python -m demo_gx.cli --input data/sample_data.json --env test --run-timestamp 2026-09-14T00:00:00Z` give identical `sha256sum` manifests over `find test/data -type f ! -path "*/logs/*" ! -name metrics.json` — 101 files, empty `diff`.
+  2. **The artefact count in the equivalence check is fixture-dependent, not a fixed 100.** The count in the first entry was measured on the fixture present then. The method is the reproducible part: `git stash` the change, run both revisions against the same fixed fixture, compare fingerprints after dropping run-timestamp columns. Every fingerprint matched.
+  3. **"27 passed from `/tmp`" needs the absolute path**: `cd /tmp && /home/hermes/workspace/demo-gx/.venv/bin/python -m pytest /home/hermes/workspace/demo-gx/tests -q` gives 27 passed. A bare `pytest tests/` from `/tmp` collects nothing.
+  4. **The end-to-end command is `python -m demo_gx.cli`** after the package move. `pipeline/cli.py` no longer exists, so the command quoted in the first two entries no longer runs as written.
+- **回滚**: not applicable; documentation only.
+- **关联**: `docs/changes/validation.md` (same date, correction entry) / commit hash in `git log`.

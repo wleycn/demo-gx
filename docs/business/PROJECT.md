@@ -97,7 +97,7 @@ make run
 # Run tests
 make test
 # Or manually
-.venv/bin/python pipeline/cli.py --input data/sample_data.json --env dev
+.venv/bin/python -m demo_gx.cli --input data/sample_data.json --env dev
 .venv/bin/python -m pytest tests/ -q
 ```
 

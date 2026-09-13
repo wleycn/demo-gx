@@ -19,3 +19,12 @@
 - **验证**: see the full entry in `docs/changes/engineering.md`.
 - **回滚**: revert the commit.
 - **关联**: `docs/changes/engineering.md` (same date) / `KNOWN-ISSUE.md#now-timestamp`.
+
+## 20260914 · verification-correction — Correct the first entry's envelope row count
+
+- **动机**: the first entry above states the envelope held "4 rows". An independent audit re-ran it and measured 5. Neither number is a reproducible quantity: `scripts/generate_sample_data.py` varies `event_id` and every timestamp per run, so the row count tracks the fixture, not the code. Entry bodies stay untouched because this directory is append-only.
+- **范围**: documentation only. No code changed.
+- **行为与契约变化**: none.
+- **验证**: with the fixture held fixed, `rm -rf test/data && .venv/bin/python -m demo_gx.cli --input data/sample_data.json --env test --run-timestamp 2026-09-14T00:00:00Z` writes `test/data/errors/bad_schema/20260914T000000000000Z_errors.json` with 5 lines: 4 `schema_mismatch` and 1 `type_coercion_failed`. Field order is `original_json / error_type / error_details / ingestion_timestamp`. The reproducible claim is the invariant: the envelope carries all four fields in that order and both `error_type` values.
+- **回滚**: not applicable; documentation only.
+- **关联**: `docs/changes/engineering.md` (same date, correction entry).
