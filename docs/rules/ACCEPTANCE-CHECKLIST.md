@@ -14,6 +14,7 @@
 - [ ] No sensitive context leakage: no production data samples, log fragments or credentials in the code
 - [ ] Destructive operations (DROP / DELETE / bulk overwrite) have a recorded explicit human authorization
 - [ ] Agent behavior compliant: **no "incidental improvements" to adjacent code** (one task touches only the authorized scope)
+- [ ] Line-ending and blank-line hygiene: line endings match the repository declaration, with no extra blank lines (such as a double-CR `\r\r\n`)
 
 ## II. Production Readiness Checklist (before going live)
 

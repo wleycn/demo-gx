@@ -70,3 +70,13 @@
 - **Verification**: `pre_commit_gate.py --repo . --agents-strict` to exit 0 and `--repo <memo-ledger>` to exit 0, so no false positive was introduced. A negative fixture with `[data-type]` in prose now reports "残留类型标记 ['[data-type]']", which it did not before.
 - **Rollback**: revert. Recorded here because this gate decides whether this repository's commits are blocked.
 - **Related**: `docs/changes/engineering.md` (same date, `english-doc-assets`) / commit hash in `git log`.
+
+## 20260914 · line-ending-hygiene — Fix the double-CR line endings and add the byte-level check
+
+- **Motivation**: `AGENTS.md` carried `\r\r\n` (a double carriage return) at the end of every line in the working tree, so most renderers displayed a blank line after each line. `git status` and `git diff` both reported the file as clean, because the `eol=crlf` attribute in `.gitattributes` normalises line endings before comparing. A fresh clone reported the file as modified instead, because the index held an unnormalised blob. "Extra blank lines" had been reported before on other documents, and this case explains why they survive review.
+- **Scope**: this repository — `AGENTS.md` working tree rewritten to CRLF and re-added, the `docs/rules/` set re-assembled. Upstream material library — `pre_commit_gate.py` gained check 10 (line-ending hygiene at the byte level, whole repository); `_base/pre-commit-gate/README.md` gained the two missing rows for checks 9 and 10; `_base/ACCEPTANCE-CHECKLIST.md` and its `en/` mirror gained one checkpoint; skill `project-doc-system` and skill `docs-writing-discipline` document the new check. The word-list rollout never reached the rules layer for check 9, which is why that row was missing.
+- **Behaviour and contract changes**: none in the pipeline; documentation and tooling only. One acceptance criterion is added. A merge request now checks line endings and blank lines as well.
+- **Verification**: `git clone` of the repository into a temporary directory reported an empty `git status`, and `AGENTS.md` arrived as pure CRLF; before the fix the same clone reported `M AGENTS.md`. `pre_commit_gate.py --repo . --agents-strict` to exit 0 with zero warnings, and the same result for the other live project. `pytest tests/ -q` to 27 passed. The gate counterexample probe reported all eight expected hits and all five expected non-hits. A repository-wide scan found no other file with a double CR.
+- **Rollback**: revert the commits. No data repair is needed. The new gate check is a warning, except that `--eol-strict` promotes the double-CR finding to a blocker.
+- **Related**: `CHANGELOG.md` entry for this date / commit hashes in `git log`.
+
