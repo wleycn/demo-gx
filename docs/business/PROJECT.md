@@ -72,7 +72,12 @@ The gate script lives in the shared toolchain, so the hook is installed once per
 mkdir -p .git/hooks && cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
-It blocks a commit when any of three checks fails: the credential scan, the test suite, or the `AGENTS.md` structure check.
+The gate blocks a commit when any of these three checks fails:
+
+- credential scan
+- test suite
+- `AGENTS.md` structure check
+
 The test command uses the project venv (`.venv/bin/python -m pytest -q`), so no external interpreter is required.
 The hook source lives in `scripts/hooks/pre-commit`, which keeps it reviewable and reproducible.
 
