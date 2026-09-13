@@ -5,7 +5,7 @@ these tests protect the aggregation logic (dev-review: previously zero-tested).
 """
 
 import pandas as pd
-from curation.builder import GoldBuilder
+from demo_gx.curation.builder import GoldBuilder
 
 
 def _silver_df():

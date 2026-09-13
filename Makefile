@@ -7,10 +7,11 @@ ENV    ?= dev
 
 .PHONY: setup data run test clean
 
-## First run only: create the virtualenv and install dependencies
+## First run only: create the virtualenv and install the package in editable mode.
+## Dependencies are declared once in pyproject.toml; there is no separate lock file.
 setup:
 	python3 -m venv .venv
-	$(PYTHON) -m pip install -r requirements.txt
+	$(PYTHON) -m pip install -e ".[dev]"
 
 ## Generate sample input data (data/sample_data.json)
 data:
@@ -18,7 +19,7 @@ data:
 
 ## Run the full pipeline (override env: ENV=test make run)
 run: data
-	$(PYTHON) pipeline/cli.py --input $(INPUT) --env $(ENV)
+	$(PYTHON) -m demo_gx.cli --input $(INPUT) --env $(ENV)
 
 ## Run the pytest suite
 test:

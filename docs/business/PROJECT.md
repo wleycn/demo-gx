@@ -31,10 +31,11 @@ and the full list of deviations from the production shape.
 
 ```text
 demo-gx/
-├── pipeline/                 # Python packages (namespace packages, no __init__.py)
+├── src/demo_gx/              # Installable package (per-package __init__.py)
 │   ├── cli.py                # Entry point: orchestrates the full ETL flow
 │   ├── ingestion/reader.py   # read_input() + write_bronze()
 │   ├── validation/schema_validator.py   # SchemaValidator (strict contract validation)
+│   ├── validation/error_envelope.py     # Quarantine envelope build + write
 │   ├── transformation/cleaner.py        # DataCleaner
 │   ├── transformation/deduplicator.py   # Deduplicator
 │   ├── curation/builder.py              # GoldBuilder (fact / dims / wide)
@@ -49,14 +50,15 @@ demo-gx/
 ├── tests/                    # pytest suite (27 tests)
 ├── scripts/generate_sample_data.py
 ├── Makefile                  # setup / data / run / test / clean
+├── pyproject.toml            # Single entry for dependencies, packaging and pytest config
 ├── .gitlab-ci.yml            # CI skeleton (test -> data-quality -> promote)
 ├── .gitattributes            # Line-ending policy (md=CRLF, code=LF)
-├── requirements.txt
 └── README.md
 ```
 
-Run artifacts (sample input, Bronze/Silver/Gold, metrics, logs) live under environment
-storage dirs (`data/`, `test/data/`, `data_prod/`) and are git-ignored.
+The package is installed in editable mode by `make setup`, so the entry point is
+`python -m demo_gx.cli`. Run artifacts (sample input, Bronze/Silver/Gold, metrics, logs) live
+under environment storage dirs (`data/`, `test/data/`, `data_prod/`) and are git-ignored.
 
 ## Contract Summary
 
@@ -117,7 +119,6 @@ The following known issues are documented in [KNOWN-ISSUE.md](KNOWN-ISSUE.md):
 
 | Anchor | One-line summary |
 |---|---|
-| `#layout-flat-pipeline` | Flat namespace packages instead of installable `src/` layout |
 | `#coverage-gate-off` | No coverage gate; baseline is one assertion per requirement |
 | `#no-catalog` | No catalog; local Parquet without session management |
 | `#no-snapshot-lifecycle` | No snapshot layer; partition directories are overwritten directly |

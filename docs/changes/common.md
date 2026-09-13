@@ -1,4 +1,4 @@
-# common changes (`pipeline/common/`)
+# common changes (`src/demo_gx/common/`)
 
 > Format and discipline: see `docs/rules/DEVELOP-FLOW.md` section 4. Append-only; never rewrite past entries.
 

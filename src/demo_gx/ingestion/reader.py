@@ -9,7 +9,7 @@ import pandas as pd
 from pathlib import Path
 import json
 
-from common.time_utils import parse_utc_mixed
+from demo_gx.common.time_utils import parse_utc_mixed
 
 
 def read_input(file_path: str) -> pd.DataFrame:

@@ -1,7 +1,7 @@
 """Unit tests for the deduplication module (Deduplicator)."""
 
 import pandas as pd
-from transformation.deduplicator import Deduplicator
+from demo_gx.transformation.deduplicator import Deduplicator
 
 
 def _dup_df(*rows):

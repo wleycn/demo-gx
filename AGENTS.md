@@ -16,9 +16,9 @@
 
 - **语言与运行环境**：Python 3.11（最低 3.10）。虚拟环境在项目内 `.venv/`，不进版本库，命令一律以 `.venv/bin/python` 开头
 - **存储引擎**：本地文件系统，无数据库。三层数据落 `data/`，测试环境落 `test/data/`，由配置项 `storage.base_path` 隔离
-- **编排**：`Makefile` 目标加 `pipeline/cli.py`，无调度器。分区参数由 `--event-date` 注入，运行时间戳由 `--run-timestamp` 注入；入口只在未注入时读一次系统时间
+- **编排**：`src/demo_gx/cli.py`，以 `python -m demo_gx.cli` 调用，无调度器。分区参数由 `--event-date` 注入，运行时间戳由 `--run-timestamp` 注入；入口只在未注入时读一次系统时间
 - **表格式**：Parquet 分区目录 `event_date=YYYY-MM-DD`，无 Iceberg，无 catalog
-- **依赖与工具链**：`requirements.txt`（pandas / pyarrow / pyyaml / pytest）、`pytest.ini`、`.gitlab-ci.yml`
+- **依赖与工具链**：`pyproject.toml`（依赖与工具链唯一入口）、`Makefile`、`.gitlab-ci.yml`
 - **目标形态**：设计面向 Spark 加 Iceberg 的大数据形态，本地以 Pandas 单机验证。技术选型与被否方案见 `docs/business/PROJECT.md`
 
 ## 2. 上下文加载（动手前必做）
@@ -65,7 +65,7 @@
 
 ## 6. 变更留痕
 
-功能或契约变更，在 `docs/changes/{module}.md` **追加**一条目。条目 slug 与分支名同名，七项模板见 `docs/rules/DEVELOP-FLOW.md` §4。`{module}` 取 `pipeline/` 顶层模块目录名，即 `ingestion`、`validation`、`transformation`、`curation`、`common`；非功能变更落 `engineering.md`。该目录**只放条目文件**，不放 README、说明或附件。模块清单见 §9.1 项目地图。
+功能或契约变更，在 `docs/changes/{module}.md` **追加**一条目。条目 slug 与分支名同名，七项模板见 `docs/rules/DEVELOP-FLOW.md` §4。`{module}` 取 `src/demo_gx/` 顶层模块目录名，即 `ingestion`、`validation`、`transformation`、`curation`、`common`；非功能变更落 `engineering.md`。该目录**只放条目文件**，不放 README、说明或附件。模块清单见 §9.1 项目地图。
 
 - 上线后追加部署记录。
 
@@ -103,7 +103,9 @@
 | 表契约 | `docs/tables/{table}.md` | 一表一档：粒度 / 主键 / 去重方式 / 生命周期 |
 | 字段契约源 | `config/schema.yaml` | 字段类型 / 必填 / 枚举 / 正则表达式 |
 | 环境配置 | `config/dev.yaml`、`config/test.yaml`、`config/prod.yaml` | 存储路径 / 日志 / 指标 / 告警 |
-| 管道入口 | `pipeline/cli.py` | 六阶段编排；`Makefile` 五个目标封装常用命令 |
+| 产品代码 | `src/demo_gx/` | 可安装包；入口 `cli.py`，模块 `common` / `ingestion` / `validation` / `transformation` / `curation` |
+| 依赖与工具链 | `pyproject.toml` | 依赖声明、打包与 pytest 配置的唯一入口 |
+| 样例数据生成 | `scripts/generate_sample_data.py` | 生成 `data/sample_data.json`，不含业务逻辑 |
 | 运行产物 | `data/` | Bronze / Silver / Gold / errors，可重建，勿手改 |
 | 变更留痕 | `docs/changes/{module}.md` | 每模块一份，追加式变更条目 |
 | 门禁 | `.git/hooks/pre-commit` | 调用 `ng/tools/pre_commit_gate.py` |
@@ -143,8 +145,13 @@
 
 | 议题 | 上游写法 | 本项目 | 处置 |
 |---|---|---|---|
-| 建环境 | 提交 `uv.lock` 锁文件 | 标准库 venv 加 `requirements.txt`；本机未装 uv | 等效替代（上游允许无 uv 时走此路径），见 `docs/business/PROJECT.md` |
-| 源目录布局 | 可安装包 `src/{pkg}/`，各包含 `__init__.py` | 平铺命名空间包 `pipeline/`，无 `__init__.py` | 迁移项，见 `docs/business/KNOWN-ISSUE.md#layout-flat-pipeline` |
+| 建环境 | 提交 `uv.lock` 锁文件 | `pyproject.toml` 声明依赖，venv 加 pip 安装，无锁文件 | 见 `docs/business/PROJECT.md` |
+| 编排目录 | `dags/` 放任务编排与依赖组装 | 无调度器；编排兼在包内入口 `src/demo_gx/cli.py` | 见下「数据处理骨架适用边界」 |
+| 转换模块划分 | `src/{pkg}/pipelines/{domain}/`，按业务域 | 按管道阶段分模块：`ingestion` / `validation` / `transformation` / `curation` | 见下「数据处理骨架适用边界」 |
+| 契约模型层 | `src/{pkg}/models/` 放 schema 与类型定义 | 字段契约在 `config/schema.yaml`，表契约在 `docs/tables/`；无 Python 模型层 | 见下「数据处理骨架适用边界」 |
+| SQL 资产 | `sql/migrations/` 增量 DDL 与 `sql/transforms/` | 无 SQL 引擎，无 DDL；Parquet 直接落盘 | 见下「数据处理骨架适用边界」 |
+| 测试目录 | `tests/` 与 `src/` 镜像 | 平铺 `tests/test_{module}.py` | 见下「数据处理骨架适用边界」 |
+| 数据分层命名 | `ods` → `dwd` → `dws` → `ads` | Bronze → Silver → Gold | 见 `docs/business/DOMAIN-LANGUAGE.md` 分层映射 |
 | 覆盖率门禁 | 有 CI 的项目单测覆盖率 ≥ 80% | 未启用覆盖率工具；底线为「每需求至少一条断言」 | 见 `docs/business/KNOWN-ISSUE.md#coverage-gate-off` |
 | 计算与 catalog 收口 | 由 `catalog.py` 统一会话与表加载 | 无 catalog：本地 Parquet，不存在会话概念 | 见 `docs/business/KNOWN-ISSUE.md#no-catalog` |
 | 快照与压缩策略 | 每张表配置保留期与压缩任务 | 分区目录直接覆盖写，无快照层 | 见 `docs/business/KNOWN-ISSUE.md#no-snapshot-lifecycle` |
@@ -153,6 +160,17 @@
 | 阶段模型 | 基线十阶段（含预发 / 部署 / 观测） | 阶段 8 以端到端 smoke 代替，阶段 9 与 10 不适用 | 见下「阶段模型适用边界」 |
 
 **阶段模型适用边界**：本项目是本地参考实现，没有预发环境、没有生产部署、没有 CI 之外的发布链路。基线十阶段中阶段 1–7 全量适用；阶段 8 以端到端 smoke 代替，界面类检查不适用；阶段 9 与阶段 10 不适用。CI 门禁与提交纪律仍然适用。
+
+**数据处理骨架适用边界**：数据处理类型的结构骨架假定 Spark 加 Iceberg 加调度器的技术栈。本项目是 Pandas 单机参考实现（选型与被否方案见 `docs/business/PROJECT.md`），骨架中依赖该栈的条目经登记后不适用：
+
+- **不设 `dags/`**：没有调度器。编排兼在包内入口，`python -m demo_gx.cli` 就是调用方式。骨架允许入口合并时只留 `src/`，本项目满足那三条边界。
+- **转换模块按管道阶段划分**：项目只有 events 一个业务域，按域分会得到单元素目录；阶段边界才是真实的可复用边界。
+- **不设 `src/demo_gx/models/`**：字段契约的唯一真源是 `config/schema.yaml`，表契约在 `docs/tables/`。另设 Python 模型层会产生第二份定义。
+- **不设 `sql/`**：没有 SQL 引擎也没有 DDL，schema 变更靠 `schema.yaml` 与表契约同步。
+- **测试平铺不镜像 `src/`**：4 个测试文件对应 4 个模块，镜像会为每个文件多加一层目录。
+- **分层沿用 Bronze / Silver / Gold**：与上游 `ods` / `dwd` / `dws` / `ads` 的对应关系记在 `docs/business/DOMAIN-LANGUAGE.md`。
+
+代价与回退：迁到 Spark 加 Iceberg 时，前四条需要重建目录并在其中重新落位逻辑；后两条是命名与组织差异，回退成本为零。
 
 - **禁止无登记地默默降标准**。「这只是个例」不是免于登记的理由。
 - **表格里的竖线要转义**：单元格中写 `a|b` 这类含竖线的内容时，写成 `a\|b`，否则 Markdown 会把这一格切坏。

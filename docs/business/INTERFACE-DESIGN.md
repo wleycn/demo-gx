@@ -4,7 +4,7 @@ This document is the single source of truth for the CLI interface, input formats
 
 ## 1. CLI Parameter Contract
 
-Entry point: `pipeline/cli.py`
+Entry point: `demo_gx.cli`, run as `python -m demo_gx.cli`
 
 | Parameter | Required | Default | Choices | Description |
 |---|---|---|---|---|
@@ -16,9 +16,9 @@ Entry point: `pipeline/cli.py`
 Example:
 
 ```bash
-.venv/bin/python pipeline/cli.py --input data/sample_data.json --env dev
-.venv/bin/python pipeline/cli.py --input data/sample_data.json --env test --event-date 2026-09-09
-.venv/bin/python pipeline/cli.py --input data/sample_data.json --env test --run-timestamp 2026-09-14T00:00:00Z
+python -m demo_gx.cli --input data/sample_data.json --env dev
+python -m demo_gx.cli --input data/sample_data.json --env test --event-date 2026-09-09
+python -m demo_gx.cli --input data/sample_data.json --env test --run-timestamp 2026-09-14T00:00:00Z
 ```
 
 The CLI anchors all relative paths (storage, logs, metrics, input) to the project root, so it behaves identically regardless of the caller's working directory.

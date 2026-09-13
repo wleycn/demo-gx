@@ -7,7 +7,7 @@ quarantined with a descriptive error reason).
 
 import pytest
 import pandas as pd
-from validation.schema_validator import SchemaValidator
+from demo_gx.validation.schema_validator import SchemaValidator
 import yaml
 from pathlib import Path
 

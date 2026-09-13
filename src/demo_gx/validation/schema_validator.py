@@ -12,7 +12,7 @@ import json
 from datetime import datetime
 import uuid
 
-from common.time_utils import parse_utc_mixed
+from demo_gx.common.time_utils import parse_utc_mixed
 
 
 class SchemaValidator:

@@ -10,7 +10,7 @@ Python 3.10 or later, and `make` (Linux/macOS). Every step has a `make` target; 
 
 | Step | Command | What it does |
 |---|---|---|
-| 1 | `make setup` | First run only: create `.venv` and install dependencies |
+| 1 | `make setup` | First run only: create `.venv` and install the package in editable mode |
 | 2 | `make data` | Generate `data/sample_data.json` (107 records with injected anomalies) |
 | 3 | `make run` | Run the pipeline (default env `dev`; override with `ENV=test make run`) |
 | 4 | `make test` | Run the pytest suite |
@@ -19,29 +19,34 @@ Python 3.10 or later, and `make` (Linux/macOS). Every step has a `make` target; 
 Manual equivalents (no `make`):
 
 ```bash
-# 1. Setup (first run only)
+# 1. Setup (first run only). Dependencies are declared in pyproject.toml.
 python3 -m venv .venv
-source .venv/bin/activate
-.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m pip install -e ".[dev]"
 
 # 2. Generate data
 .venv/bin/python scripts/generate_sample_data.py
 
 # 3. Run the pipeline
-.venv/bin/python pipeline/cli.py --input data/sample_data.json --env dev
+.venv/bin/python -m demo_gx.cli --input data/sample_data.json --env dev
 
 # 4. Run tests
 .venv/bin/python -m pytest tests/
 ```
 
+`pip install -e .` is what makes `python -m demo_gx.cli` work from any directory.
+If you would rather not install, `PYTHONPATH=src .venv/bin/python -m demo_gx.cli ...`
+runs the same entry point, and `pytest` needs no install at all because
+`pyproject.toml` already puts `src` on the test path.
+
 ## Repository Layout
 
 ```text
 demo-gx/
-├── pipeline/                 # Python packages (namespace packages, no __init__.py)
+├── src/demo_gx/              # Installable package (per-package __init__.py)
 │   ├── cli.py                # Entry point: orchestrates read -> Bronze -> validate -> clean -> dedup -> Silver -> Gold
 │   ├── ingestion/reader.py   # read_input() + write_bronze()
 │   ├── validation/schema_validator.py   # SchemaValidator (strict contract validation)
+│   ├── validation/error_envelope.py     # Quarantine envelope build + write
 │   ├── transformation/cleaner.py        # DataCleaner
 │   ├── transformation/deduplicator.py   # Deduplicator
 │   ├── curation/builder.py              # GoldBuilder (fact / dims / wide)
@@ -57,9 +62,9 @@ demo-gx/
 ├── scripts/generate_sample_data.py
 ├── scripts/hooks/pre-commit  # Pre-commit gate hook (copy into .git/hooks)
 ├── Makefile                  # setup / data / run / test / clean
+├── pyproject.toml            # Single entry for dependencies, packaging and pytest config
 ├── .gitlab-ci.yml            # CI skeleton (test -> data-quality -> promote)
 ├── .gitattributes            # Line-ending policy (md=CRLF, code=LF)
-├── requirements.txt
 └── README.md
 ```
 

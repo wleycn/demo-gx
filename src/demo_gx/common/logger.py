@@ -40,8 +40,11 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(entry, ensure_ascii=False)
 
 
+LOGGER_NAME = "demo_gx"
+
+
 def setup_logging(level: str = "INFO", log_file: str | None = None) -> logging.Logger:
-    """Configure and return the ``pipeline`` logger.
+    """Configure and return the ``demo_gx`` logger.
 
     Writes to stdout and, optionally, appends to a file.  Idempotent per
     handler TYPE: calling again with a ``log_file`` after an earlier
@@ -56,9 +59,9 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> logging.L
             logging is enabled.
 
     Returns:
-        logging.Logger: The configured ``pipeline`` logger.
+        logging.Logger: The configured ``demo_gx`` logger.
     """
-    logger = logging.getLogger("pipeline")
+    logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(level.upper())
     formatter = JsonFormatter()
     if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
@@ -75,14 +78,14 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> logging.L
     return logger
 
 
-def get_logger(name: str = "pipeline") -> logging.Logger:
-    """Return the pipeline logger for reuse across modules.
+def get_logger(name: str = LOGGER_NAME) -> logging.Logger:
+    """Return the ``demo_gx`` logger for reuse across modules.
 
     ``setup_logging`` must be called before the first use of this function
     so that handlers are configured.
 
     Args:
-        name (str): Logger name.  Defaults to ``"pipeline"``.
+        name (str): Logger name.  Defaults to ``demo_gx``.
 
     Returns:
         logging.Logger: The logger instance.

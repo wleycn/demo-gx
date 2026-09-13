@@ -1,4 +1,4 @@
-# ingestion changes (`pipeline/ingestion/`)
+# ingestion changes (`src/demo_gx/ingestion/`)
 
 > Format and discipline: see `docs/rules/DEVELOP-FLOW.md` section 4. Append-only; never rewrite past entries.
 

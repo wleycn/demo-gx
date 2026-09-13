@@ -14,16 +14,16 @@ import sys
 from pathlib import Path
 import pandas as pd
 
-from common.config import PROJECT_ROOT, load_config, load_schema
-from common.logger import setup_logging, get_logger
-from common.metrics import MetricsCollector
-from common.time_utils import parse_utc_mixed
-from ingestion.reader import read_input, write_bronze
-from validation.schema_validator import SchemaValidator
-from validation.error_envelope import write_error_envelope
-from transformation.cleaner import DataCleaner
-from transformation.deduplicator import Deduplicator
-from curation.builder import GoldBuilder
+from demo_gx.common.config import PROJECT_ROOT, load_config, load_schema
+from demo_gx.common.logger import setup_logging, get_logger
+from demo_gx.common.metrics import MetricsCollector
+from demo_gx.common.time_utils import parse_utc_mixed
+from demo_gx.ingestion.reader import read_input, write_bronze
+from demo_gx.validation.schema_validator import SchemaValidator
+from demo_gx.validation.error_envelope import write_error_envelope
+from demo_gx.transformation.cleaner import DataCleaner
+from demo_gx.transformation.deduplicator import Deduplicator
+from demo_gx.curation.builder import GoldBuilder
 
 
 def main():

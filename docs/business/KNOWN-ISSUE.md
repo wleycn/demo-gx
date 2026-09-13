@@ -1,16 +1,7 @@
 # Known Issues and Design Decisions
 
 This document records known pitfalls, design decisions, and rejected alternatives. Each entry has five parts: symptom, root cause, impact, disposition, and related document. The disposition is either "accepted" (the project lives with it) or "migration item" (to be addressed when the production shape is available).
-The `AGENTS.md` section 10 deviation table points to the six anchors below. Items that have been migrated out of this list are listed under "Resolved Migration Items" at the end.
----
-
-### #layout-flat-pipeline — Flat namespace packages instead of installable src layout
-
-**Symptom**: the `pipeline/` directory uses flat namespace packages with no `__init__.py` files, instead of the installable `src/{pkg}/` layout with per-package `__init__.py`.
-**Root cause**: the project was set up as a take-home reference implementation, not a distributable package. The flat layout was chosen for simplicity and faster iteration.
-**Impact**: the package cannot be `pip install`ed. Imports rely on the working directory being the project root. Tooling like `pip install -e .` is not available.
-**Disposition**: migration item. Moving to `src/` layout is a future task when the project is packaged for reuse.
-**Related**: PROJECT.md (directory layout), AGENTS.md section 10 (deviation: source directory layout).
+The `AGENTS.md` section 10 deviation table points to the five anchors below. Items that have been migrated out of this list are listed under "Resolved Migration Items" at the end.
 ---
 
 ### #coverage-gate-off — No coverage gate enabled
@@ -100,6 +91,7 @@ Items that were registered as migration items and have since been migrated out. 
 |---|---|---|
 | `#cli-holds-transform` | `cli.py` built the error envelope instead of delegating to a module | `docs/changes/validation.md` (20260914) — extracted to `validation/error_envelope.py` |
 | `#now-timestamp` | Pipeline code read the system clock for processing timestamps | `docs/changes/engineering.md` (20260914) — `--run-timestamp` injected at the entry boundary and threaded down |
+| `#layout-flat-pipeline` | Flat namespace packages instead of an installable src layout | `docs/changes/engineering.md` (20260914) — moved to `src/demo_gx/`, per-package `__init__.py`, `pyproject.toml` |
 
 ### Residual boundaries after #now-timestamp
 

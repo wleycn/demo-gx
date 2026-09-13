@@ -1,4 +1,4 @@
-# curation changes (`pipeline/curation/`)
+# curation changes (`src/demo_gx/curation/`)
 
 > Format and discipline: see `docs/rules/DEVELOP-FLOW.md` section 4. Append-only; never rewrite past entries.
 

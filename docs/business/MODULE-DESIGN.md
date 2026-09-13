@@ -16,9 +16,11 @@ Each module is responsible for one thing only and communicates via standardized 
 | `common/` | `logger.py` | Structured JSON logging | `setup_logging(level, log_file)`, `get_logger(name)` |
 | `common/` | `metrics.py` | Run metrics collection and persistence | `class MetricsCollector` |
 | `common/` | `time_utils.py` | Shared timestamp parsing policy | `parse_utc_mixed(series)` |
-| `pipeline/` | `cli.py` | CLI entry point: parse arguments, orchestrate the full pipeline | `main()` |
+| `demo_gx/` | `cli.py` | Package entry point: parse arguments, orchestrate the full pipeline | `main()` |
 
 ## 2. Module Interface Contracts
+
+All paths in this section are relative to `src/demo_gx/`.
 
 ### 2.1 ingestion/reader.py
 

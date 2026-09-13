@@ -18,7 +18,7 @@ unit-test:
   stage: test
   image: python:3.11
   before_script:
-    - pip install --cache-dir "$PIP_CACHE_DIR" -r requirements.txt
+    - pip install --cache-dir "$PIP_CACHE_DIR" -e ".[dev]"
   script:
     - python -m pytest tests/ -v
 
@@ -26,11 +26,11 @@ data-quality:
   stage: data-quality
   image: python:3.11
   before_script:
-    - pip install --cache-dir "$PIP_CACHE_DIR" -r requirements.txt
+    - pip install --cache-dir "$PIP_CACHE_DIR" -e ".[dev]"
   script:
     # End-to-end smoke: generate sample data and run the pipeline (test env)
     - python scripts/generate_sample_data.py
-    - python pipeline/cli.py --input data/sample_data.json --env test
+    - python -m demo_gx.cli --input data/sample_data.json --env test
     # Assertions: a regression that quarantines everything must fail CI
     - python -c "import json; m=json.load(open('test/data/metrics.json')); assert m['valid_rows']>0, 'no valid rows survived validation'; print('valid_rows', m['valid_rows'])"
     - python -c "import glob; assert glob.glob('test/data/gold/fact_daily_events/event_date=*/data.parquet'), 'gold fact table missing'; print('gold ok')"

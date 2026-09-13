@@ -1,7 +1,7 @@
 """Unit tests for the cleaning module (DataCleaner)."""
 
 import pandas as pd
-from transformation.cleaner import DataCleaner
+from demo_gx.transformation.cleaner import DataCleaner
 
 
 def _clean_df(**overrides):
