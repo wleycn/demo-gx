@@ -80,3 +80,12 @@
 - **Rollback**: revert the commits. No data repair is needed. The new gate check is a warning, except that `--eol-strict` promotes the double-CR finding to a blocker.
 - **Related**: `CHANGELOG.md` entry for this date / commit hashes in `git log`.
 
+## 20260914 · eol-check-blocking — Make the double-CR finding a blocker, and keep the archive out of scope
+
+- **Motivation**: the line-ending check added earlier the same day reported a double CR as a warning. That defect is invisible to git, so this check is the only thing that can catch it, and a warning is easy to scroll past. The byte pattern has no legitimate use in a text file, and the check produced zero false positives across both live projects and the whole machine.
+- **Scope**: `ng/tools/pre_commit_gate.py` — the double-CR finding blocks by default, `--eol-strict` is replaced by `--eol-warn` as the downgrade escape, and the scan now skips the archive area through the same `ARCHIVE_SKIP_RX` constant that the writing check uses. Upstream material library — the gate README row and the two skills that describe the check. No file in this repository changed for this fix.
+- **Behaviour and contract changes**: a commit that introduces a double CR outside the archive area is now rejected. The remaining line-ending findings stay at warning level.
+- **Verification**: both live projects to exit 0 with blocking enabled. A machine-wide scan of 18417 text files found no double CR outside the archive area, so the new blocker cannot fire on existing content. The counterexample probe now asserts the exit code as well as the message; it reported eight expected hits, six expected non-hits, and a non-zero exit against a repository that contains a double-CR sample.
+- **Rollback**: revert the commit. `--eol-warn` downgrades the check in place, and `--no-eol` skips it entirely.
+- **Related**: `docs/changes/engineering.md` (same date, `line-ending-hygiene`) / `CHANGELOG.md` / commit hash in `git log`.
+
