@@ -6,7 +6,8 @@ Gold (curated)
 
 ## Grain
 
-Same as `fact_daily_events`: one row per `event_date` plus `customer_id` plus `event_type` group, denormalized with dimension columns.
+Same as `fact_daily_events`: one row per `event_date` plus `customer_id` plus `event_type`
+group, denormalized with dimension columns.
 
 ## Business Primary Key
 
@@ -14,7 +15,8 @@ Composite: (`event_date`, `customer_id`, `event_type`)
 
 ## Deduplication
 
-Not applicable. Built by left-joining the fact table with dimension tables. Source-level deduplication happens in Silver.
+Not applicable. Built by left-joining the fact table with dimension tables. Source-level
+deduplication happens in Silver.
 
 ## Partition
 
@@ -36,6 +38,9 @@ Not applicable. Built by left-joining the fact table with dimension tables. Sour
 ## Lifecycle
 
 - **Write mode**: partition-scoped overwrite (idempotent).
-- **Source**: built from the fact table and dimension tables; the fact table in turn reads the full on-disk Silver snapshot. Rule: DATA-DESIGN.md section 2.4.
+- **Source**: built from the fact table and dimension tables; the fact table in turn reads
+  the full on-disk Silver snapshot. Rule: DATA-DESIGN.md section 2.4.
 - **Retention**: no retention policy. All partitions persist until manually cleaned.
-- **Join semantics**: left join with `validate="many_to_one"` to ensure each fact row maps to at most one dimension row. A dimension miss produces `NaN` in the dimension columns, not a dropped row.
+- **Join semantics**: left join with `validate="many_to_one"` to ensure each fact row maps
+  to at most one dimension row. A dimension miss produces `NaN` in the dimension columns,
+  not a dropped row.

@@ -14,7 +14,8 @@ Composite: (`event_date`, `customer_id`, `event_type`)
 
 ## Deduplication
 
-Not applicable. The fact table is an aggregation built from Silver detail data. Source-level deduplication happens in Silver by `event_id`.
+Not applicable. The fact table is an aggregation built from Silver detail data. Source-level
+deduplication happens in Silver by `event_id`.
 
 ## Partition
 
@@ -34,6 +35,8 @@ Not applicable. The fact table is an aggregation built from Silver detail data. 
 ## Lifecycle
 
 - **Write mode**: partition-scoped overwrite (idempotent).
-- **Source**: built from the full on-disk Silver snapshot, so a backfill run cannot lose rows or shrink dimensions. Rule: DATA-DESIGN.md section 2.4.
+- **Source**: built from the full on-disk Silver snapshot, so a backfill run cannot lose
+  rows or shrink dimensions. Rule: DATA-DESIGN.md section 2.4.
 - **Retention**: no retention policy. All partitions persist until manually cleaned.
-- **Reprocessing**: `--event-date` reprocesses one date. Gold rebuild semantics: DATA-DESIGN.md section 2.6.
+- **Reprocessing**: `--event-date` reprocesses one date. Gold rebuild semantics:
+  DATA-DESIGN.md section 2.6.

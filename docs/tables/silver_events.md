@@ -14,11 +14,14 @@ One row per unique event (after deduplication by `event_id`).
 
 ## Deduplication
 
-By `event_id`, keeping the record with the latest `ingestion_timestamp`. Superseded duplicates are written to `errors/duplicates.log`. The tie-break rule lives in DATA-DESIGN.md section 1.
+By `event_id`, keeping the record with the latest `ingestion_timestamp`. Superseded
+duplicates are written to `errors/duplicates.log`. The tie-break rule lives in
+DATA-DESIGN.md section 1.
 
 ## Partition
 
-`event_date` (date, derived from `event_timestamp`). Partition directory format: `event_date={YYYY-MM-DD}/data.parquet`.
+`event_date` (date, derived from `event_timestamp`). Partition directory format:
+`event_date={YYYY-MM-DD}/data.parquet`.
 
 ## Field List
 
@@ -43,7 +46,9 @@ By `event_id`, keeping the record with the latest `ingestion_timestamp`. Superse
 
 ## Lifecycle
 
-- **Write mode**: partition-scoped overwrite (idempotent). Each partition's `data.parquet` is rewritten per run.
+- **Write mode**: partition-scoped overwrite (idempotent). Each partition's `data.parquet`
+  is rewritten per run.
 - **Empty partitions**: not pruned. A full clean re-run (`make clean`) removes all artifacts.
 - **Retention**: no retention policy. All partitions persist until manually cleaned.
-- **Reprocessing**: `--event-date` reprocesses one date. Late data writes to the corresponding historical partition.
+- **Reprocessing**: `--event-date` reprocesses one date. Late data writes to the
+  corresponding historical partition.

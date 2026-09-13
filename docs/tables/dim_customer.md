@@ -30,6 +30,8 @@ None. Full snapshot, non-partitioned. Written as a single `data.parquet` file.
 ## Lifecycle
 
 - **Write mode**: full overwrite. The entire table is rewritten on every run.
-- **Source**: built from the full on-disk Silver snapshot, so a backfill run cannot lose customers or reset `first_seen_date`. Rule: DATA-DESIGN.md section 2.4.
+- **Source**: built from the full on-disk Silver snapshot, so a backfill run cannot lose
+  customers or reset `first_seen_date`. Rule: DATA-DESIGN.md section 2.4.
 - **Retention**: no retention policy. The table is overwritten on each run.
-- **Future extension**: the `category` field is reserved for a business classification but is currently not populated.
+- **Future extension**: the `category` field is reserved for a business classification but
+  is currently not populated.
