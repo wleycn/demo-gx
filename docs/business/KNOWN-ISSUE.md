@@ -1,7 +1,7 @@
 # Known Issues and Design Decisions
 
 This document records known pitfalls, design decisions, and rejected alternatives. Each entry has five parts: symptom, root cause, impact, disposition, and related document. The disposition is either "accepted" (the project lives with it) or "migration item" (to be addressed when the production shape is available).
-The `AGENTS.md` section 10 deviation table points to the eight anchors below.
+The `AGENTS.md` section 10 deviation table points to the seven anchors below. Items that have been migrated out of this list are listed under "Resolved Migration Items" at the end.
 ---
 
 ### #layout-flat-pipeline — Flat namespace packages instead of installable src layout
@@ -58,15 +58,6 @@ The `AGENTS.md` section 10 deviation table points to the eight anchors below.
 **Related**: INTERFACE-DESIGN.md (CLI parameters), AGENTS.md section 3 (red line: partition parameter injection), AGENTS.md section 10 (deviation: partition parameter injection).
 ---
 
-### #cli-holds-transform — CLI builds the error envelope instead of delegating to a module
-
-**Symptom**: `cli.py` constructs the error envelope (classifying error reasons, building the JSON structure, writing to disk) instead of delegating this to a dedicated module.
-**Root cause**: the upstream rule requires the orchestration file to only orchestrate, not contain transformation logic. The error envelope construction was added to the CLI during development for convenience and was not refactored into a separate module.
-**Impact**: the CLI is longer than it needs to be. The error classification logic (mapping validator reasons to `schema_mismatch` or `type_coercion_failed`) is coupled to the CLI rather than living in the validation or transformation layer.
-**Disposition**: migration item. A future refactor should extract the envelope construction into a dedicated function or module, keeping the CLI as a thin orchestrator.
-**Related**: MODULE-DESIGN.md (section 2.9, pipeline entry), INTERFACE-DESIGN.md (section 4, error envelope fields), AGENTS.md section 10 (deviation: orchestration and transformation separation).
----
-
 ### #table-contract-approval — No approval chain for table contracts
 
 **Symptom**: table contract files in `docs/tables/` do not carry a `status: approved` frontmatter field. There is no CI check that blocks migration of unapproved contracts.
@@ -107,3 +98,13 @@ The `AGENTS.md` section 10 deviation table points to the eight anchors below.
 **Chosen**: Bronze, Silver, and Gold writes use partition-scoped overwrite.
 **Rejected**: append mode.
 **Reason**: re-running the same date must not produce duplicate data. A production Bronze would append new files instead of overwriting, but for the single-machine demo, overwrite is simpler and sufficient.
+
+---
+
+## Resolved Migration Items
+
+Items that were registered as migration items and have since been migrated out. The full record lives in the module change log; the line here keeps the audit trail visible from this document.
+
+| Anchor | Was | Resolved in |
+|---|---|---|
+| `#cli-holds-transform` | `cli.py` built the error envelope instead of delegating to a module | `docs/changes/validation.md` (20260914) — extracted to `validation/error_envelope.py` |

@@ -150,7 +150,6 @@
 | 快照与压缩策略 | 每张表配置保留期与压缩任务 | 分区目录直接覆盖写，无快照层 | 见 `docs/business/KNOWN-ISSUE.md#no-snapshot-lifecycle` |
 | 金额精度 | 金额禁用 `float`，走 DECIMAL 与统一换算 | `amount` 列为 pandas `float64` | 见 `docs/business/KNOWN-ISSUE.md#amount-float` |
 | 分区参数注入 | 任务签名 `run(ds)`，禁读系统当前时间 | `cli.py` 用 `pd.Timestamp.now` 生成处理时间戳 | 见 `docs/business/KNOWN-ISSUE.md#now-timestamp` |
-| 编排与转换分离 | 编排文件只做编排，禁写转换逻辑 | `cli.py` 就地构造错误封套并落盘 | 见 `docs/business/KNOWN-ISSUE.md#cli-holds-transform` |
 | 表契约审批 | 契约 frontmatter 记 `status: approved`，CI 拦截未审迁移 | 本地参考实现，无审批链路 | 见 `docs/business/KNOWN-ISSUE.md#table-contract-approval` |
 | 阶段模型 | 基线十阶段（含预发 / 部署 / 观测） | 阶段 8 以端到端 smoke 代替，阶段 9 与 10 不适用 | 见下「阶段模型适用边界」 |
 

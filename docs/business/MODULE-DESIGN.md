@@ -8,6 +8,7 @@ Each module is responsible for one thing only and communicates via standardized 
 |---|---|---|---|
 | `ingestion/` | `reader.py` | Read raw data (JSON/CSV/Parquet) and append `_raw_json` audit column; archive arriving records to Bronze | `read_input(file_path)`, `write_bronze(raw_df, bronze_base)` |
 | `validation/` | `schema_validator.py` | Strict data-contract validation (field existence, type, enum, pattern, minimum, future time) | `class SchemaValidator` with `validate(df) -> (valid_df, invalid_df)` |
+| `validation/` | `error_envelope.py` | Build the quarantine error envelope and map validator reasons to the coarse `error_type` | `classify_error(reason)`, `build_error_envelope(invalid_df, ingestion_timestamp)`, `write_error_envelope(invalid_df, errors_dir, ingestion_timestamp)` |
 | `transformation/` | `cleaner.py` | Timestamp UTC standardization, currency normalization, amount numeric check | `class DataCleaner` with `standardize_timestamps(df)`, `normalize_currency(df)`, `check_amount(df)` |
 | `transformation/` | `deduplicator.py` | Deduplicate by business key (`event_id`), keep the newest record | `class Deduplicator` with `deduplicate(df)` |
 | `curation/` | `builder.py` | Build Gold star schema (fact, dimensions, wide table) | `class GoldBuilder` with `build_fact_table(df)`, `build_dimensions(df)`, `build_wide_table(fact_df, dims)` |
@@ -90,13 +91,21 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 2. Call `ingestion.read_input` to read the batch.
 3. Call `ingestion.write_bronze` to archive the full arriving batch.
 4. If `--event-date` is given, scope processing to rows whose `event_timestamp` falls on that date.
-5. Call `SchemaValidator.validate` to split valid and invalid data. Invalid records are written to `errors/bad_schema/` with an error envelope.
+5. Call `SchemaValidator.validate` to split valid and invalid data. Invalid records are handed to `validation.error_envelope.write_error_envelope`, which builds the envelope and writes it to `errors/bad_schema/`.
 6. Call `DataCleaner` and `Deduplicator` to process valid data. Superseded duplicates are written to `errors/duplicates.log`.
 7. Write to Silver layer (partitioned by `event_date`, Parquet format). Add `_processed_timestamp` at write time.
 8. Call `GoldBuilder` to generate Gold-layer data from the full on-disk Silver snapshot (see DATA-DESIGN.md section 2.4).
 9. Save `metrics.json`.
 
 **Idempotency**: Bronze, Silver, and Gold writes use partition-scoped overwrite mode. Re-running the same date does not produce duplicate data.
+
+### 2.10 validation/error_envelope.py
+
+**Description**: owns the quarantine error envelope end to end. `classify_error` maps a validator `error_reason` to the coarse `error_type`. `build_error_envelope` assembles the four-field frame. `write_error_envelope` writes it as JSON Lines to `errors/bad_schema/{timestamp}_errors.json` and returns the written path. The filename stamp is made filesystem-safe because an ISO string contains characters illegal on Windows.
+**Input**: the rejected DataFrame (carrying `error_reason`), the quarantine directory, and the run timestamp.
+**Output**: the written file path. The envelope field list and the classification rule are defined once in INTERFACE-DESIGN.md section 4.
+**Timestamp**: passed in as a parameter, never read from the system clock here (AGENTS.md section 3 red line 10).
+**Serialization fallback**: when the rejected frame carries no `_raw_json` column, each row is re-serialized instead, so the envelope is still auditable.
 
 ## 3. Configuration Management
 

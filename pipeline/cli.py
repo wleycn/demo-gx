@@ -20,6 +20,7 @@ from common.metrics import MetricsCollector
 from common.time_utils import parse_utc_mixed
 from ingestion.reader import read_input, write_bronze
 from validation.schema_validator import SchemaValidator
+from validation.error_envelope import write_error_envelope
 from transformation.cleaner import DataCleaner
 from transformation.deduplicator import Deduplicator
 from curation.builder import GoldBuilder
@@ -97,28 +98,10 @@ def main():
         # Write invalid records to the error quarantine area
         if not invalid_df.empty:
             errors_path = Path(config["storage"]["base_path"]) / config["storage"]["errors_subpath"] / "bad_schema"
-            errors_path.mkdir(parents=True, exist_ok=True)
-            # Envelope per data-design §3.4: original_json / error_type /
-            # error_details / ingestion_timestamp. The coarse error_type is
-            # derived from the validator's per-rule error_reason.
-            def _classify(reason: str) -> str:
-                type_hints = ("not numeric", "not string", "parse failed")
-                return "type_coercion_failed" if any(h in reason for h in type_hints) else "schema_mismatch"
-            now_ts = pd.Timestamp.now("UTC")
-            # Filename-safe timestamp (isoformat contains ':'/'+' which are
-            # illegal on Windows); the envelope still logs the full ISO stamp
-            stamp = now_ts.strftime("%Y%m%dT%H%M%S%fZ")
-            if "_raw_json" in invalid_df.columns:
-                original = invalid_df["_raw_json"].astype(str)
-            else:
-                original = invalid_df.apply(lambda r: r.to_json(date_format="iso"), axis=1)
-            envelope = pd.DataFrame({
-                "original_json": original,
-                "error_type": invalid_df["error_reason"].map(_classify),
-                "error_details": invalid_df["error_reason"].str.strip(),
-                "ingestion_timestamp": now_ts.isoformat(),
-            })
-            envelope.to_json(errors_path / f"{stamp}_errors.json", orient="records", lines=True, force_ascii=False, date_format="iso")
+            # Envelope fields and reason classification belong to the validation
+            # layer (INTERFACE-DESIGN.md section 4); the orchestrator only
+            # supplies the destination and the run timestamp.
+            write_error_envelope(invalid_df, errors_path, pd.Timestamp.now("UTC"))
             logger.warning(f"Invalid records written to {errors_path}")
 
         if valid_df.empty:

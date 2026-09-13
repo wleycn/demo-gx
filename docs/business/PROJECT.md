@@ -123,8 +123,9 @@ The following known issues are documented in [KNOWN-ISSUE.md](KNOWN-ISSUE.md):
 | `#no-snapshot-lifecycle` | No snapshot layer; partition directories are overwritten directly |
 | `#amount-float` | `amount` column uses `float64` instead of `DECIMAL` |
 | `#now-timestamp` | CLI uses `pd.Timestamp.now` for processing timestamps |
-| `#cli-holds-transform` | CLI builds the error envelope instead of delegating to a module |
 | `#table-contract-approval` | No approval chain for table contracts |
+
+Resolved migration items are listed under "Resolved Migration Items" in [KNOWN-ISSUE.md](KNOWN-ISSUE.md).
 
 ## Future Extensions
 

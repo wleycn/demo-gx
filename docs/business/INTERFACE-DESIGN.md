@@ -121,7 +121,7 @@ Invalid records are written to `errors/bad_schema/{timestamp}_errors.json` in JS
 
 ### Error Type Classification
 
-The CLI classifies each error reason into one of two types:
+`validation/error_envelope.py` classifies each error reason into one of two types:
 
 - `type_coercion_failed`: the reason text contains "not numeric", "not string", or "parse failed".
 - `schema_mismatch`: all other reasons (missing field, pattern mismatch, enum violation, extra fields, future timestamp, below minimum, exceeds max length, exceeds max decimals, not finite).
