@@ -4,6 +4,7 @@ Version-level changes, reverse chronological order. Source: `git log --date=shor
 
 ## 2026-09-14
 
+- `14ab112` docs: record the type-marker gate fix in the change trail
 - `c114261` docs: move the repository to English via an upstream language layer
 - `67d05e7` docs: apply the independent audit findings
 - `4ce4aad` refactor: move pipeline/ to an installable src/demo_gx package
