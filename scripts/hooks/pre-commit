@@ -1,0 +1,24 @@
+#!/bin/sh
+# Pre-commit gate (thin shell). Install into .git/hooks/pre-commit.
+# Real script: ng/tools/pre_commit_gate.py (override with PRE_COMMIT_GATE).
+#
+# Install (once per clone):
+#   mkdir -p .git/hooks && cp scripts/hooks/pre-commit .git/hooks/pre-commit \
+#     && chmod +x .git/hooks/pre-commit
+set -e
+
+GATE="${PRE_COMMIT_GATE:-$HOME/workspace/ng/tools/pre_commit_gate.py}"
+ROOT="$(git rev-parse --show-toplevel)"
+
+if [ ! -f "$GATE" ]; then
+  echo "[gate] gate script not found: $GATE (skipping; set PRE_COMMIT_GATE or install ng/tools)" >&2
+  exit 0
+fi
+
+# Project-specific arguments:
+#   --tests-cmd      use the project venv interpreter, not an external python3
+#                    (avoids false failures from dependency drift)
+#   --agents-strict  a missing core section in AGENTS.md blocks the commit
+exec python3 "$GATE" --repo "$ROOT" \
+  --tests-cmd ".venv/bin/python -m pytest -q" \
+  --agents-strict "$@"
