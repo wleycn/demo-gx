@@ -11,15 +11,19 @@ Entry point: `pipeline/cli.py`
 | `--input` | Yes | none | file path | Path to the input file (JSON, CSV, or Parquet) |
 | `--env` | No | `dev` | `dev`, `test`, `prod` | Environment configuration to load |
 | `--event-date` | No | none | `YYYY-MM-DD` | Scope processing to one event date (safe backfill) |
+| `--run-timestamp` | No | wall clock at the entry boundary | ISO-8601 | Run instant injected by the orchestrator. Stamps `_processed_timestamp` and the error envelope. Passing it makes a run byte-reproducible. |
 
 Example:
 
 ```bash
 .venv/bin/python pipeline/cli.py --input data/sample_data.json --env dev
 .venv/bin/python pipeline/cli.py --input data/sample_data.json --env test --event-date 2026-09-09
+.venv/bin/python pipeline/cli.py --input data/sample_data.json --env test --run-timestamp 2026-09-14T00:00:00Z
 ```
 
 The CLI anchors all relative paths (storage, logs, metrics, input) to the project root, so it behaves identically regardless of the caller's working directory.
+
+The run timestamp is read exactly once, at this entry boundary, and then threaded down as a parameter. Modules never read the system clock for data stamping, which is what makes the injected value authoritative.
 
 ## 2. Input Format
 

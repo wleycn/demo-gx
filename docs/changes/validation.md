@@ -10,3 +10,12 @@
 - **验证**: `.venv/bin/python -m pytest tests/ -q` → 27 passed. End-to-end run `.venv/bin/python pipeline/cli.py --input data/sample_data.json --env test` → exit 0, envelope written with 4 rows and both `error_type` values present. Behaviour equivalence proved against the pre-change revision: 100 artefact fingerprints identical after dropping run-timestamp columns (`git stash` A/B run).
 - **回滚**: revert the commit. No data repair needed, because no output shape changed.
 - **关联**: `CHANGELOG.md` entry for this date / `KNOWN-ISSUE.md#cli-holds-transform` / commit hash in `git log`.
+
+## 20260914 · inject-run-timestamp — Future-timestamp rule uses the injected run instant
+
+- **动机**: part of the `#now-timestamp` migration. Full entry lives in `docs/changes/engineering.md`.
+- **范围**: `pipeline/validation/schema_validator.py` only — `SchemaValidator.__init__` takes `run_ts`; the `<= current time` rule compares against it.
+- **行为与契约变化**: the constructor gains a required second parameter. The rule and its quarantine behaviour are unchanged; only its reference instant moved from the wall clock to the injected value.
+- **验证**: see the full entry in `docs/changes/engineering.md`.
+- **回滚**: revert the commit.
+- **关联**: `docs/changes/engineering.md` (same date) / `KNOWN-ISSUE.md#now-timestamp`.

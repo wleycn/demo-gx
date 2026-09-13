@@ -30,16 +30,21 @@ class SchemaValidator:
             enum, pattern, etc.).
     """
 
-    def __init__(self, schema_config):
+    def __init__(self, schema_config, run_ts: pd.Timestamp):
         """Initialize the validator with a schema configuration.
 
         Args:
             schema_config (dict): Parsed ``schema.yaml`` content containing
                 a ``fields`` key mapping field names to rule dictionaries.
+            run_ts (pandas.Timestamp): The run instant, injected by the caller.
+                Used as the reference for the ``<= current time`` rule, so a
+                given run validates reproducibly (AGENTS.md section 3 red
+                line 10).
         """
         self.schema = schema_config
         self.expected_fields = set(schema_config["fields"].keys())
         self.field_rules = schema_config["fields"]
+        self.run_ts = run_ts
 
     def validate(self, df: pd.DataFrame) -> tuple:
         """Validate the DataFrame against the schema contract.
@@ -186,7 +191,7 @@ class SchemaValidator:
                 # "<= current time" (see docs/business/PROJECT.md source-schema
                 # table); a record stamped in the future is quarantined here
                 # together with parse failures rather than silently passing.
-                now_utc = pd.Timestamp.now(tz="UTC")
+                now_utc = self.run_ts
                 in_future = dt_series > now_utc  # NaT > now is False
                 if in_future.any():
                     invalid_mask = invalid_mask | in_future

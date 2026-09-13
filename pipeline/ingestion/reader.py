@@ -57,7 +57,7 @@ def read_input(file_path: str) -> pd.DataFrame:
     return df
 
 
-def write_bronze(raw_df: pd.DataFrame, bronze_base: Path) -> int:
+def write_bronze(raw_df: pd.DataFrame, bronze_base: Path, run_ts: pd.Timestamp) -> int:
     """Archive raw records to the Bronze layer (JSON Lines, partitioned).
 
     Bronze is the immutable landing zone: **every** arrived record —
@@ -83,6 +83,10 @@ def write_bronze(raw_df: pd.DataFrame, bronze_base: Path) -> int:
             column is excluded from the archive.
         bronze_base (pathlib.Path): Root path of the Bronze layer, e.g.
             ``Path("data") / "bronze"``.
+        run_ts (pandas.Timestamp): The run instant, injected by the caller.
+            Used as the partition-date fallback for rows with no parseable
+            ``ingestion_timestamp``, so the partition does not depend on the
+            wall clock (AGENTS.md section 3 red line 10).
 
     Returns:
         int: The number of records actually written to disk (the caller
@@ -98,14 +102,14 @@ def write_bronze(raw_df: pd.DataFrame, bronze_base: Path) -> int:
         df["source_system"] = df["source_system"].fillna("unknown")
     else:
         df["source_system"] = "unknown"
-    now_date = pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d")
+    run_date = run_ts.strftime("%Y-%m-%d")
     if "ingestion_timestamp" in df.columns:
         ts = parse_utc_mixed(df["ingestion_timestamp"])
-        df["_ingestion_dt"] = now_date
+        df["_ingestion_dt"] = run_date
         valid_dt = ts.notna()
         df.loc[valid_dt, "_ingestion_dt"] = ts[valid_dt].dt.strftime("%Y-%m-%d")
     else:
-        df["_ingestion_dt"] = now_date
+        df["_ingestion_dt"] = run_date
     written = 0
     for (source, dt), group in df.groupby(["source_system", "_ingestion_dt"], dropna=False):
         part_dir = bronze_base / str(source) / f"dt={dt}"

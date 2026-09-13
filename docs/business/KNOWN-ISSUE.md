@@ -1,7 +1,7 @@
 # Known Issues and Design Decisions
 
 This document records known pitfalls, design decisions, and rejected alternatives. Each entry has five parts: symptom, root cause, impact, disposition, and related document. The disposition is either "accepted" (the project lives with it) or "migration item" (to be addressed when the production shape is available).
-The `AGENTS.md` section 10 deviation table points to the seven anchors below. Items that have been migrated out of this list are listed under "Resolved Migration Items" at the end.
+The `AGENTS.md` section 10 deviation table points to the six anchors below. Items that have been migrated out of this list are listed under "Resolved Migration Items" at the end.
 ---
 
 ### #layout-flat-pipeline — Flat namespace packages instead of installable src layout
@@ -47,15 +47,6 @@ The `AGENTS.md` section 10 deviation table points to the seven anchors below. It
 **Impact**: floating-point arithmetic can introduce rounding errors in `total_amount` and `avg_amount` aggregations. For a demo with small data this is not visible, but it would be a correctness issue in production.
 **Disposition**: migration item. The production shape uses `DECIMAL(18,2)` in the Iceberg DDL (see DATA-DESIGN section 2.7, Silver and Gold table definitions).
 **Related**: DATA-DESIGN.md (section 2.7, Iceberg DDL), AGENTS.md section 3 (red line: amount float), AGENTS.md section 10 (deviation: amount precision).
----
-
-### #now-timestamp — CLI uses pd.Timestamp.now for processing timestamps
-
-**Symptom**: the CLI generates the `_processed_timestamp` and error envelope timestamp using `pd.Timestamp.now("UTC")` instead of receiving a partition parameter from the scheduler.
-**Root cause**: the upstream rule requires partition parameters to be injected by the scheduler, not read from the system clock. This project has no scheduler. The CLI is invoked manually or via `make run`, so it reads the current time directly.
-**Impact**: re-running the same batch at different wall-clock times produces different `_processed_timestamp` values. This does not affect data correctness (the partition key is `event_date`, not the processing time), but it makes it harder to reproduce exact outputs.
-**Disposition**: migration item. When an orchestrator (Airflow) is added, the run date should be passed as a parameter. The `--event-date` flag already exists for backfill scoping.
-**Related**: INTERFACE-DESIGN.md (CLI parameters), AGENTS.md section 3 (red line: partition parameter injection), AGENTS.md section 10 (deviation: partition parameter injection).
 ---
 
 ### #table-contract-approval — No approval chain for table contracts
@@ -108,3 +99,11 @@ Items that were registered as migration items and have since been migrated out. 
 | Anchor | Was | Resolved in |
 |---|---|---|
 | `#cli-holds-transform` | `cli.py` built the error envelope instead of delegating to a module | `docs/changes/validation.md` (20260914) — extracted to `validation/error_envelope.py` |
+| `#now-timestamp` | Pipeline code read the system clock for processing timestamps | `docs/changes/engineering.md` (20260914) — `--run-timestamp` injected at the entry boundary and threaded down |
+
+### Residual boundaries after #now-timestamp
+
+Two clock reads survive by design and are not defects:
+
+- **Entry boundary**: `cli.py` reads the wall clock once when `--run-timestamp` is absent. The entry plays the scheduler role in a single-machine project; without that read `make run` would have no run instant. Injecting the flag removes the read entirely, and every data artefact then becomes byte-reproducible.
+- **Telemetry**: `common/metrics.py` and `common/logger.py` stamp real wall-clock times. Metrics record how long a run actually took; injecting a synthetic value there would make the metric lie.

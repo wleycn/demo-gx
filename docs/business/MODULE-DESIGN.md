@@ -6,8 +6,8 @@ Each module is responsible for one thing only and communicates via standardized 
 
 | Module directory | Script file | Core responsibility | Exposed interface |
 |---|---|---|---|
-| `ingestion/` | `reader.py` | Read raw data (JSON/CSV/Parquet) and append `_raw_json` audit column; archive arriving records to Bronze | `read_input(file_path)`, `write_bronze(raw_df, bronze_base)` |
-| `validation/` | `schema_validator.py` | Strict data-contract validation (field existence, type, enum, pattern, minimum, future time) | `class SchemaValidator` with `validate(df) -> (valid_df, invalid_df)` |
+| `ingestion/` | `reader.py` | Read raw data (JSON/CSV/Parquet) and append `_raw_json` audit column; archive arriving records to Bronze | `read_input(file_path)`, `write_bronze(raw_df, bronze_base, run_ts)` |
+| `validation/` | `schema_validator.py` | Strict data-contract validation (field existence, type, enum, pattern, minimum, future time) | `class SchemaValidator` with `__init__(schema_config, run_ts)` and `validate(df) -> (valid_df, invalid_df)` |
 | `validation/` | `error_envelope.py` | Build the quarantine error envelope and map validator reasons to the coarse `error_type` | `classify_error(reason)`, `build_error_envelope(invalid_df, ingestion_timestamp)`, `write_error_envelope(invalid_df, errors_dir, ingestion_timestamp)` |
 | `transformation/` | `cleaner.py` | Timestamp UTC standardization, currency normalization, amount numeric check | `class DataCleaner` with `standardize_timestamps(df)`, `normalize_currency(df)`, `check_amount(df)` |
 | `transformation/` | `deduplicator.py` | Deduplicate by business key (`event_id`), keep the newest record | `class Deduplicator` with `deduplicate(df)` |
@@ -26,7 +26,7 @@ Each module is responsible for one thing only and communicates via standardized 
 **Input**: file path (string or Path object).
 **Output**: Pandas DataFrame containing the raw data and a `_raw_json` column.
 **Exception handling**: a missing file or an unsupported suffix raises immediately (fail fast, never a silent skip). The CLI logs the error and exits non-zero. Retry is the orchestration layer's responsibility, not the CLI's.
-**`write_bronze`**: archives every raw record to Bronze, partitioned by `source_system` and ingestion date. The `_raw_json` column is excluded from the archive. Missing `source_system` falls back to `unknown`; missing `ingestion_timestamp` falls back to the run date. Returns the count of records written.
+**`write_bronze`**: archives every raw record to Bronze, partitioned by `source_system` and ingestion date. The `_raw_json` column is excluded from the archive. Missing `source_system` falls back to `unknown`; missing or unparseable `ingestion_timestamp` falls back to the injected run date. Returns the count of records written.
 
 ### 2.2 validation/schema_validator.py
 
@@ -38,6 +38,7 @@ Each module is responsible for one thing only and communicates via standardized 
 **Input**: raw DataFrame.
 **Output**: tuple of two DataFrames `(valid_df, invalid_df)`. `invalid_df` includes an `error_reason` column describing each violation.
 **Failure policy**: invalid records are written to `errors/bad_schema/` and do not block the processing of valid data.
+**Run reference**: the `<= current time` rule is evaluated against the run instant passed to the constructor, not the wall clock, so a given run validates reproducibly (AGENTS.md section 3 red line 10).
 
 ### 2.3 transformation/cleaner.py
 
@@ -84,7 +85,8 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 
 ### 2.9 Pipeline Entry cli.py
 
-**Description**: parses CLI arguments (`--env`, `--input`, optional `--event-date`), calls each module in sequence.
+**Description**: parses CLI arguments (`--env`, `--input`, optional `--event-date`, optional `--run-timestamp`), calls each module in sequence.
+**Run timestamp**: resolved once at the top of `main()` and threaded into every consumer. When `--run-timestamp` is absent the boundary reads the wall clock; that single read is the only place the pipeline stamps data from the system clock (AGENTS.md section 3 red line 10).
 **Execution order**:
 
 1. Load configuration and set up logging.
@@ -93,7 +95,7 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 4. If `--event-date` is given, scope processing to rows whose `event_timestamp` falls on that date.
 5. Call `SchemaValidator.validate` to split valid and invalid data. Invalid records are handed to `validation.error_envelope.write_error_envelope`, which builds the envelope and writes it to `errors/bad_schema/`.
 6. Call `DataCleaner` and `Deduplicator` to process valid data. Superseded duplicates are written to `errors/duplicates.log`.
-7. Write to Silver layer (partitioned by `event_date`, Parquet format). Add `_processed_timestamp` at write time.
+7. Write to Silver layer (partitioned by `event_date`, Parquet format). Add `_processed_timestamp` from the injected run timestamp at write time.
 8. Call `GoldBuilder` to generate Gold-layer data from the full on-disk Silver snapshot (see DATA-DESIGN.md section 2.4).
 9. Save `metrics.json`.
 

@@ -44,7 +44,21 @@ def main():
     parser.add_argument("--env", default="dev", choices=["dev", "test", "prod"])
     parser.add_argument("--input", required=True, help="Path to input file")
     parser.add_argument("--event-date", help="Override event date for processing (YYYY-MM-DD)")
+    parser.add_argument(
+        "--run-timestamp",
+        help="ISO-8601 run timestamp injected by the orchestrator; "
+             "defaults to the wall clock read once at this entry boundary",
+    )
     args = parser.parse_args()
+
+    # The run timestamp enters the pipeline exactly here and is then threaded
+    # down as a parameter. The CLI is the outermost boundary (the stand-in for
+    # a scheduler), so this single read is the only place the pipeline touches
+    # the system clock for data stamping — AGENTS.md section 3 red line 10.
+    # Passing --run-timestamp makes a run byte-reproducible.
+    run_ts = pd.Timestamp(args.run_timestamp) if args.run_timestamp else pd.Timestamp.now(tz="UTC")
+    if run_ts.tzinfo is None:
+        run_ts = run_ts.tz_localize("UTC")
 
     # Load environment configuration
     config = load_config(args.env)
@@ -66,7 +80,7 @@ def main():
         #     so rows later quarantined are still preserved for replay/audit)
         logger.info("Writing Bronze archive...")
         bronze_base = Path(config["storage"]["base_path"]) / config["storage"]["bronze_subpath"]
-        bronze_written = write_bronze(raw_df, bronze_base)
+        bronze_written = write_bronze(raw_df, bronze_base, run_ts)
         metrics.increment("bronze_rows", bronze_written)
 
         # 1c. Optional event-date backfill scope: when --event-date is given,
@@ -90,7 +104,7 @@ def main():
         # 2. Validate schema
         logger.info("Validating schema...")
         schema_cfg = load_schema()
-        validator = SchemaValidator(schema_cfg)
+        validator = SchemaValidator(schema_cfg, run_ts)
         valid_df, invalid_df = validator.validate(raw_df)
         metrics.increment("valid_rows", len(valid_df))
         metrics.increment("invalid_rows", len(invalid_df))
@@ -101,7 +115,7 @@ def main():
             # Envelope fields and reason classification belong to the validation
             # layer (INTERFACE-DESIGN.md section 4); the orchestrator only
             # supplies the destination and the run timestamp.
-            write_error_envelope(invalid_df, errors_path, pd.Timestamp.now("UTC"))
+            write_error_envelope(invalid_df, errors_path, run_ts)
             logger.warning(f"Invalid records written to {errors_path}")
 
         if valid_df.empty:
@@ -131,8 +145,9 @@ def main():
             logger.info(f"Duplicates logged to {dup_log}")
         metrics.increment("silver_rows", len(deduped_df))
         # data-design §3.2: _processed_timestamp is added automatically at
-        # write time (pipeline processing timestamp, UTC)
-        deduped_df["_processed_timestamp"] = pd.Timestamp.now(tz="UTC")
+        # write time (pipeline processing timestamp, UTC), injected by the
+        # entry boundary rather than read here (AGENTS.md section 3 red line 10)
+        deduped_df["_processed_timestamp"] = run_ts
 
         # 5. Write Silver layer
         silver_path = Path(config["storage"]["base_path"]) / config["storage"]["silver_subpath"]
