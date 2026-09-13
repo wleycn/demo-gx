@@ -1,0 +1,108 @@
+# Known Issues and Design Decisions
+
+This document records known pitfalls, design decisions, and rejected alternatives. Each entry has five parts: symptom, root cause, impact, disposition, and related document. The disposition is either "accepted" (the project lives with it) or "migration item" (to be addressed when the production shape is available).
+The `AGENTS.md` section 10 deviation table points to the eight anchors below.
+---
+
+### #layout-flat-pipeline — Flat namespace packages instead of installable src layout
+
+**Symptom**: the `pipeline/` directory uses flat namespace packages with no `__init__.py` files, instead of the installable `src/{pkg}/` layout with per-package `__init__.py`.
+**Root cause**: the project was set up as a take-home reference implementation, not a distributable package. The flat layout was chosen for simplicity and faster iteration.
+**Impact**: the package cannot be `pip install`ed. Imports rely on the working directory being the project root. Tooling like `pip install -e .` is not available.
+**Disposition**: migration item. Moving to `src/` layout is a future task when the project is packaged for reuse.
+**Related**: PROJECT.md (directory layout), AGENTS.md section 10 (deviation: source directory layout).
+---
+
+### #coverage-gate-off — No coverage gate enabled
+
+**Symptom**: the project does not run a coverage tool. There is no `--cov` flag in the pytest configuration or CI pipeline.
+**Root cause**: the upstream rule requires coverage of at least 80 percent for projects with CI. This project's CI skeleton defines test and data-quality stages but does not wire a coverage tool.
+**Impact**: there is no automated check that new code is covered by tests. The baseline is "at least one assertion per requirement" plus manual review.
+**Disposition**: accepted. The project has 27 tests covering contract edge cases. Adding a coverage gate is a future improvement, not a blocking issue for a reference implementation.
+**Related**: AGENTS.md section 10 (deviation: coverage gate), tests/.
+---
+
+### #no-catalog — No catalog or session management
+
+**Symptom**: the project has no `catalog.py` and no concept of a unified compute session. Bronze, Silver, and Gold are plain directory paths on the local file system.
+**Root cause**: the upstream rule requires a central catalog for compute and table loading. This project runs on Pandas with local Parquet files. There is no Spark session, no Iceberg catalog, and no table registry.
+**Impact**: table metadata (schema, partitions) is implicit in the directory structure, not registered in a catalog. Time travel and snapshot isolation are not available.
+**Disposition**: accepted for the local demo. The production shape would use an Iceberg catalog. See DATA-DESIGN section 2.7 for the Iceberg DDL reference.
+**Related**: DATA-DESIGN.md (section 2.7, production table format reference), AGENTS.md section 10 (deviation: catalog).
+---
+
+### #no-snapshot-lifecycle — No snapshot layer or retention policy
+
+**Symptom**: partition directories are overwritten directly. There is no snapshot history, no retention policy, and no compaction task.
+**Root cause**: the upstream rule requires each table to have a snapshot retention and compaction strategy. This project writes Parquet files directly to partition directories using overwrite mode. There is no metadata layer tracking snapshots.
+**Impact**: re-running a partition destroys the previous version. There is no way to roll back to a prior state. Time travel queries are not possible.
+**Disposition**: accepted for the local demo. Bronze retains the original JSON for replay. The production shape would use Iceberg snapshots with retention configuration.
+**Related**: DATA-DESIGN.md (section 2.6, reprocessing semantics), AGENTS.md section 10 (deviation: snapshot lifecycle).
+---
+
+### #amount-float — Amount column uses float64 instead of DECIMAL
+
+**Symptom**: the `amount` column in Silver and Gold is stored as pandas `float64`, not as a `DECIMAL` type.
+**Root cause**: the upstream rule prohibits `float` for monetary values. Pandas does not have a native `DECIMAL` type; `float64` is the default numeric type. Converting to `decimal.Decimal` would break vectorized operations and significantly slow down the pipeline.
+**Impact**: floating-point arithmetic can introduce rounding errors in `total_amount` and `avg_amount` aggregations. For a demo with small data this is not visible, but it would be a correctness issue in production.
+**Disposition**: migration item. The production shape uses `DECIMAL(18,2)` in the Iceberg DDL (see DATA-DESIGN section 2.7, Silver and Gold table definitions).
+**Related**: DATA-DESIGN.md (section 2.7, Iceberg DDL), AGENTS.md section 3 (red line: amount float), AGENTS.md section 10 (deviation: amount precision).
+---
+
+### #now-timestamp — CLI uses pd.Timestamp.now for processing timestamps
+
+**Symptom**: the CLI generates the `_processed_timestamp` and error envelope timestamp using `pd.Timestamp.now("UTC")` instead of receiving a partition parameter from the scheduler.
+**Root cause**: the upstream rule requires partition parameters to be injected by the scheduler, not read from the system clock. This project has no scheduler. The CLI is invoked manually or via `make run`, so it reads the current time directly.
+**Impact**: re-running the same batch at different wall-clock times produces different `_processed_timestamp` values. This does not affect data correctness (the partition key is `event_date`, not the processing time), but it makes it harder to reproduce exact outputs.
+**Disposition**: migration item. When an orchestrator (Airflow) is added, the run date should be passed as a parameter. The `--event-date` flag already exists for backfill scoping.
+**Related**: INTERFACE-DESIGN.md (CLI parameters), AGENTS.md section 3 (red line: partition parameter injection), AGENTS.md section 10 (deviation: partition parameter injection).
+---
+
+### #cli-holds-transform — CLI builds the error envelope instead of delegating to a module
+
+**Symptom**: `cli.py` constructs the error envelope (classifying error reasons, building the JSON structure, writing to disk) instead of delegating this to a dedicated module.
+**Root cause**: the upstream rule requires the orchestration file to only orchestrate, not contain transformation logic. The error envelope construction was added to the CLI during development for convenience and was not refactored into a separate module.
+**Impact**: the CLI is longer than it needs to be. The error classification logic (mapping validator reasons to `schema_mismatch` or `type_coercion_failed`) is coupled to the CLI rather than living in the validation or transformation layer.
+**Disposition**: migration item. A future refactor should extract the envelope construction into a dedicated function or module, keeping the CLI as a thin orchestrator.
+**Related**: MODULE-DESIGN.md (section 2.9, pipeline entry), INTERFACE-DESIGN.md (section 4, error envelope fields), AGENTS.md section 10 (deviation: orchestration and transformation separation).
+---
+
+### #table-contract-approval — No approval chain for table contracts
+
+**Symptom**: table contract files in `docs/tables/` do not carry a `status: approved` frontmatter field. There is no CI check that blocks migration of unapproved contracts.
+**Root cause**: the upstream rule requires table contracts to record approval status and CI to enforce it. This project is a local reference implementation with no approval chain.
+**Impact**: table contracts can be changed without review. There is no audit trail of who approved a schema change.
+**Disposition**: accepted. The project has no production data and no multiple consumers. The contracts are maintained by the developer. A production system would add frontmatter and a CI gate.
+**Related**: docs/tables/ (table contract files), AGENTS.md section 10 (deviation: table contract approval).
+---
+
+## Design Decisions and Rejected Alternatives
+### Decision: Pandas single-machine instead of PySpark
+
+**Chosen**: Pandas on a single machine.
+**Rejected**: PySpark on a cluster.
+**Reason**: no big-data cluster is available. Data volume assumption is under 10 GB per batch, which Pandas handles well. Module boundaries communicate through DataFrame contracts, so migrating to Spark is a re-implementation of each stage without re-architecting the pipeline.
+
+### Decision: Strict mode rejects unknown fields
+
+**Chosen**: strict mode that rejects rows carrying undeclared fields.
+**Rejected**: lenient mode that passes unknown fields through to Silver.
+**Reason**: strict mode maintains data contract integrity. Unknown fields indicate a schema drift that should be caught early, not silently propagated downstream.
+
+### Decision: Fail-safe isolation over flag-and-pass
+
+**Chosen**: type and format violations are quarantined at the validation stage. They never reach Silver.
+**Rejected**: a "yellow path" that flags suspect rows with `_validation_status = "type_mismatch"` and passes them to Silver for downstream handling.
+**Reason**: the single-machine demo chooses fail-safe isolation over carrying suspect rows downstream. The `_validation_status` column exists in the Silver schema but always contains `"passed"` in the current implementation. The `type_mismatch` value is reserved for the future yellow path.
+
+### Decision: Gold always reads from on-disk Silver snapshot
+
+**Chosen**: the CLI reads all Silver Parquet files from disk and builds Gold from the full snapshot.
+**Rejected**: building Gold from the in-memory batch that was just processed.
+**Reason**: dimension tables and the wide table are full snapshots. A `--event-date` scoped backfill run must not rebuild dimensions from the scoped subset, or rows and `first_seen_date` values would be lost.
+
+### Decision: Partition overwrite for idempotency
+
+**Chosen**: Bronze, Silver, and Gold writes use partition-scoped overwrite.
+**Rejected**: append mode.
+**Reason**: re-running the same date must not produce duplicate data. A production Bronze would append new files instead of overwriting, but for the single-machine demo, overwrite is simpler and sufficient.

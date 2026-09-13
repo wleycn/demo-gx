@@ -183,7 +183,7 @@ class SchemaValidator:
                     invalid_mask = invalid_mask | failed_parse
                     df.loc[failed_parse, "_error_reason"] = df.loc[failed_parse, "_error_reason"].fillna("") + f" Field {field} timestamp parse failed;"
                 # Reject future timestamps: the schema contract requires
-                # "<= current time" (see docs/architecture.md source-schema
+                # "<= current time" (see docs/business/PROJECT.md source-schema
                 # table); a record stamped in the future is quarantined here
                 # together with parse failures rather than silently passing.
                 now_utc = pd.Timestamp.now(tz="UTC")

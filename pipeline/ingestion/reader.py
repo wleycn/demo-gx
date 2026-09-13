@@ -67,7 +67,7 @@ def write_bronze(raw_df: pd.DataFrame, bronze_base: Path) -> int:
     stage (quality is the Silver gate's job); Bronze only preserves the raw
     facts for replay, audit, and re-processing.
 
-    Partition layout (see ``docs/data-design.md`` §1)::
+    Partition layout (see ``docs/business/DATA-DESIGN.md`` section 1)::
 
         {bronze_base}/{source_system}/dt={YYYY-MM-DD}/events.json
 

@@ -63,7 +63,7 @@ def test_validation_fails_future_timestamp(schema_config):
     """A record stamped in the future should be quarantined as invalid.
 
     The schema contract requires ``event_timestamp <= current time``
-    (see docs/architecture.md); future-dated records are data-quality
+    (see docs/business/PROJECT.md); future-dated records are data-quality
     violations and must not pass into Silver.
     """
     future = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(days=1)).isoformat()

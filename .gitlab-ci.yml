@@ -1,5 +1,5 @@
 # demo-gx CI pipeline (GitLab CI skeleton)
-# Stages mirror docs/architecture.md §9: test → data-quality → promote.
+# Stages mirror docs/business/PROJECT.md section 9: test → data-quality → promote.
 # A real deployment would add environment secrets and storage config.
 
 stages:
