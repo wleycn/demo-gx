@@ -4,6 +4,8 @@ Version-level changes, reverse chronological order. Source: `git log --date=shor
 
 ## 2026-09-14
 
+- `99a7001` docs: fix the double-CR line endings in AGENTS.md and normalise the index
+- `e6f78e4` docs: record the line-ending fix and re-assemble the rules set
 - `14ab112` docs: record the type-marker gate fix in the change trail
 - `c114261` docs: move the repository to English via an upstream language layer
 - `67d05e7` docs: apply the independent audit findings
