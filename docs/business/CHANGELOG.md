@@ -2,6 +2,19 @@
 
 Version-level changes, reverse chronological order. Source: `git log --date=short --pretty=format:'%ad %h %s'`.
 
+## 2026-09-14
+
+- `4ce4aad` refactor: move pipeline/ to an installable src/demo_gx package
+- `65f7b4b` refactor: inject the run timestamp at the entry boundary
+- `67ff35f` refactor(validation): extract the error envelope out of the CLI
+- `c3c9c21` docs: wrap over-long English lines in PROJECT.md and the table contracts
+- `5c5ec2d` docs: restore missing content and converge duplicated statements
+- `c10c173` docs: turn the gate description into a list in PROJECT.md
+- `f306ec2` docs: split an over-long sentence in PROJECT.md
+- `ecd08a4` docs(governance): keep the pre-commit gate hook in the repository
+- `e92748c` docs: migrate to the nine-document system, archive superseded docs
+- `9761eb8` docs(governance): add AGENTS.md and docs/rules four-piece set
+
 ## 2026-09-11
 
 - `0a8eb3a` docs: add change-logs / known-issues placeholder docs
