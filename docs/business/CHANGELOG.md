@@ -4,6 +4,8 @@ Version-level changes, reverse chronological order. Source: `git log --date=shor
 
 ## 2026-09-14
 
+- `c114261` docs: move the repository to English via an upstream language layer
+- `67d05e7` docs: apply the independent audit findings
 - `4ce4aad` refactor: move pipeline/ to an installable src/demo_gx package
 - `65f7b4b` refactor: inject the run timestamp at the entry boundary
 - `67ff35f` refactor(validation): extract the error envelope out of the CLI
