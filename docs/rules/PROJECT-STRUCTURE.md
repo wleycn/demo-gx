@@ -1,121 +1,121 @@
-# PROJECT-STRUCTURE — 工程结构规范（Python）
+# PROJECT-STRUCTURE — Project Structure Standard (Python)
 
-## 1. 目录结构（通用骨架）
+## 1. Directory Structure (General Skeleton)
 
 ```text
 {project}/
-├── README.md                 # 人类入口（必留根）
-├── AGENTS.md                 # AI 编码约束（项目根唯一名）
-├── pyproject.toml            # 依赖与工具链（ruff/mypy/pytest）唯一入口
-├── uv.lock                   # 依赖锁，随库提交 🔴（无 uv 时用 requirements.txt 等效锁定，见 §3）
-├── src/{pkg}/                # 产品代码（可安装包，不是平铺脚本）
+├── README.md                 # Human entry point (must stay at root)
+├── AGENTS.md                 # AI coding constraints (unique name at project root)
+├── pyproject.toml            # Sole entry point for dependencies and toolchain (ruff/mypy/pytest)
+├── uv.lock                   # Dependency lock, committed with the repo 🔴 (without uv use requirements.txt for equivalent locking, see §3)
+├── src/{pkg}/                # Product code (an installable package, not flat scripts)
 │   ├── __init__.py
-│   ├── config.py             # 🔴 收口：env / secret 加载，typed config
-│   ├── <domain>/             # 按业务模块划分
-│   └── utils/                # 跨模块通用能力收口
-├── scripts/                  # 入口脚本与薄壳（只转发，不含业务逻辑）
-├── tests/                    # 测试，与 src 结构镜像
+│   ├── config.py             # 🔴 single entry point: env / secret loading, typed config
+│   ├── <domain>/             # Split by business module
+│   └── utils/                # Single entry point for cross-module shared capabilities
+├── scripts/                  # Entry scripts and thin shells (forward only, no business logic)
+├── tests/                    # Tests, mirroring the src structure
 │   └── fixtures/
 └── docs/
-    ├── rules/                # 本四件套
-    ├── business/             # 九文档
-    └── changes/              # 变更留痕（每模块一份，追加式）
+    ├── rules/                # This four-file set
+    ├── business/             # business documents: PROJECT / DATA-DESIGN / MODULE-DESIGN / INTERFACE-DESIGN / DOMAIN-LANGUAGE / CHANGELOG / KNOWN-ISSUE
+    └── changes/              # Change trail (one per module, append-only)
 ```
 
-## 2. 目录职责与禁止事项
+## 2. Directory Responsibilities and Prohibitions
 
-| 目录 | 职责 | 禁止 |
+| Directory | Responsibility | Prohibited |
 |---|---|---|
-| `src/{pkg}/` | 产品代码 | 硬编码配置；直接散读 `os.environ` |
-| `scripts/` | 入口 / 薄壳（cron 壳只 subprocess 转发） | **承载业务逻辑**（真身必须唯一） |
+| `src/{pkg}/` | Product code | Hardcoded configuration; reading `os.environ` directly in scattered places |
+| `scripts/` | Entries / thin shells (cron shells only forward via subprocess) | **Carrying business logic** (the real implementation must be unique) |
 
-> **`src/` 与 `scripts/` 为什么不合并**：两者被调用的方式不同——`src/` 是被 `import` 的库代码（可能被安装、被打包、被多处复用），`scripts/` 是被 shell / cron / 调度器**当成命令调用**的入口（含 `if __name__ == "__main__"` 与参数解析）。分开的收益：① 库代码不因入口而携带命令行副作用；② 调度壳改参数不影响库；③ 权限与路径假设不同（壳可以有 env / argv 依赖，库不允许）。
-> **允许合并的边界**（满足全部三条才可以只留 `src/`）：① 只有 1–2 个入口；② 入口不含调度器专属假设（硬编码绝对路径、固定 env 名）；③ 没有会被 shell 之外复用的库代码。任一条不满足 → 分开。合并后用 `python -m {pkg}.cli` 作为入口，仍不写脚本文件。
-| `tests/` | 测试 | 放生产代码；用 `Path.cwd()` 定位项目根（应用 `Path(__file__).parent.parent`） |
-| `notebooks/` | 探索与分析 | 被生产调度引用；提交输出与明文凭证 |
-| `docs/` | 规范与业务文档 | 与代码漂移（改代码必同步） |
-| `docs/changes/` | 变更留痕（每模块一份，追加式） | 写非变更内容（说明、附件、临时文件） |
+> **Why `src/` and `scripts/` are not merged**: the two are invoked in different ways. `src/` is library code that is `import`ed: possibly installed, packaged and reused in many places. `scripts/` are entries invoked **as commands** by shell / cron / a scheduler, containing `if __name__ == "__main__"` and argument parsing. The benefits of separating them: ① library code does not carry command-line side effects because of an entry; ② changing scheduling shell arguments does not affect the library; ③ permission and path assumptions differ (a shell may depend on env / argv, a library must not).
+> **Boundary where merging is allowed** (keep only `src/` only when all three hold): ① there are only 1-2 entries; ② the entries contain no scheduler-specific assumptions (hardcoded absolute paths, fixed env names); ③ there is no library code that would be reused outside the shell. If any one fails -> keep them separate. After merging, use `python -m {pkg}.cli` as the entry and still write no script files.
+| `tests/` | Tests | Placing production code; locating the project root with `Path.cwd()` (use `Path(__file__).parent.parent` instead) |
+| `notebooks/` | Exploration and analysis | Being referenced by production scheduling; committing outputs and plaintext credentials |
+| `docs/` | Standards and business documents | Drifting from the code (changing code must be synced) |
+| `docs/changes/` | Change trail (one per module, append-only) | Writing non-change content (explanations, attachments, temporary files) |
 
-## 3. 收口文件（单一入口原则）
+## 3. Single Entry Point Files (Single Entry Point Principle)
 
-| 收口点 | 文件 | 职责 |
+| Single entry point | File | Responsibility |
 |---|---|---|
-| 配置与凭证 | `config.py` | env / secret 加载，typed 输出（Pydantic Settings），带校验 |
-| 路径 | `path_anchor.py` / `path_resolve.py` | **禁** `Path.home()` / `expanduser` / 直接 `import dotenv`；统一 `load_shared_env()` |
-| 路径（项目根） | `Path(__file__).resolve().parents[k]` | 项目一律从 `__file__` 推导，**不依赖外部共享库**（共享 `path_anchor` 只适用于托管在统一基础设施目录下的系统脚本） |
-| 日志 | `utils/log.py` | `get_logger(__name__)`，含 run_id / 目标 / 行数 / 耗时 |
-| 重试 | `utils/retry.py` | 统一重试与冲突处理；**统一闸**：非零退出/空输出/超时/异常四类均触发 |
-| 数据访问 | `utils/db.py` | 统一连接与查询入口（PG 操作见 skill `pg-query`） |
-| 脱敏 | `utils/mask.py` | 手机号 / 证件 / 地址 / 银行卡 |
+| Configuration and credentials | `config.py` | env / secret loading, typed output (Pydantic Settings), with validation |
+| Paths | `path_anchor.py` / `path_resolve.py` | **No** `Path.home()` / `expanduser` / direct `import dotenv`; unified `load_shared_env()` |
+| Paths (project root) | `Path(__file__).resolve().parents[k]` | Projects always derive from `__file__` and **do not depend on an external shared library** (a shared `path_anchor` applies only to system scripts hosted under a unified infrastructure directory) |
+| Logging | `utils/log.py` | `get_logger(__name__)`, with run_id / target / row count / elapsed time |
+| Retry | `utils/retry.py` | Unified retry and conflict handling; **unified gate**: all four categories -- non-zero exit / empty output / timeout / exception -- trigger |
+| Data access | `utils/db.py` | Unified connection and query entry (for PG operations see skill `pg-query`) |
+| Redaction | `utils/mask.py` | Phone numbers / ID documents / addresses / bank cards |
 
-> 🔴 **收口点之外不得 reimplement 同类能力**（含重试、脱敏正则、连接参数调优、日志 handler）。新脚本须过 `path_governance_audit.py` 零违规。
+> 🔴 **The same capability must not be reimplemented outside the single entry point** (including retry, redaction regexes, connection parameter tuning, logging handlers). New scripts must pass `path_governance_audit.py` with zero violations.
 
-## 4. 命名约定
+## 4. Naming Conventions
 
-| 对象 | 规则 | 示例 |
+| Object | Rule | Example |
 |---|---|---|
-| 模块 / 文件 | `snake_case` | `order_sync.py` |
-| 类 / Pydantic 模型 | `PascalCase` | `OrderRecord` |
-| 常量 | `UPPER_SNAKE` | `MAX_RETRY` |
-| 测试文件 | `test_*.py`，与源模块同名 | `test_order_sync.py` |
-| 环境变量 | `UPPER_SNAKE`，带项目前缀 | `APP_DB_URL` |
+| Module / file | `snake_case` | `order_sync.py` |
+| Class / Pydantic model | `PascalCase` | `OrderRecord` |
+| Constant | `UPPER_SNAKE` | `MAX_RETRY` |
+| Test file | `test_*.py`, same name as the source module | `test_order_sync.py` |
+| Environment variable | `UPPER_SNAKE`, with a project prefix | `APP_DB_URL` |
 
-> 更细的命名纪律（真实 / 充分 / 易记：「信达雅」）见 skill `engineering-naming-discipline`。
+> For finer naming discipline (real / sufficient / memorable: faithfulness, expressiveness, elegance) see skill `engineering-naming-discipline`.
 
-## 5. 依赖与环境
+## 5. Dependencies and Environment
 
-- 🔴 **每项目独立 venv**（`PEP 668` 环境下系统 python 装包必失败；见 skill `python-project-env-setup`）
-- 🔴 依赖只进 `pyproject.toml`，锁文件随库提交；**禁止 ad-hoc `pip install`**（环境漂移根因）
-- 🟡 国内网络装包走镜像源（见 skill `china-pip-mirrors`）
-- 🔴 运行时只读 env，不在代码内写死绝对路径
+- 🔴 **An independent venv per project** (under a `PEP 668` environment, installing packages into the system python always fails; see skill `python-project-env-setup`)
+- 🔴 Dependencies go only into `pyproject.toml`, with the lock file committed to the repo; **ad-hoc `pip install` is forbidden** (the root cause of environment drift)
+- 🟡 Installing packages on a domestic network goes through a mirror source (see skill `china-pip-mirrors`)
+- 🔴 At runtime only read env; do not hardcode absolute paths in the code
 
-## 6. 类型专项结构不在栈层重复
+## 6. Type-Specific Structure Is Not Repeated at the Stack Layer
 
-## 7. 测试与服务层结构
+## 7. Test and Service Layer Structure
 
-> **不适用可跳过**：无服务层（`serving/`）的项目跳过本节的服务层部分（跨形态内容：本项目不适用即整体跳过）。
+> **Skip if not applicable**: a project without a service layer (`serving/`) skips the service layer part of this section (cross-shape content: if not applicable to this project, skip it as a whole).
 
-- `tests/` 与 `src/` **镜像**；fixture 小样本放 `tests/fixtures/`
-- 测试隔离外部服务（DB / Qdrant 等）用 **env 注入独立资源名**，不连生产
-- 若含服务层（`serving/`）：API 与业务逻辑分离，统一响应体 + 分页约定，认证复用统一中间件（禁止接口内手写校验）
+- `tests/` and `src/` **mirror** each other; small fixture samples go in `tests/fixtures/`
+- Tests isolate external services (DB / Qdrant etc.) by **injecting distinct resource names via env** and do not connect to production
+- If a service layer (`serving/`) is present: API and business logic are separated, with a unified response body + pagination conventions, and authentication reuses the unified middleware (hand-written checks inside endpoints are forbidden)
 
-## 【层：data-processing】PROJECT-STRUCTURE — 工程结构（数据处理类项目）
+## [Layer: data-processing]PROJECT-STRUCTURE — Project Structure (Data-Processing Projects)
 
-### 1. 结构骨架（在 `python/PROJECT-STRUCTURE.md` 之上增加）
+### 1. Structure Skeleton (additions on top of `python/PROJECT-STRUCTURE.md`)
 
 ```text
 {project}/
-├── dags/                        # 编排：仅依赖组装，不含转换逻辑 🔴
-├── src/{pkg}/pipelines/{domain}/ # 读写转换逻辑（按业务域）
-├── src/{pkg}/models/            # schema / 契约模型，与表契约对齐 🔴
-├── src/{pkg}/catalog.py         # 🔴 收口：会话、catalog、表加载、维护操作
-├── sql/migrations/              # V{N}__{desc}.sql 增量 DDL
-├── sql/transforms/              # SQL 转换脚本（按业务域）
-├── docs/tables/{table}.md       # 表契约：一表一 md
+├── dags/                        # orchestration: dependency assembly only, no transform logic 🔴
+├── src/{pkg}/pipelines/{domain}/ # read/write transform logic (by business domain)
+├── src/{pkg}/models/            # schema / contract models, aligned with the table contract 🔴
+├── src/{pkg}/catalog.py         # 🔴 single entry point: session, catalog, table loading, maintenance ops
+├── sql/migrations/              # V{N}__{desc}.sql incremental DDL
+├── sql/transforms/              # SQL transform scripts (by business domain)
+├── docs/tables/{table}.md       # table contract: one md per table
 └── tests/{fixtures,pipelines}/
 ```
 
-| 目录 | 职责 | 禁止 |
+| Directory | Responsibility | Forbidden |
 |---|---|---|
-| `dags/` | 任务编排与依赖组装 | 写转换逻辑、直接读写表 |
-| `pipelines/` | 按业务域的读写转换 | 编排依赖、硬编码配置 |
-| `models/` | schema 与类型定义 | 业务逻辑 |
-| `utils/` | 跨模块通用能力收口 | 引用具体业务模块 |
-| `sql/migrations/` | schema evolution 增量脚本 | 修改已提交编号、生产手工执行 |
-| `notebooks/` | 探索分析 | 被生产调度引用、提交输出与凭证 |
+| `dags/` | Task orchestration and dependency assembly | Writing transform logic, reading/writing tables directly |
+| `pipelines/` | Read/write transforms by business domain | Orchestrating dependencies, hardcoded config |
+| `models/` | schema and type definitions | Business logic |
+| `utils/` | Single entry point for cross-module shared capabilities | Referencing concrete business modules |
+| `sql/migrations/` | schema evolution incremental scripts | Modifying an already-committed number, manual execution in production |
+| `notebooks/` | Exploratory analysis | Referenced by production scheduling, committing outputs and credentials |
 
-### 2. 分层与依赖方向 🔴
+### 2. Layering and Dependency Direction 🔴
 
-- 业务域与源系统（OLTP 域）对齐，如 `trade / product / user / marketing / fulfillment`
-- 数据分层：`ods`（接入）→ `dwd`（清洗明细）→ `dws`（主题聚合）→ `ads`（应用）
-- 🔴 依赖方向**仅** `ods→dwd→dws→ads`，禁止反向依赖与跨层引用（如 ads 直读 ods）
-- 🟡 同层跨域引用走 dws 公共主题，禁止互读 dwd 明细
+- Business domains align with source systems (OLTP domains), e.g. `trade / product / user / marketing / fulfillment`
+- Data layering: `ods` (ingest) → `dwd` (cleaned detail) → `dws` (subject aggregates) → `ads` (application)
+- 🔴 The dependency direction is **only** `ods→dwd→dws→ads`; reverse dependencies and cross-layer references (e.g. ads reading ods directly) are forbidden
+- 🟡 Same-layer cross-domain references go through dws shared subjects; reading each other's dwd detail is forbidden
 
-### 3. 表契约（一表一档）🔴
+### 3. Table Contract (one file per table) 🔴
 
-每表一份 `docs/tables/{table}.md`，必须包含：层级 / 主题 / 粒度 / 业务主键 / **去重方式** / 分区 spec（含理由与单分区数据量预估）/ 金额单位约定 / PII 字段与脱敏方式 / 生命周期（快照保留、压缩策略、数据保留期）/ 新鲜度 SLA 与 owner / 上下游依赖 / **质量规则清单**。
+Each table gets one `docs/tables/{table}.md`. It must record: layer / subject / grain / business key / **deduplication method** / partition spec (with rationale and estimated per-partition data volume) / monetary unit convention. It must also record: PII fields and masking method / lifecycle (snapshot retention, compaction strategy, retention period) / freshness SLA and owner / upstream and downstream dependencies / **quality rule list**.
 
-契约顶部用 frontmatter 记录审批状态：
+The top of the contract records the approval state via frontmatter:
 
 ```yaml
 ---
@@ -125,28 +125,28 @@ approved_at: 2026-09-11
 version: 3
 ---
 ```
-- CI 检查：`status != approved` 时禁止对应迁移合入 `main`
-- **契约变更时 status 自动重置为 `draft`**，需重新审批
+- CI check: when `status != approved` the corresponding migration is blocked from merging into `main`
+- **When the contract changes, status is automatically reset to `draft`** and re-approval is required
 
-### 4. 命名约定（在栈规范之上补充）
+### 4. Naming Conventions (additions on top of the stack standard)
 
-| 对象 | 规则 | 示例 |
+| Object | Rule | Example |
 |---|---|---|
-| 表名 | `{layer}_{domain}_{entity}_{cycle}` | `dwd_trade_order_di`（`_di` 日增量 / `_df` 日全量） |
-| 字段 | snake_case | `pay_amount` / `created_at` |
-| 模型类 | PascalCase，与表契约对齐 | `DwdTradeOrderDi` |
+| Table name | `{layer}_{domain}_{entity}_{cycle}` | `dwd_trade_order_di` (`_di` daily incremental / `_df` daily full) |
+| Field | snake_case | `pay_amount` / `created_at` |
+| Model class | PascalCase, aligned with the table contract | `DwdTradeOrderDi` |
 | DAG | `dag_{layer}_{domain}_{entity}_{cycle}` | `dag_dwd_trade_order_di` |
-| 迁移 | `V{N}__{desc}.sql` | `V12__create_dwd_trade_order_di.sql` |
+| Migration | `V{N}__{desc}.sql` | `V12__create_dwd_trade_order_di.sql` |
 
-### 5. 收口点（单一入口）
+### 5. Single Entry Points (single-entry principle)
 
-| 收口点 | 文件 | 职责 |
+| Single entry point | File | Responsibility |
 |---|---|---|
-| 计算与 catalog | `catalog.py` | 会话 / catalog / 表加载 / 快照过期 / 压缩触发 |
-| 配置与凭证 | `config.py` | env / secret 加载，typed 输出 |
-| 金额 | `utils/money.py` | 分↔元换算、舍入方式 |
-| 脱敏 | `utils/mask.py` | 手机号 / 证件 / 地址脱敏 |
-| 质量 | `utils/quality.py` | `check_table(df, rules)` |
-| 日志与指标 | `utils/log.py` | logger + 运行指标（行数 / 分区 / 耗时） |
+| Compute and catalog | `catalog.py` | Session / catalog / table loading / snapshot expiry / compaction trigger |
+| Config and credentials | `config.py` | env / secret loading, typed output |
+| Money | `utils/money.py` | cents↔yuan conversion, rounding mode |
+| Masking | `utils/mask.py` | phone number / ID document / address masking |
+| Quality | `utils/quality.py` | `check_table(df, rules)` |
+| Logging and metrics | `utils/log.py` | logger + run metrics (row count / partitions / elapsed) |
 
-🔴 收口点之外不得自行 reimplement 同类能力（含会话参数调优、脱敏正则、重试逻辑）。
+🔴 Outside the single entry points you must not reimplement equivalent capabilities on your own (including session parameter tuning, masking regexes, retry logic).

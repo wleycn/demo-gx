@@ -78,9 +78,11 @@ The gate script lives in the shared toolchain, so the hook is installed once per
 mkdir -p .git/hooks && cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
-The gate blocks a commit when any of these three checks fails:
+The gate blocks a commit when any of these checks fails:
 
 - credential scan
+- forbidden file paths
+- oversized files
 - test suite
 - `AGENTS.md` structure check
 

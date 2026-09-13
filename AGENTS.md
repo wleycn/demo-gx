@@ -1,179 +1,193 @@
-# AGENTS.md — AI 编码约束（数据处理类项目模板）
+# AGENTS.md — AI Coding Constraints (Data-processing project template)
 
-> 规则分两级。🔴 红线：AI 不得生成违反它的代码，评审直接打回。🟡 建议：偏离时要在回报或 `CHANGELOG` 里说明理由。
-> 在本仓库工作的 AI 编码工具和 agent 运行时，都受本文件约束。
-> 这包括 Hermes Agent 自己，以及它派出的 coder profile、委托子代理和 cron 任务。
-> Claude Code、Codex、Cursor 及其它 CLI / IDE 助手同样适用。
-> 判断标准只有一条：**以本仓库为 cwd 即受约束**。没被上面点名的工具，不因此不受约束。Hermes 侧的生效路径见 §8。
+> Rules come in two levels. 🔴 Red line: the AI must not generate code that violates it; review rejects it outright. 🟡 Recommendation: when deviating, state the reason in the report or in `CHANGELOG`.
+> Every AI coding tool and agent runtime working in this repository is bound by this file.
+> That includes Hermes Agent itself, along with the coder profiles, delegated subagents and cron jobs it dispatches.
+> Claude Code, Codex, Cursor and other CLI / IDE assistants are equally subject to it.
+> There is exactly one test: **having this repository as cwd means being bound**. A tool not named above is not exempt just because of that. The effective path on the Hermes side is in §8.
 
-## 0. 规范优先级
+## 0. Rule Precedence
 
-本文件效力最高。往下依次是 `docs/rules/` 四件套、`docs/business/` 九文档、既有代码风格、通用业界实践。几层冲突时取效力高的那层。
+This file has the highest authority. Going down from there: the `docs/rules/` four-piece set, `docs/business/` business documents, existing code style, general industry practice. When layers conflict, the layer with the higher authority wins.
 
-发现既有代码与高层规则冲突时，**不得默然跟随既有代码**。要在变更记录里指出冲突。
+When you find existing code conflicting with a higher-level rule, **do not silently follow the existing code**. Point the conflict out in the change trail.
 
-## 1. 技术栈
+## 1. Tech Stack
 
-- **语言与运行环境**：Python 3.11（最低 3.10）。虚拟环境在项目内 `.venv/`，不进版本库，命令一律以 `.venv/bin/python` 开头
-- **存储引擎**：本地文件系统，无数据库。三层数据落 `data/`，测试环境落 `test/data/`，由配置项 `storage.base_path` 隔离
-- **编排**：`src/demo_gx/cli.py`，以 `python -m demo_gx.cli` 调用，无调度器。分区参数由 `--event-date` 注入，运行时间戳由 `--run-timestamp` 注入；入口只在未注入时读一次系统时间
-- **表格式**：Parquet 分区目录 `event_date=YYYY-MM-DD`，无 Iceberg，无 catalog
-- **依赖与工具链**：`pyproject.toml`（依赖与工具链唯一入口）、`Makefile`、`.gitlab-ci.yml`
-- **目标形态**：设计面向 Spark 加 Iceberg 的大数据形态，本地以 Pandas 单机验证。技术选型与被否方案见 `docs/business/PROJECT.md`
+- **Language and runtime**: Python 3.11 (minimum 3.10). The virtual environment lives inside the project at `.venv/`, is not committed, and commands always start with `.venv/bin/python`
+- **Storage engine**: local filesystem, no database. The three data layers land in `data/`, the test environment in `test/data/`, isolated by the `storage.base_path` config item
+- **Orchestration**: `src/demo_gx/cli.py`, invoked as `python -m demo_gx.cli`, no scheduler. The partition parameter is injected by `--event-date` and the run timestamp by `--run-timestamp`; the entry point reads the system clock once, and only when neither was injected
+- **Table format**: Parquet partition directories `event_date=YYYY-MM-DD`, no Iceberg, no catalog
+- **Dependencies and toolchain**: `pyproject.toml` (the single entry point for dependencies and toolchain), `Makefile`, `.gitlab-ci.yml`
+- **Target shape**: designed for a Spark + Iceberg big-data shape, verified locally on single-machine Pandas. For the technology choices and the rejected alternatives see `docs/business/PROJECT.md`
 
-## 2. 上下文加载（动手前必做）
+## 2. Context Loading (mandatory before starting)
 
-按顺序读完再动手：
+Read through in this order before starting:
 
-1. 读本文 §3 红线清单
-2. 读 `docs/rules/PROJECT-STRUCTURE.md` 的「目录职责」与「收口点」
-3. 读 `docs/rules/CODING-STANDARD.md` 的本类型红线
-4. 涉及数据变更 → 读对应 `docs/tables/{table}.md` 表契约
-5. **合计不超过 3 个规则文件**（防上下文过载）
+1. Read the red line list in §3 of this file
+2. Read the "directory duties" and "single entry point" sections of `docs/rules/PROJECT-STRUCTURE.md`
+3. Read this type's red lines in `docs/rules/CODING-STANDARD.md`
+4. A data change is involved → read the table contract in the corresponding `docs/tables/{table}.md`
+5. **No more than 3 rule files in total** (to prevent context overload)
 
-## 3. 红线清单
+## 3. Red Line List
 
-> AI 不得输出违反以下内容的代码；违反即阻断，不接受「先合入后续再改」。
+> The AI must not output code that violates the following; a violation blocks the change, and "merge first, fix later" is not accepted.
 
-1. 🔴 **写入必须幂等**（MERGE 或分区级 overwrite），**禁止裸 append**
-2. 🔴 **查询必须带分区裁剪**。禁止全表扫描，禁止把全量数据拉到驱动端
-3. 🔴 **金额禁止用 `float`**。单位换算只在接入边界做一次
-4. 🔴 **PII 在明细层必须脱敏**。禁止明文外泄到日志或对外表
-5. 🔴 **凭证、endpoint、路径不得硬编码**，统一走配置收口
-6. 🔴 **计算与 catalog 走收口文件**。禁止散建会话实例
-7. 🔴 **破坏性操作必须有人类显式授权**，包括 DROP、DELETE、snapshots expire
-8. 🔴 **schema evolution 只走迁移**。禁止隐式加列
-9. 🔴 **每张表必须有快照保留与压缩策略**。禁止无限保留
-10. 🔴 **分区参数由调度注入**。禁止代码读系统当前时间
+1. 🔴 **Writes must be idempotent** (MERGE or partition-level overwrite), **bare append is forbidden**
+2. 🔴 **Queries must carry partition pruning**. Full table scans are forbidden, and pulling the full dataset to the driver is forbidden
+3. 🔴 **Amounts must not use `float`**. Unit conversion is done once, at the ingestion boundary
+4. 🔴 **PII must be masked at the detail layer**. Leaking plaintext into logs or into external tables is forbidden
+5. 🔴 **Credentials, endpoints and paths must not be hardcoded**; they all go through the configuration single entry point
+6. 🔴 **Computation and catalog access go through the single entry point file**. Scattered session instances are forbidden
+7. 🔴 **Destructive operations require explicit human authorization**, including DROP, DELETE, snapshots expire
+8. 🔴 **Schema evolution only goes through migrations**. Implicit column additions are forbidden
+9. 🔴 **Every table must have a snapshot retention and compaction policy**. Unlimited retention is forbidden
+10. 🔴 **Partition parameters are injected by the scheduler**. Code reading the system's current time is forbidden
 
-## 4. Agent 行为准则
+## 4. Agent Conduct
 
-- **不做「顺手改进」**：只改授权范围内的文件。发现相邻问题另行提出，不代改。
-- **失败必留痕**：异常要记日志。禁止捕获后空处理。
-- **不确定就停**：想不清接口形状、目录结构、改动该落在哪个文件时，先提问。
-- **不擅自执行破坏性操作**：DROP、DELETE、批量覆盖、快照过期，一律先问。
-- 🔴 不得直接向 `main` 推送。必须走 feature 分支，再提交 MR。
+- **No "incidental improvements"**: only change files within the authorized scope. Raise an adjacent problem separately; do not fix it on the side.
+- **Failures must leave a trail**: exceptions must be logged. Catching and then doing nothing is forbidden.
+- **Stop when unsure**: when the interface shape, the directory structure or the file a change belongs in is unclear, ask first.
+- **Do not execute destructive operations on your own initiative**: DROP, DELETE, bulk overwrite, snapshot expiry — always ask first.
+- 🔴 Must not push directly to `main`. A feature branch is mandatory, then submit an MR.
 
-## 5. 输出要求
+## 5. Output Requirements
 
-- 只给代码或明确的 diff，不夹带无关说明
-- 在改动文件头部加 `[AI-GENERATED] model=<m> date=<d> reviewed_by=<human>` 注释。commit message 含 `[AI]`。
-- 单次变更不超过文件总量的 **40%**。超出就拆成多次，逐步验证。
-- 注释与 docstring 要和代码在同一个提交里改。不许留下与实现不符的注释。注释解释「**为什么**」，不复述「是什么」。细则见 `docs/rules/CODING-STANDARD.md` 的注释一节。
-- 写文档、写回报、写交付说明之前，先载入技能 `docs-writing-discipline`，按其检查表通读一遍再交
-- 迁移脚本必须由人类逐行 review 并在 PR 中 comment 确认
+- Give only code or an explicit diff, with no unrelated explanation mixed in
+- Add a `[AI-GENERATED] model=<m> date=<d> reviewed_by=<human>` comment at the head of each changed file. The commit message contains `[AI]`.
+- A single change must not exceed **40%** of the file total. If it exceeds that, split it into several changes and verify step by step.
+- Comments and docstrings must be changed in the same commit as the code. Comments that contradict the implementation must not be left behind. A comment explains "**why**", it does not restate "what". For details see the comments section of `docs/rules/CODING-STANDARD.md`.
+- Before writing documents, writing reports or writing delivery notes, load the `docs-writing-discipline` skill and read through once against its checklist before delivering
+- Migration scripts must be reviewed line by line by a human, with a confirming comment in the PR
 
-## 6. 变更留痕
+## 6. Change Trail
 
-功能或契约变更，在 `docs/changes/{module}.md` **追加**一条目。条目 slug 与分支名同名，七项模板见 `docs/rules/DEVELOP-FLOW.md` §4。`{module}` 取 `src/demo_gx/` 顶层模块目录名，即 `ingestion`、`validation`、`transformation`、`curation`、`common`；非功能变更落 `engineering.md`。该目录**只放条目文件**，不放 README、说明或附件。模块清单见 §9.1 项目地图。
+For a functional or contract change, **append** one entry to `docs/changes/{module}.md`. The entry slug has the same name as the branch; for the entry template see `docs/rules/DEVELOP-FLOW.md` §4. `{module}` takes the top-level module directory name under `src/demo_gx/`, namely `ingestion`, `validation`, `transformation`, `curation`, `common`; a non-functional change lands in `engineering.md`. That directory holds **entry files only** — no README, notes or attachments. For the module list see §9.1 project map.
 
-- 上线后追加部署记录。
+- Append a deployment record after release.
 
-## 7. 不确定行为
+## 7. Uncertainty
 
-- 规范没覆盖但改动可以安全回退时，照本仓库最相近的类比规则执行，并在变更记录里说明类比的是哪一条。
-- 下面四类必须向人类确认，不得自决：金额怎么算、去重怎么做、回刷范围、破坏性操作。
-- 不许自行引入新的第三方依赖。要引入就写进依赖清单，并走评审。
-- 规范没覆盖或互相冲突时：**停止 → 提问 → 等确认**。不许自行放宽红线，也不许「先合入，之后再改」。
+- When the rules do not cover a change but the change can be safely rolled back, follow the closest analogous rule in this repository and state in the change trail which rule the analogy was drawn from.
+- The following four categories must be confirmed with a human and must not be decided autonomously: how an amount is computed, how deduplication is done, backfill scope, destructive operations.
+- Do not introduce a new third-party dependency on your own initiative. To introduce one, write it into the dependency list and go through review.
+- When the rules do not cover something or conflict with each other: **stop → ask → wait for confirmation**. Do not loosen a red line on your own, and do not "merge first, change later".
 
-## 8. 本文件如何被读取（生效路径）
+## 8. How This File Is Read (Effective Path)
 
-- 生效方式：工具按 **cwd → git 根** 的目录链在**会话启动**时注入本文件。它不是「放进项目就自动生效」。
-- 会话、委托、测试 harness 都必须**以项目根为 cwd 启动**。从项目外启动只会晚一步懒加载，在那之前动作等于没有约束。
-- **三种情况本文件不生效**：非 git 项目从子目录启动、`delegate_task` 子代理、未设 `workdir` 的 cron 任务。
-- **Hermes 侧保证**：Hermes 及其委托链路一律**以项目根为 cwd 启动**。委托链路包括 coder profile、`delegate_task` 子代理和 cron 任务。委托任务书必须写明 `cwd=/home/hermes/workspace/demo-gx`。**不得假设执行者已读过本文件**，拿不准时把 §3 红线**内联**进任务书。
-- 红线要**可执行化**：能写成 lint、检查脚本或 CI check，就不要指望「模型会读到」。
+- How it takes effect: the tool injects this file at **session start** along the **cwd → git root** directory chain. It is not "effective automatically once placed in the project".
+- Sessions, delegations and test harnesses must all **start with the project root as cwd**. Starting from outside the project only lazy-loads it one step late, and actions taken before that are effectively unconstrained.
+- **This file does not take effect in three cases**: a non-git project started from a subdirectory, a `delegate_task` subagent, and a cron job with no `workdir` set.
+- **Guarantee on the Hermes side**: Hermes and its delegation chain always **start with the project root as cwd**. The delegation chain includes coder profiles, `delegate_task` subagents and cron jobs. A delegation brief must state `cwd=/home/hermes/workspace/demo-gx`. **Do not assume the executor has read this file**; when in doubt, **inline** the §3 red lines into the brief.
+- Red lines must be **made executable**: if something can be written as a lint, a check script or a CI check, do not count on "the model will read it".
 
-## 9. 地图（去哪找什么 · 用什么技能）
+## 9. Maps (where to find what · which skill to use)
 
-两张地图缺一不可。9.1 回答「东西在哪」，9.2 回答「这个阶段该用哪个技能」。
+Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which skill to use at this stage".
 
-### 9.1 项目地图（文件索引）
+### 9.1 Project Map (file index)
 
-> 生成规则：把**项目里真实存在**的文件填进下表，删掉不适用的行。表内路径必须真实可访问，`pre_commit_gate.py` 会检查。
+> Generation rule: fill the table below with files that **actually exist in the project**, and delete inapplicable rows. Paths in the table must be really reachable; `pre_commit_gate.py` checks them.
 
-| 类别 | 位置 | 用途 |
+| Category | Location | Purpose |
 |---|---|---|
-| 人类入口 | `README.md` | 这是什么 / 怎么上手（5 秒测试） |
-| AI 约束 | `AGENTS.md`（本文） | 红线与行为准则，优先级最高 |
-| 规范 | `docs/rules/` | 四件套：结构 / 编码 / 流程 / 验收 |
-| 业务文档 | `docs/business/` | 项目说明 / 模块 / 数据 / 接口 / 术语 / 变更 / 已知问题 |
-| 接口契约 | `docs/business/INTERFACE-DESIGN.md` | CLI 参数、产物路径、错误封套，唯一真源 |
-| 数据契约 | `docs/business/DATA-DESIGN.md` | 分层数据流、表结构、分区与重跑语义 |
-| 表契约 | `docs/tables/{table}.md` | 一表一档：粒度 / 主键 / 去重方式 / 生命周期 |
-| 字段契约源 | `config/schema.yaml` | 字段类型 / 必填 / 枚举 / 正则表达式 |
-| 环境配置 | `config/dev.yaml`、`config/test.yaml`、`config/prod.yaml` | 存储路径 / 日志 / 指标 / 告警 |
-| 产品代码 | `src/demo_gx/` | 可安装包；入口 `cli.py`，模块 `common` / `ingestion` / `validation` / `transformation` / `curation` |
-| 依赖与工具链 | `pyproject.toml` | 依赖声明、打包与 pytest 配置的唯一入口 |
-| 样例数据生成 | `scripts/generate_sample_data.py` | 生成 `data/sample_data.json`，不含业务逻辑 |
-| 运行产物 | `data/` | Bronze / Silver / Gold / errors，可重建，勿手改 |
-| 变更留痕 | `docs/changes/{module}.md` | 每模块一份，追加式变更条目 |
-| 门禁 | `.git/hooks/pre-commit` | 调用 `ng/tools/pre_commit_gate.py` |
+| Human entry | `README.md` | What this is / how to get started (5-second test) |
+| AI constraints | `AGENTS.md` (this file) | Red lines and conduct, highest precedence |
+| Rules | `docs/rules/` | Four-piece set: structure / coding / flow / acceptance |
+| Business documents | `docs/business/` | Project description / modules / data / interfaces / glossary / changes / known issues |
+| Interface contract | `docs/business/INTERFACE-DESIGN.md` | CLI arguments, artefact paths, error envelope: the single source of truth |
+| Data contract | `docs/business/DATA-DESIGN.md` | Layered data flow, table structures, partitioning and rerun semantics |
+| Table contracts | `docs/tables/{table}.md` | One file per table: grain / primary key / dedup method / lifecycle |
+| Field contract source | `config/schema.yaml` | Field types / required / enums / regular expressions |
+| Environment config | `config/dev.yaml`, `config/test.yaml`, `config/prod.yaml` | Storage paths / logging / metrics / alerting |
+| Product code | `src/demo_gx/` | Installable package; entry `cli.py`, modules `common` / `ingestion` / `validation` / `transformation` / `curation` |
+| Dependencies and toolchain | `pyproject.toml` | The single entry point for dependency declarations, packaging and pytest config |
+| Sample data generation | `scripts/generate_sample_data.py` | Generates `data/sample_data.json`, carries no business logic |
+| Run artefacts | `data/`, `test/data/`, `data_prod/` | Bronze / Silver / Gold / errors; rebuildable, do not hand-edit |
+| Change trail | `docs/changes/{module}.md` | One per module, append-only change entries |
+| Gate | `scripts/hooks/pre-commit`, installed as `.git/hooks/pre-commit` | Calls `ng/tools/pre_commit_gate.py` |
 
-### 9.2 技能地图（阶段 → 技能）
+### 9.2 Skill Map (stage → skill)
 
-> 阶段定义见 `docs/rules/DEVELOP-FLOW.md` §1（十阶段）与 §1.1（阶段 4 子步骤）。下表只接**技能库里真实存在**的技能，名字必须可查，`pre_commit_gate.py` 会检查。
-> 用法：进入某阶段前先载入该阶段技能（`skill_view`），按它的 Phase 或 Step 执行。禁用「通用做法」替代技能流程。
+> For stage definitions see `docs/rules/DEVELOP-FLOW.md` §1 (ten stages) and §1.1 (stage 4 substeps). The table below links only skills that **actually exist in the skill library**; the names must be resolvable, `pre_commit_gate.py` checks them.
+> Usage: before entering a stage, load that stage's skill (`skill_view`) and execute by its Phase or Step. Replacing a skill flow with "the usual approach" is forbidden.
 
-| 阶段 | 技能 | 什么时候用 |
+| Stage | Skill | When to use |
 |---|---|---|
-| 1 需求分析 | `requirement-analysis`；存量改造先 `legacy-recon`；可行性未知 → `feasibility-probe` | 诉求模糊 / 接手陌生仓库 / 方案 A·B 选型 |
-| 2 方案设计 | `system-architecture`（架构与 ADR）、`project-doc-system`（文档体系）、`api-contract-design`、`data-layer-design`、`identity-access-design`、`secrets-management`、`threat-modeling`、`ui-foundation-design` | 立架构 / 定文档 / 改契约 |
-| 3 任务拆分 | 无专用技能：按 `coding-flow` 七步执行序拆；委托子代理用 `coder-profile-delegation` | 拆到「能独立验证」的粒度 |
-| 4 编码实现 | `coding-flow`（流程）、`minimal-diff`（改哪几行）、`engineering-naming-discipline`（命名）；MCP / 工具服务 → `mcp-server-development` | 每次动代码前必载 |
-| 4a–4d 编码子步骤 | 同上；4b 接口实现另载 `api-contract-design`；4d 接线自测另载 `http-e2e-testing` | 4a→4b→4c→4d 逐步推进，**不得并行大改** |
-| 5 单元测试 | `tdd-discipline`（RED-GREEN-REFACTOR）；卡住 → `python-debugging` / `node-debugging` | 写生产代码前先有失败测试 |
-| 6 代码评审 | `pre-commit-gate`（提交闸）、`independent-review`（第三方判定）、`ai-code-audit`（AI 生成代码安全） | 每次提交 / 交付前 |
-| 7 集成测试 | `verify-data-layer`（数据层交接独立验证）、`performance-benchmarking`（数据量级基线） | 改数据链路或分区布局时 |
-| 8 预发验证 | 本项目**无界面、无预发环境**，界面走查与可访问性审计不适用；端到端验证走 `make run` 加 CI 的 data-quality 阶段 | 产物或分区布局变更时 |
-| 9 上线部署 | `ci-cd-delivery`；提交纪律 `git-submit` | 有流水线 / 多环境时 |
-| 10 线上观测 | `observability-sre`（SLO / 告警）、`incident-postmortem`（故障复盘）、`performance-benchmarking` | 有生产环境时 |
-| 横切（任意阶段） | `doc-code-drift`（契约与代码漂移）、`post-change-cleanup`（改后清理）、`module-retirement`（下线旧模块）、`docs-writing-discipline`（写文档与回报前）；日常纪律 `ops-basics-discipline` / `path-ssot-governance` / `secret-sprawl-audit` | 阶段完成 / 交付前 / 发现漂移时 |
-| 任意阶段（本类型专属） | `data-layer-design`（schema 与查询计划）；`verify-data-layer`（数据层交接独立验证）；`pg-query`；`performance-benchmarking` | 涉及表 / 分区 / 数据链路时 |
-| 本项目例外 | 本地参考实现：无预发环境、无生产部署、除 CI 外无发布链路。阶段 8 的界面类技能与阶段 9 的发布动作不适用 | 见 §10「阶段模型适用边界」 |
+| 1 Requirement analysis | `requirement-analysis`; for legacy rework start with `legacy-recon`; feasibility unknown → `feasibility-probe` | Vague request / taking over an unfamiliar repository / choosing between options A and B |
+| 2 Solution design | `system-architecture` (architecture and ADR), `project-doc-system` (document system), `api-contract-design`, `data-layer-design`, `identity-access-design`, `secrets-management`, `threat-modeling`, `ui-foundation-design` | Setting up architecture / defining documents / changing a contract |
+| 3 Task breakdown | No dedicated skill: break down by the `coding-flow` seven-step execution order; to delegate to a subagent use `coder-profile-delegation` | Down to a granularity that "can be verified independently" |
+| 4 Coding implementation | `coding-flow` (flow), `minimal-diff` (which lines to change), `engineering-naming-discipline` (naming); MCP / tool services → `mcp-server-development` | Must be loaded before every code change |
+| 4a–4d Coding substeps | Same as above; 4b interface implementation additionally loads `api-contract-design`; 4d wiring self-test additionally loads `http-e2e-testing` | Advance 4a→4b→4c→4d step by step; **no large parallel changes** |
+| 5 Unit testing | `tdd-discipline` (RED-GREEN-REFACTOR); when stuck → `python-debugging` / `node-debugging` | A failing test comes before production code |
+| 6 Code review | `pre-commit-gate` (commit gate), `independent-review` (third-party verdict), `ai-code-audit` (security of AI-generated code) | Before every commit / delivery |
+| 7 Integration testing | `verify-data-layer` (independent verification of a data-layer handover), `performance-benchmarking` (data-volume baseline) | When changing a data pipeline or the partition layout |
+| 8 Pre-release verification | This project has **no interface and no pre-release environment**, so interface walkthroughs and accessibility audits do not apply; end-to-end verification runs through `make run` plus the CI data-quality stage | When artefacts or the partition layout change |
+| 9 Deployment and release | `ci-cd-delivery`; commit discipline `git-submit` | When there is a pipeline / multiple environments |
+| 10 Live observability | `observability-sre` (SLO / alerting), `incident-postmortem` (incident postmortem), `performance-benchmarking` | When there is a production environment |
+| Cross-cutting (any stage) | `doc-code-drift` (contract and code drift), `post-change-cleanup` (post-change cleanup), `module-retirement` (retiring an old module), `docs-writing-discipline` (before writing documents and reports); daily discipline `ops-basics-discipline` / `path-ssot-governance` / `secret-sprawl-audit` | Stage completion / before delivery / when drift is found |
+| Any stage (specific to this type) | `data-layer-design` (schema and query plan); `verify-data-layer` (independent verification of a data-layer handover); `pg-query`; `performance-benchmarking` | When tables / partitions / a data pipeline are involved |
 
-## 10. 规则来源与偏离
+## 10. Rule Provenance and Deviations
 
-- **来源**：本项目规则 = 本文 + `docs/rules/` 四件套。四件套由装配工具按 **基线 → 技术栈 → 项目类型** 三层逐字拼装（`rules_assembly.py`）。装配只降标题级别，不改上层文字，也不删上层条目。**不逐项目手工改**。
-- **偏离登记**：本项目与上游规范不一致的地方逐条写在本节，四列分别是议题 / 上游写法 / 本项目做法 / 处置。「处置」必须指向真实存在的文档锚点，禁止只写「已说明」。
-- 尚未消解的偏离视为**已知问题**，登记进 `docs/business/KNOWN-ISSUE.md`，并在此处留索引行。
-- **偏离纪律**：标准做法是**默认值**，偏离是例外。允许偏离，但要同时满足三条：
-  - ① 在本节逐条登记，「处置」一列指向真实存在的锚点。
-  - ② 说明**为什么不采用标准做法**，禁止「本项目特殊」这类空理由。
-  - ③ 标注代价与回退成本。
-**本项目偏离登记**（与上游规范不一致处，逐条登记）：
+- **Provenance**: this project's rules = this file + the `docs/rules/` four-piece set. The four-piece set is assembled verbatim by the assembly tool in three layers: **baseline → tech stack → project type** (`rules_assembly.py`). Assembly only lowers heading levels; it does not change the text of an upper layer, nor delete an upper-layer entry. **Not hand-edited per project**.
+- **Deviation registration**: every place where this project disagrees with the upstream rules is listed item by item in this section, in four columns: issue / upstream wording / this project's practice / disposition. "Disposition" must point to a document anchor that actually exists; writing only "already explained" is forbidden.
+- A deviation not yet resolved counts as a **known issue**: register it in `docs/business/KNOWN-ISSUE.md` and leave an index row here.
 
-| 议题 | 上游写法 | 本项目 | 处置 |
+**Deviations registered for this project** (every place where this project disagrees with the upstream rules):
+
+| Issue | Upstream wording | This project | Disposition |
 |---|---|---|---|
-| 建环境 | 提交 `uv.lock` 锁文件 | `pyproject.toml` 声明依赖，venv 加 pip 安装，无锁文件 | 见 `docs/business/PROJECT.md` |
-| 编排目录 | `dags/` 放任务编排与依赖组装 | 无调度器；编排兼在包内入口 `src/demo_gx/cli.py` | 见下「数据处理骨架适用边界」 |
-| 转换模块划分 | `src/{pkg}/pipelines/{domain}/`，按业务域 | 按管道阶段分模块：`ingestion` / `validation` / `transformation` / `curation` | 见下「数据处理骨架适用边界」 |
-| 契约模型层 | `src/{pkg}/models/` 放 schema 与类型定义 | 字段契约在 `config/schema.yaml`，表契约在 `docs/tables/`；无 Python 模型层 | 见下「数据处理骨架适用边界」 |
-| SQL 资产 | `sql/migrations/` 增量 DDL 与 `sql/transforms/` | 无 `sql/` 资产，无 SQL 引擎；Parquet 直接落盘。Iceberg DDL 只作归档参考，不进执行路径 | 见下「数据处理骨架适用边界」 |
-| 测试目录 | `tests/` 与 `src/` 镜像 | 平铺 `tests/test_{module}.py` | 见下「数据处理骨架适用边界」 |
-| 数据分层命名 | `ods` → `dwd` → `dws` → `ads` | Bronze → Silver → Gold | 见 `docs/business/DOMAIN-LANGUAGE.md` 术语 `data layer mapping` |
-| 覆盖率门禁 | 有 CI 的项目单测覆盖率 ≥ 80% | 未启用覆盖率工具；底线为「每需求至少一条断言」 | 见 `docs/business/KNOWN-ISSUE.md#coverage-gate-off` |
-| 计算与 catalog 收口 | 由 `catalog.py` 统一会话与表加载 | 无 catalog：本地 Parquet，不存在会话概念 | 见 `docs/business/KNOWN-ISSUE.md#no-catalog` |
-| 快照与压缩策略 | 每张表配置保留期与压缩任务 | 分区目录直接覆盖写，无快照层 | 见 `docs/business/KNOWN-ISSUE.md#no-snapshot-lifecycle` |
-| 金额精度 | 金额禁用 `float`，走 DECIMAL 与统一换算 | `amount` 列为 pandas `float64` | 见 `docs/business/KNOWN-ISSUE.md#amount-float` |
-| 表契约审批 | 契约 frontmatter 记 `status: approved`，CI 拦截未审迁移 | 本地参考实现，无审批链路 | 见 `docs/business/KNOWN-ISSUE.md#table-contract-approval` |
-| 阶段模型 | 基线十阶段（含预发 / 部署 / 观测） | 阶段 8 以端到端 smoke 代替，阶段 9 与 10 不适用 | 见下「阶段模型适用边界」 |
+| Environment setup | Commit a `uv.lock` lock file | Dependencies declared in `pyproject.toml`; venv plus pip install; no lock file | See "Deviation rationale and cost" below |
+| Orchestration directory | `dags/` holds task orchestration and dependency assembly | No scheduler; orchestration doubles as the in-package entry point `src/demo_gx/cli.py` | See "Data-processing skeleton applicability boundaries" below |
+| Transformation module split | `src/{pkg}/pipelines/{domain}/`, by business domain | Split by pipeline stage: `ingestion` / `validation` / `transformation` / `curation` | See "Data-processing skeleton applicability boundaries" below |
+| Contract model layer | `src/{pkg}/models/` holds schema and type definitions | Field contract in `config/schema.yaml`, table contracts in `docs/tables/`; no Python model layer | See "Data-processing skeleton applicability boundaries" below |
+| SQL assets | `sql/migrations/` incremental DDL and `sql/transforms/` | No `sql/` assets and no SQL engine; Parquet is written straight to disk. Iceberg DDL exists as an archived reference only and is not on the execution path | See "Data-processing skeleton applicability boundaries" below |
+| Test directory | `tests/` mirrors `src/` | Flat `tests/test_{module}.py` | See "Data-processing skeleton applicability boundaries" below |
+| Data layer naming | `ods` to `dwd` to `dws` to `ads` | Bronze to Silver to Gold | See the `data layer mapping` term in `docs/business/DOMAIN-LANGUAGE.md` |
+| Coverage gate | Projects with CI require unit-test coverage of 80% or more | No coverage tooling enabled; the floor is "at least one assertion per requirement" | See `docs/business/KNOWN-ISSUE.md#coverage-gate-off` |
+| Computation and catalog entry point | `catalog.py` unifies session and table loading | No catalog: local Parquet, the session concept does not exist | See `docs/business/KNOWN-ISSUE.md#no-catalog` |
+| Snapshot and compaction policy | Every table configures a retention period and a compaction job | Partition directories are overwritten in place, no snapshot layer | See `docs/business/KNOWN-ISSUE.md#no-snapshot-lifecycle` |
+| Amount precision | Amounts must not use `float`; use DECIMAL with a single conversion | The `amount` column is pandas `float64` | See `docs/business/KNOWN-ISSUE.md#amount-float` |
+| Table contract approval | Contract frontmatter carries `status: approved` and CI blocks unreviewed migrations | Local reference implementation, no approval chain | See `docs/business/KNOWN-ISSUE.md#table-contract-approval` |
+| Stage model | The baseline ten stages, including pre-release, deployment and observability | Stage 8 is replaced by an end-to-end smoke run; stages 9 and 10 do not apply | See "Stage model applicability boundaries" below |
+| Clock reads outside data stamping | Red line 10 forbids code reading the system's current time | `common/metrics.py` and `common/logger.py` still read the clock, for telemetry only; no data-stamping site reads it | See `docs/business/KNOWN-ISSUE.md#clock-reads-outside-data-stamping` |
 
-**阶段模型适用边界**：本项目是本地参考实现，没有预发环境、没有生产部署、没有 CI 之外的发布链路。基线十阶段中阶段 1–7 全量适用；阶段 8 以端到端 smoke 代替，界面类检查不适用；阶段 9 与阶段 10 不适用。CI 门禁与提交纪律仍然适用。
+**Stage model applicability boundaries**: this project is a local reference implementation. It has no pre-release environment, no production deployment, and no release chain beyond CI. Of the baseline ten stages, stages 1-7 apply in full; stage 8 is replaced by an end-to-end smoke run, and its interface checks do not apply; stages 9 and 10 do not apply. The CI gate and commit discipline still apply.
 
-**数据处理骨架适用边界**：数据处理类型的结构骨架假定 Spark 加 Iceberg 加调度器的技术栈。本项目是 Pandas 单机参考实现（选型与被否方案见 `docs/business/PROJECT.md`），骨架中依赖该栈的条目经登记后不适用：
+**Data-processing skeleton applicability boundaries**: the data-processing structure skeleton assumes a technology stack of Spark plus Iceberg plus a scheduler. This project is a single-machine Pandas reference implementation (for the choices and the rejected alternatives see `docs/business/PROJECT.md`), so the skeleton entries that depend on that stack are registered here as inapplicable:
 
-- **不设 `dags/`**：没有调度器，编排兼在包内入口，`python -m demo_gx.cli` 就是调用方式。骨架的「入口可合并」边界要求三条全满足，本项目**只满足第一条**：入口写死了 `--env` 的三个取值与默认值，不满足第二条；`reader` / `validator` / `cleaner` / `builder` 是被 `tests/` 当库 import 的，第三条也存疑。本项目仍选择合并，理由是只有这一个入口、也没有第二个调用方；代价是入口带命令行副作用，将来拆分要把参数解析与库代码分开。
-- **转换模块按管道阶段划分**：项目只有 events 一个业务域，按域分会得到单元素目录；阶段边界才是真实的可复用边界。`common/` 是跨阶段共享层，不在骨架的列举里但符合 `utils/` 的定位。
-- **不设 `src/demo_gx/models/`**：字段契约的唯一真源是 `config/schema.yaml`，表契约在 `docs/tables/`。另设 Python 模型层会产生第二份定义。
-- **不设 `sql/`**：没有 SQL 引擎，schema 变更靠 `schema.yaml` 与表契约同步。仓库里存在 Iceberg DDL，但只在 `docs/archive/` 作生产形态参考，不进执行路径。
-- **测试平铺不镜像 `src/`**：单文件单模块，镜像会为 4 个测试文件各加一层目录。命名不严格同源模块：`test_validation.py` 对应的是 `validation/schema_validator.py`。
-- **分层沿用 Bronze / Silver / Gold**：与上游 `ods` / `dwd` / `dws` / `ads` 的对应关系记在 `docs/business/DOMAIN-LANGUAGE.md` 的术语 `data layer mapping`。
+- **No `dags/`**: there is no scheduler, so orchestration doubles as the in-package entry point and `python -m demo_gx.cli` is the invocation. The skeleton's "merging is allowed" boundary requires all three conditions; this project **satisfies only the first**: there is one entry, but it hardcodes the three `--env` values and their default, so condition two fails, and `tests/` imports four pipeline components as libraries (`GoldBuilder`, `DataCleaner`, `Deduplicator`, `SchemaValidator`), so condition three fails as well. The project still merges, because there is only this one entry and no second caller; the cost is that the entry carries command-line side effects, and a future split would have to separate argument parsing from library code.
+- **Transformation modules split by pipeline stage**: the project has a single business domain, events, so splitting by domain would produce single-element directories; the stage boundaries are the real reusable boundaries. `common/` is the cross-stage shared layer: it is not in the skeleton's list, but it matches the intent of `utils/`.
+- **No `src/demo_gx/models/`**: the single source of truth for the field contract is `config/schema.yaml`, and table contracts live in `docs/tables/`. A separate Python model layer would create a second definition.
+- **No `sql/`**: there is no SQL engine, so schema changes are kept in step through `schema.yaml` and the table contracts. Iceberg DDL does exist in the repository, but only under `docs/archive/` as a production-shape reference, and it is not on the execution path.
+- **Tests are flat rather than mirroring `src/`**: one file per module; mirroring would add a directory level for each of the four test files. Names do not mirror their module exactly: `test_validation.py` covers `validation/schema_validator.py`.
+- **Layering keeps Bronze / Silver / Gold**: the mapping to the upstream `ods` / `dwd` / `dws` / `ads` is recorded under the `data layer mapping` term in `docs/business/DOMAIN-LANGUAGE.md`.
 
-**未被单测直接覆盖的模块**：`ingestion/reader.py`、`validation/error_envelope.py`、`common/*` 与 `cli.py` 目前只有端到端 smoke 覆盖，没有直接单测。这是 `#coverage-gate-off` 的具体表现。
+**Modules with no direct unit test**: `ingestion/reader.py`, `validation/error_envelope.py`, `common/*` and `cli.py` currently have end-to-end smoke coverage only, with no direct unit tests. This is the concrete form of `#coverage-gate-off`.
 
-代价与回退：迁到 Spark 加 Iceberg 时，前四条需要重建目录并在其中重新落位逻辑；后两条是命名与组织差异，回退成本为零。
+**Deviation rationale and cost**
 
-- **禁止无登记地默默降标准**。「这只是个例」不是免于登记的理由。
-- **表格里的竖线要转义**：单元格中写 `a|b` 这类含竖线的内容时，写成 `a\|b`，否则 Markdown 会把这一格切坏。
-- **本文件结构固定**：共 §0–§10 十一节，**不得新增节**。项目级补充写在对应节。红线写进 §3，行为准则写进 §4，输出要求写进 §5。地图写进 §9.1 / §9.2，与上游不一致写进本节偏离表。自加节会与既有节各自漂移，机器门禁会告警。尤其不要再加一张与 §3 重复的「反模式」对照表。
+Cost and rollback for the six skeleton rows above: moving to Spark plus Iceberg means the first four items need their directories rebuilt and the logic re-placed inside them; the last two are naming and organisation differences with zero rollback cost.
+
+Cost and rollback for the remaining rows:
+
+- **Environment setup**: uv is not installed in this environment and the upstream fallback is an equivalent lock kept in a plain requirements file, whereas this project folds the dependency declaration into `pyproject.toml` and commits no lock file. Cost: dependency resolution is not pinned, so a fresh environment can resolve different versions. Rollback cost: low, add `uv lock`, or pin the environment with `pip freeze` into a requirements file.
+- **Coverage gate**: no coverage tooling is enabled. Cost: a regression that no test asserts can pass CI unnoticed. Rollback cost: low, add pytest-cov and a threshold.
+- **Computation and catalog entry point**: there is no catalog and no session concept to unify. Cost: introducing Iceberg later means adding a `catalog.py` and re-pointing every read and write. Rollback cost: medium.
+- **Snapshot and compaction policy**: partitions are overwritten in place. Cost: no point-in-time recovery and no small-file compaction. Rollback cost: medium, re-registering the data as an Iceberg table.
+- **Amount precision**: the `amount` column is `float64`, which cannot represent decimal amounts exactly, so equality comparisons and sums are approximate. Cost: monetary rounding has to be handled by explicit rounding at the boundary. Rollback cost: medium, switch the column to `decimal.Decimal` and re-lock the affected tests and the table contract.
+- **Table contract approval**: no approval chain exists. Cost: nothing blocks an unreviewed contract change. Rollback cost: low, add a CI check on the frontmatter.
+- **Stage model**: stages 9 and 10 have no practice here. Cost: release and observability discipline is not exercised. Rollback cost: both stages must be reinstated once this becomes a deployed service.
+- **Clock reads outside data stamping**: `common/metrics.py` and `common/logger.py` still read the clock, for telemetry only; no data-stamping site reads it. Cost: telemetry timestamps are not reproducible across runs. Rollback cost: low, inject the run instant into the telemetry path too.
+
+- **Deviation discipline**: the standard practice is the **default** and a deviation is the exception. A deviation is allowed, but it must satisfy all three conditions at once:
+  - ① Register it item by item in this section, with the "disposition" column pointing to an anchor that actually exists.
+  - ② State **why the standard practice is not adopted**; empty reasons such as "this project is special" are forbidden.
+  - ③ Note the cost and the rollback cost.
+- **Silently lowering the standard without registering it is forbidden**. "This is just a one-off case" is not a reason for exemption from registration.
+- **Vertical bars inside table cells must be escaped**: when writing content that contains a vertical bar such as `a|b` in a cell, write it as `a\|b`, otherwise Markdown breaks that cell.
+- **The structure of this file is fixed**: eleven sections in total, §0–§10, and **no new section may be added**. Project-level additions go into the corresponding section. Red lines go into §3, conduct into §4, output requirements into §5. Maps go into §9.1 / §9.2, and any disagreement with upstream goes into this section's deviation table. A self-added section would drift apart from the existing ones, and the machine gate warns about it. In particular, do not add another "anti-pattern" comparison table that duplicates §3.

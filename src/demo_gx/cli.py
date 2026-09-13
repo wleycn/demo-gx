@@ -85,7 +85,7 @@ def main():
 
         # 1c. Optional event-date backfill scope: when --event-date is given,
         #     process only rows whose event_timestamp falls on that date
-        #     (safe backfill per data-design §4). Bronze above always keeps
+        #     (safe backfill per DATA-DESIGN.md section 2.6). Bronze above always keeps
         #     the full arriving batch for replay.
         if args.event_date:
             target_date = pd.to_datetime(args.event_date).date()
@@ -144,7 +144,7 @@ def main():
                 duplicates_df.to_csv(f, index=False, header=False)
             logger.info(f"Duplicates logged to {dup_log}")
         metrics.increment("silver_rows", len(deduped_df))
-        # data-design §3.2: _processed_timestamp is added automatically at
+        # DATA-DESIGN.md section 2.3: _processed_timestamp is added automatically at
         # write time (pipeline processing timestamp, UTC), injected by the
         # entry boundary rather than read here (AGENTS.md section 3 red line 10)
         deduped_df["_processed_timestamp"] = run_ts

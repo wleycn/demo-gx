@@ -1,260 +1,260 @@
-# DEVELOP-FLOW — 开发流程规范（基线 · 栈与项目类型无关）
+# DEVELOP-FLOW — Development flow standard (baseline · independent of stack and project type)
 
-> **流程管控**：由本项目 `AGENTS.md`（AI 编码约束）+ 本规范共同承担；编码模式参考 `docs/rules/CODING-STANDARD.md`。
+> **Flow control**: shared between this project's `AGENTS.md` (AI coding constraints) and this standard; for coding patterns see `docs/rules/CODING-STANDARD.md`.
 
-## 1. 十阶段流水线
+## 1. Ten-stage pipeline
 
-1.需求 → 2.方案 → 3.拆分 → 4.编码 → 5.单测 → 6.评审 → 7.集成 → 8.预发 → 9.部署 → 10.观测
+1.Requirements → 2.Solution → 3.Breakdown → 4.Coding → 5.Unit test → 6.Review → 7.Integration → 8.Staging → 9.Deployment → 10.Observability
 
-| Stage | 名称 | Quality Gate（退出条件） | 阶段产出（产出什么、放哪） |
+| Stage | Name | Quality Gate (exit condition) | Stage output (what is produced, where it goes) |
 |---|---|---|---|
-| 1 | 需求分析 | 需求无歧义、模糊点已澄清、业务价值明确 | 需求清单 + 影响分析。**可人工输入**（口头 / 工单 / 客户文档均可，不强制先写文档）；要落文档时写进 `docs/business/PROJECT.md` §范围与需求 |
-| 2 | 方案设计 | 方案经评审、选型有依据、🔴 红线冲突清零 | **规范**：`docs/rules/` 四件套（结构 / 编码 / 流程 / 验收）；**设计文档**：`docs/business/` 的 `PROJECT` / `MODULE-DESIGN` / `DATA-DESIGN` / `INTERFACE-DESIGN` / `DOMAIN-LANGUAGE`；技术变更清单 + 变更条目 |
-| 3 | 任务拆分 | 任务粒度 ≤ 4h、依赖关系明确 | 任务列表 + 执行顺序（粒度判据：**能独立验证**） |
-| 4 | 编码实现 | 遵守编码规范、红线零违反、编译/静态检查 0 error | 可运行代码 + 契约文档同步 + 变更条目（子步骤见 §1.1） |
-| 5 | 单元测试 | 覆盖率 ≥ 80%（**仅限有 CI 的项目**）、核心逻辑 100%、测试全绿 | 测试代码（与 `src/` 结构镜像）+ 测试报告 |
-| 6 | 代码评审 | 评审无 🔴 问题、CI 门禁全绿 | 评审记录（问题清单 + 结论 + 未决项） |
-| 7 | 集成测试 | 接口联调通过、数据流正确 | 集成测试报告（含真实请求 / 响应证据） |
-| 8 | 预发验证 | staging 环境验证通过（含冒烟） | 验证记录（冒烟路径 + 实际结果） |
-| 9 | 上线部署 | 部署脚本执行成功、冒烟通过 | 部署记录（日期 / 环境 / 版本 / 冒烟结果） |
-| 10 | 线上观测 | 观测期无异常、指标在基线内 | 观测报告（指标 + 异常 + 结论） |
+| 1 | Requirements analysis | Requirements unambiguous, ambiguities clarified, business value clear | Requirement list + impact analysis. **Human input is acceptable** (verbal / ticket / customer document are all fine, writing a document first is not mandatory); when a document is needed, write it into `docs/business/PROJECT.md` §Scope and requirements |
+| 2 | Solution design | Solution reviewed, choices justified, 🔴 red line conflicts cleared to zero | **Standards**: the four-piece set under `docs/rules/` (structure / coding / flow / acceptance); **design documents**: `PROJECT` / `MODULE-DESIGN` / `DATA-DESIGN` / `INTERFACE-DESIGN` / `DOMAIN-LANGUAGE` under `docs/business/`; technical change list + change entries |
+| 3 | Task breakdown | Task granularity ≤ 4h, dependencies clear | Task list + execution order (granularity criterion: **can be verified independently**) |
+| 4 | Coding implementation | Coding standard followed, zero red line violations, compile/static checks 0 error | Runnable code + contract documents kept in sync + change entries (sub-steps in §1.1) |
+| 5 | Unit test | Coverage ≥ 80% (**only for projects with CI**), core logic 100%, all tests green | Test code (mirroring the `src/` structure) + test report |
+| 6 | Code review | No 🔴 issues in review, CI gates all green | Review record (issue list + conclusion + open items) |
+| 7 | Integration test | Interface integration verified, data flow correct | Integration test report (including real request / response evidence) |
+| 8 | Staging verification | Verification in the staging environment passed (including smoke test) | Verification record (smoke path + actual result) |
+| 9 | Production deployment | Deployment script executed successfully, smoke test passed | Deployment record (date / environment / version / smoke result) |
+| 10 | Production observability | Observation period anomaly-free, metrics within baseline | Observability report (metrics + anomalies + conclusion) |
 
-> **产出分两类，别混**：① **规范与设计文档**（阶段 2，长期维护的活文档，改代码要同步）；② **过程记录**（阶段 4–10，写进 `docs/changes/{module}.md` 的变更条目，版本级摘要写 `docs/business/CHANGELOG.md`）。过程记录**不另外发明文件类型**。
+> **Outputs fall into two categories, do not mix them**: ① **standards and design documents** (stage 2, long-lived living documents that must be kept in sync when code changes); ② **process records** (stages 4–10, written as change entries in `docs/changes/{module}.md`, with version-level summaries in `docs/business/CHANGELOG.md`). Process records **must not invent additional file types**.
 
-### 1.1 阶段 4「编码实现」的子步骤（顺序推进，逐步验证）
+### 1.1 Sub-steps of stage 4 "Coding implementation" (advance in order, verify step by step)
 
-阶段 4 不是「一次写完」。按下面顺序推进，每个子步骤结束时**代码必须仍可编译 / 可运行**：
+Stage 4 is not "write it all in one go". Advance in the order below; at the end of every sub-step the **code must still compile / still run**:
 
-| 子步骤 | 做什么 | 退出条件（可验证） |
+| Sub-step | What to do | Exit condition (verifiable) |
 |---|---|---|
-| 4a 框架搭建 | 目录骨架、依赖声明、配置收口、日志与错误处理收口、入口文件（可空实现） | 项目能起（服务可启动 / 命令可运行）；静态检查 0 error |
-| 4b 接口实现 | **契约先行**的接口层：路由 / 签名 / 入参校验 / 错误形状（先占位后填实现） | 接口按契约可达；错误码与契约一致 |
-| 4c 功能模块实现 | 逐个功能模块实现业务逻辑（一个模块一个变更条目） | 每个模块行为符合对应验收标准（AC） |
-| 4d 接线与自测 | 把模块接进接口，补接线处的边界与异常处理，跑通端到端主路径 | 主路径端到端可跑通（阶段 5 的测试在此补齐） |
+| 4a Framework setup | Directory skeleton, dependency declarations, configuration single entry point, logging and error handling single entry point, entry file (may be an empty implementation) | The project starts (service can start / command can run); static checks 0 error |
+| 4b Interface implementation | The interface layer with **contract first**: routes / signatures / input validation / error shape (placeholders first, implementation later) | Interfaces reachable per the contract; error codes consistent with the contract |
+| 4c Feature module implementation | Implement business logic module by module (one change entry per module) | Each module's behavior meets its corresponding acceptance criteria (AC) |
+| 4d Wiring and self-test | Wire the modules into the interfaces, add boundary and exception handling at the wiring points, get the end-to-end main path working | The main path works end to end (the stage 5 tests are filled in here) |
 
-🔴 **禁止跨子步骤并发大改**：4a 未通过不得进 4b，4b 未通过不得进 4c（与「阶段 N 未过不进 N+1」同一条纪律）。允许在同一子步骤内小步提交多次。
+🔴 **No large concurrent changes across sub-steps**: 4a must pass before entering 4b, and 4b must pass before entering 4c (the same discipline as "do not enter N+1 until stage N passes"). Committing several small steps within the same sub-step is allowed.
 
-### 阶段衔接规则
+### Stage transition rules
 
-- **串行推进**：阶段 N 的 Quality Gate 未满足，**禁止**进入阶段 N+1
-- **小改动可合并**：涉及文件少时阶段 1–3 可一次完成，但**变更条目不可省略**；红线检查与冒烟验证**任何场景不可省略**
-- **回退**：任一阶段失败，按 §3 回滚路线表回到对应阶段重来
+- **Serial progression**: if stage N's Quality Gate is unmet, entering stage N+1 is **forbidden**
+- **Small changes may be merged**: when few files are involved, stages 1–3 may be completed in one go, but **change entries cannot be skipped**; red line checks and smoke verification **cannot be skipped in any scenario**
+- **Rollback**: if any stage fails, return to the corresponding stage per the rollback route table in §3 and start over
 
-## 2. 分支与提交
+## 2. Branches and commits
 
-| 项 | 约定 | 示例 |
+| Item | Convention | Example |
 |---|------|---------|
-| 特性分支 | `feature/{slug}`，与变更条目 slug **同名** | `feature/coupon-feature` |
-| 修复分支 | `fix/{issue-or-bug-desc}` | `fix/cart-total-rounding` |
-| 主分支 | `main`（保护分支，只接受 MR 合入） | — |
-| Commit | `type(scope): message`；type ∈ feat/fix/refactor/test/docs/chore | `feat(coupon): 支持优惠券领取` |
-| 合并 | 阶段 6 评审通过 + CI 全绿才可发起 MR | — |
+| Feature branch | `feature/{slug}`, with the **same name** as the change entry slug | `feature/coupon-feature` |
+| Fix branch | `fix/{issue-or-bug-desc}` | `fix/cart-total-rounding` |
+| Main branch | `main` (protected branch, only accepts merged MRs) | — |
+| Commit | `type(scope): message`; type ∈ feat/fix/refactor/test/docs/chore | `feat(coupon): support coupon claiming` |
+| Merge | An MR may only be raised after stage 6 review passes + CI is all green | — |
 
-## 3. 回滚路线表
+## 3. Rollback route table
 
-| Stage | 回滚策略 | 触发条件 |
+| Stage | Rollback strategy | Trigger condition |
 |---|---|---|
-| 编码实现 | `git checkout --` 丢弃变更 | 编译失败 |
-| 单元测试 | 修测试或回退代码 | 测试失败率 > 20% |
-| 代码评审 | 按评审意见修改 | 🔴 问题未解决 |
-| 集成测试 | 回退到上一个稳定版本 | 接口不通 |
-| 预发验证 | 回退到生产版本 | 功能异常 |
-| 上线部署 | 回滚上一版本镜像/包 | 冒烟失败 |
-| 线上观测 | 紧急回滚 + 降级 | 错误率 > 1% |
+| Coding implementation | Discard changes with `git checkout --` | Compile failure |
+| Unit test | Fix the tests or revert the code | Test failure rate > 20% |
+| Code review | Revise per the review comments | 🔴 issues unresolved |
+| Integration test | Revert to the last stable version | Interfaces not working |
+| Staging verification | Revert to the production version | Feature anomalies |
+| Production deployment | Roll back to the previous version's image/package | Smoke test failure |
+| Production observability | Emergency rollback + degradation | Error rate > 1% |
 
-> **数据库变更回滚不在本表范围**：回滚脚本与迁移脚本**成对**放 `sql/migrations/`（`{V}__{desc}.sql` + `{V}__{desc}.down.sql`），且**代码回滚先于数据修复**。
+> **Database change rollback is out of scope for this table**: rollback scripts and migration scripts go **in pairs** under `sql/migrations/` (`{V}__{desc}.sql` + `{V}__{desc}.down.sql`), and **code rollback precedes data repair**.
 
-## 4. 变更管理
+## 4. Change management
 
 ```text
 docs/changes/
-├── {module}.md          # 每模块一份，正序追加（模块 = `src/` 顶层模块目录名）
-└── engineering.md       # 非功能变更兜底（构建 / 依赖 / 规则 / 文档 / CI）
+├── {module}.md          # one per module, appended in ascending order (module = top-level module directory name under `src/`)
+└── engineering.md       # fallback for non-functional changes (build / dependencies / rules / documents / CI)
 ```
 
-- 🔴 本目录**只放条目文件**（`{module}.md`）：不放 README / 说明 / 清单 / 附件——**目录自身就是清单**（模块名 = 源码顶层模块目录名）。「哪个改动写哪个文件」的映射与兜底规则写进项目 `AGENTS.md` §9.1 与 `docs/business/PROJECT.md`
-- 与 `CHANGELOG.md` 的分工：本目录 = **按模块的变更详情**（每次一条目，含范围 / 验证 / 回滚）；`CHANGELOG.md` = **时间线汇总视图**（一行一条）
+- 🔴 This directory holds **entry files only** (`{module}.md`): no README / notes / lists / attachments — **the directory itself is the list** (module name = source top-level module directory name). The mapping of "which change goes in which file" and the fallback rules are written into the project's `AGENTS.md` §9.1 and `docs/business/PROJECT.md`
+- Division of labor with `CHANGELOG.md`: this directory = **per-module change details** (one entry per change, including scope / verification / rollback); `CHANGELOG.md` = **timeline summary view** (one line per entry)
 
-- 🔴 变更**完成时**在对应模块文件末尾追加一条目；跨模块变更在主要模块写全文，其它模块写一行指回
-- 🔴 模块文件**只追加**，不回改历史条目（写错了再追加一条修正条目，保持可追溯）
-- 含 DDL 的变更：迁移与回滚脚本**成对**放 `sql/migrations/`（`{V}__{desc}.sql` + `{V}__{desc}.down.sql`），条目中给路径
-- 无 CI 的项目：条目照写，「验证」一栏写实际执行的命令与结果
-- 🔴 「验证」一栏必须是**真跑过的命令与结果**（禁止「应该没问题」）；历史条目不回填，追溯走 `git log`
+- 🔴 Append an entry to the end of the corresponding module file **when the change is complete**; for cross-module changes write the full text in the primary module and a one-line pointer back in the other modules
+- 🔴 Module files are **append-only**; do not rewrite historical entries (if you got something wrong, append a correction entry to keep it traceable)
+- Changes containing DDL: migration and rollback scripts go **in pairs** under `sql/migrations/` (`{V}__{desc}.sql` + `{V}__{desc}.down.sql`), and the entry gives the paths
+- Projects without CI: write entries as usual; in the "Verification" field write the commands actually executed and their results
+- 🔴 The "Verification" field must contain **commands and results that were actually run** ("should be fine" is forbidden); historical entries are not backfilled, use `git log` for traceability
 
-### 变更条目模板（七项，一项不可少）
+### Change entry template (six required + one conditional)
 
 ````markdown
-## {YYYYMMDD} · {slug} — {一句话标题}
-- **动机**：做什么、为什么（对应需求编号 / issue）
-- **范围**：文件级清单（代码 / 配置 / DDL / 契约文档）
-- **行为与契约变化**：接口、schema、数据含义、配置项的对外影响；无变化写「无」
-- **验证**：实际执行过的命令 + 结果（禁止「应该没问题」）
-- **回滚**：代码回退方式与数据修复方式分开写
-- **关联**：`CHANGELOG.md` 条目 / `KNOWN-ISSUE.md#锚点` / commit hash
-- **部署记录**（有生产部署的项目追加）：日期 / 环境 / 版本 / 冒烟结果
+## {YYYYMMDD} · {slug} — {one-line title}
+- **Motivation**: what is being done and why (corresponding requirement ID / issue)
+- **Scope**: file-level list (code / configuration / DDL / contract documents)
+- **Behavior and contract changes**: external impact of interfaces, schema, data meaning, configuration items; write "none" if there is no change
+- **Verification**: commands actually executed + results ("should be fine" is forbidden)
+- **Rollback**: write the code revert method and the data repair method separately
+- **Related**: `CHANGELOG.md` entry / `KNOWN-ISSUE.md#anchor` / commit hash
+- **Deployment record** (conditional: append only when the project has a production deployment; otherwise omit the whole bullet): date / environment / version / smoke result
 ````
 
-> 复杂变更（跨多模块 / 含外部依赖）可在条目下追加「任务拆分」子节（粒度 ≤ 4h）。
+> Complex changes (spanning multiple modules / with external dependencies) may add a "Task breakdown" sub-section under the entry (granularity ≤ 4h).
 
-## 5. AI 编码约束（与项目根 `AGENTS.md` 配套）
+## 5. AI coding constraints (paired with the project root `AGENTS.md`)
 
-### 5.0 生效前提（先确认再谈约束）
+### 5.0 Preconditions for effect (confirm first, then talk about constraints)
 
-`AGENTS.md` 按「cwd → git 根」链在**会话启动**时注入：非 git 项目从子目录启动**不加载**；`delegate_task` 子代理与未设 `workdir` 的 cron 也**不读**。委托 / 测试 / 验收一律**以项目根为 cwd** 启动，否则约束晚一步到位，期间动作等于无约束——Hermes 及其委托链路（coder profile / 子代理 / cron）同样适用；拿不准时把项目 `AGENTS.md` §3 红线**内联**进任务书。
+`AGENTS.md` is injected at **session startup** along the "cwd → git root" chain: a non-git project started from a subdirectory **does not load it**; `delegate_task` sub-agents and cron jobs without a `workdir` set **do not read it** either. Delegation, testing and acceptance must always be started **with the project root as cwd**. Otherwise the constraints arrive one step late, and the actions in the meantime are effectively unconstrained. This applies equally to Hermes and its delegation chain: coder profile, sub-agents and cron. When unsure, **inline** the red lines from the project's `AGENTS.md` §3 into the task brief.
 
-### 5.1 40% 阈值
-- AI **单次生成代码变更量不超过文件总量 40%**；超过必须拆分为多次操作
-- 每次操作后必须验证编译/运行状态（按栈：`mvn compile` / `vue-tsc --noEmit` / `python -m compileall` + 静态检查）
+### 5.1 The 40% threshold
+- A single AI-generated **code change must not exceed 40% of the file's total volume**; above that it must be split into multiple operations
+- After each operation, verify the compile/run status (per stack: `mvn compile` / `vue-tsc --noEmit` / `python -m compileall` + static checks)
 
-### 5.2 上下文加载约束
-- 编码前按需加载两类文档：**规范** `docs/rules/`（边界与禁止项）+ **业务文档** `docs/business/`（本项目的契约、数据结构、模块设计）；合计 **不超过 3 个文件**（防上下文过载）
-- **先定位再读**：只读与本次改动相关的章节，禁止整篇兜底读
-- 具体编码模式优先参照**既有代码**与技能文件；规则文件只定义边界，不重复展开
+### 5.2 Context loading constraints
+- Before coding, load the two categories of documents as needed: **standards** in `docs/rules/` (boundaries and prohibitions) + **business documents** in `docs/business/` (this project's contracts, data structures, module design); **no more than 3 files** in total (to prevent context overload)
+- **Locate before reading**: read only the sections relevant to this change; never read the whole thing as a catch-all
+- For concrete coding patterns, prefer **existing code** and skill files; rule files only define boundaries, they do not expand on them
 
-### 5.3 质量检查点
+### 5.3 Quality checkpoints
 
-| Checkpoint | 检查内容 | 通过标准 |
+| Checkpoint | What is checked | Pass criteria |
 |---|---|---|
-| 编译检查 | 代码可编译 | 0 error |
-| 规范检查 | 符合 `CODING-STANDARD.md` | 0 🔴 violation |
-| 注释检查 | 注释 / docstring 与实现一致；无注释掉的代码、无裸 `TODO` | 0 处不符 |
-| 测试检查 | 单元测试通过 | 覆盖率 ≥ 80% |
-| 评审检查 | 代码评审通过 | 0 🔴 issue |
-| 门禁检查 | CI 流水线 | 编译/测试/覆盖率/红线扫描全绿 |
+| Compile check | Code compiles | 0 error |
+| Standard check | Complies with `CODING-STANDARD.md` | 0 🔴 violation |
+| Comment check | Comments / docstrings match the implementation; no commented-out code, no bare `TODO` | 0 mismatches |
+| Test check | Unit tests pass | Coverage ≥ 80% |
+| Review check | Code review passes | 0 🔴 issue |
+| Gate check | CI pipeline | Compile/test/coverage/red line scan all green |
 
-### 5.4 红线冲突处理
-任何阶段发现 `AGENTS.md` 的红线被违反：**立即停止推进 → 修复 → 从受影响阶段重新验证**。禁止「先合入后续再改」。
+### 5.4 Handling red line conflicts
+If a violation of the red lines in `AGENTS.md` is found at any stage: **stop advancing immediately → fix → re-verify from the affected stage**. "Merge first, fix afterwards" is forbidden.
 
-## 6. 熵管理周期表
+## 6. Entropy management cycle table
 
-| 频率 | 活动 | 内容 |
+| Frequency | Activity | Content |
 |---|---|---|
-| 每日 | 代码扫描 | 死代码、未使用 import、TODO 积压 |
-| 每周 | 依赖审计 | 过时依赖、安全漏洞 |
-| 每两周 | 架构审视 | 模块边界、循环依赖 |
-| 每月 | 技术债清理 | 优先级排序并消化 |
-| 每季度 | 代码重构 | 针对高频变更模块 |
+| Daily | Code scan | Dead code, unused imports, TODO backlog |
+| Weekly | Dependency audit | Outdated dependencies, security vulnerabilities |
+| Biweekly | Architecture review | Module boundaries, circular dependencies |
+| Monthly | Technical debt cleanup | Prioritize and pay down |
+| Quarterly | Code refactoring | For high-churn modules |
 
-## 7. 与阶段轴的对应
+## 7. Correspondence with the stage axis
 
-本规范的十阶段映射到 `develop/` 技能树的七阶段：1–3 → `01-analyze`、4 → `03-build`、5/7 → `04-test`、6 → `05-accept`、8–10 → `06-release`，线上问题 → `07-maintain`。
+The ten stages of this standard map onto the seven stages of the `develop/` skill tree: 1–3 → `01-analyze`, 4 → `03-build`, 5/7 → `04-test`, 6 → `05-accept`, 8–10 → `06-release`, production issues → `07-maintain`.
 
-## 8. 适用边界（与 `coding-flow` 七步的关系）
+## 8. Applicable boundaries (relationship to the `coding-flow` seven steps)
 
-- 本流水线面向**有 CI / MR / 预发 / 生产多环境**的交付；无 CI 的单机脚本与 agent 委托任务用 skill `coding-flow` 的**七步执行序**。
-- 映射：七步 0–2 ≈ 十阶段 1–3；七步 3–4 ≈ 4–5；七步 6 ≈ 7–8；七步 7 ≈ 10。
-- 两者共同红线：契约先于编码、测试不得写在源码旁、改动必须留痕（无 CI 时用 `docs/business/CHANGELOG.md` 代替 `summary.md`）。
+- This pipeline targets delivery **with CI / MR / staging / production multi-environment** setups; single-machine scripts without CI and delegated agent tasks use the **seven-step execution sequence** of the `coding-flow` skill.
+- Mapping: seven steps 0–2 ≈ ten stages 1–3; seven steps 3–4 ≈ 4–5; seven step 6 ≈ 7–8; seven step 7 ≈ 10.
+- Red lines shared by both: contract before coding, tests must not be written next to the source code, changes must leave a trail (without CI, use `docs/business/CHANGELOG.md` instead of `summary.md`).
 
-## 【层：python】DEVELOP-FLOW — 开发流程规范（Python）
+## [Layer: python]DEVELOP-FLOW — Development Flow Standard (Python)
 
-### 1. Python 栈的阶段落地
+### 1. Python Stack Stage Execution
 
-| 阶段 | Python 栈动作 | 命令 / 门禁 |
+| Stage | Python stack action | Command / gate |
 |---|---|---|
-| 2 方案设计 | 定**数据契约**（如有数据）：字段 / 类型 / 精度 / 主键 / 幂等做法 | 契约文档进 `docs/business/DATA-DESIGN.md` |
-| 4 编码实现 | 独立 venv + 依赖进 `pyproject.toml` | `ruff check` + `mypy` 0 error |
-| 5 单元测试 | pytest；覆盖核心逻辑与边界 | `pytest -q` 全绿，覆盖率 ≥ 80% |
-| 6 代码评审 | 红线扫描（本规范 §1–§9） | 0 🔴 violation |
-| 8 预发验证 | 影子资源名（独立库/schema）跑通 | 见 §4 影子验收 |
-| 9 上线部署 | 迁移 → 代码 → 调度（**顺序不可换**）🔴 | 部署脚本含冒烟 |
-| 10 线上观测 | 指标 + 日志字段可检索 | 观测期无异常 |
+| 2 Solution design | Define the **data contract** (if there is data): fields / types / precision / primary key / idempotency approach | The contract document goes into `docs/business/DATA-DESIGN.md` |
+| 4 Coding implementation | Independent venv + dependencies in `pyproject.toml` | `ruff check` + `mypy` 0 error |
+| 5 Unit testing | pytest; cover core logic and boundaries | `pytest -q` all green, coverage ≥ 80% |
+| 6 Code review | Red line scan (this standard §1-§9) | 0 🔴 violation |
+| 8 Pre-release verification | Run through with shadow resource names (independent DB/schema) | See §4 shadow acceptance |
+| 9 Release deployment | Migration → code → scheduling (**the order is not interchangeable**) 🔴 | The deploy script includes a smoke test |
+| 10 Production observation | Metrics + searchable log fields | No anomalies during the observation period |
 
-### 2. 契约先于编码 🔴
+### 2. Contract Before Coding 🔴
 
-有数据落库的项目：每张表 / 每个对外结构一份契约，**先定契约再写代码**。契约必须包含：
+For projects with data landing in a database: one contract per table / per external structure, and **define the contract before writing code**. The contract must include:
 
-- 粒度 / 业务主键 / **去重方式**（MERGE 还是 row_number）
-- 字段与类型、**精度**（金额 / 比率 / 汇率）、PII 字段与脱敏方式
-- 生命周期（保留期 / 清理策略）、新鲜度 SLA 与 owner、上下游依赖
-- **质量规则清单**（唯一性 / 非空 / 行数波动阈值 / 枚举取值）
+- Granularity / business primary key / **deduplication method** (MERGE or row_number)
+- Fields and types, **precision** (amounts / ratios / exchange rates), PII fields and their redaction method
+- Lifecycle (retention period / cleanup policy), freshness SLA and owner, upstream and downstream dependencies
+- **Quality rule list** (uniqueness / non-null / row count fluctuation threshold / enum values)
 
-**评审**：至少 1 名 owner approve；含金额或 PII 的表**双人会签**。
-**契约状态机**：`draft → approved`；**契约变更时状态自动重置为 `draft`，需重新审批**；CI 检查未 approved 的契约禁止对应迁移进 main。
+**Review**: at least 1 owner approves; tables containing amounts or PII require **dual sign-off**.
+**Contract state machine**: `draft → approved`; **when the contract changes the state is automatically reset to `draft` and re-approval is required**; CI checks that the migration corresponding to a contract that is not approved must not enter main.
 
-### 3. 依赖与迁移管理 🔴
+### 3. Dependency and Migration Management 🔴
 
-- 迁移脚本 `V{N}__{desc}.sql` **编号递增**，禁止修改或复用已提交编号
-- 范围：`CREATE TABLE`、schema evolution（ADD/DROP/RENAME COLUMN）、索引、表属性
-- **本地与 CI 对 dev 环境 dry-run**；生产执行仅经发布管道，**禁止在生产库手工改结构**
-- 每个 `V{N}__{desc}.sql` **必须配套 rollback 脚本**：覆盖 DROP TABLE（仅限本次新建）、DROP COLUMN（仅限本次新增列）、恢复表属性；rollback 同样要 dry-run
-- 🔴 rollback 脚本内**不允许做数据修复**；数据回滚走 §5 优先级流程
-- **带 serial 主键的表 INSERT 不列出 id 列**（否则绕过 sequence，见 skill `pg-query`）
+- Migration scripts `V{N}__{desc}.sql` are **numbered incrementally**; modifying or reusing an already-committed number is forbidden
+- Scope: `CREATE TABLE`, schema evolution (ADD/DROP/RENAME COLUMN), indexes, table properties
+- **Dry-run locally and in CI against the dev environment**; production execution goes only through the release pipeline, and **manually changing the schema in the production database is forbidden**
+- Every `V{N}__{desc}.sql` **must be paired with a rollback script**: covering DROP TABLE (only tables created in this change), DROP COLUMN (only columns added in this change) and restoring table properties; the rollback must be dry-run as well
+- 🔴 Data repair is **not allowed** inside a rollback script; data rollback follows the priority flow in §5
+- **For tables with a serial primary key, INSERT does not list the id column** (otherwise it bypasses the sequence, see skill `pg-query`)
 
-### 4. 影子运行与验收标准
+### 4. Shadow Run and Acceptance Criteria
 
-新任务 / 大改先在影子资源（dev 库或影子表）跑，**全部满足**才可切生产：
+New tasks / major changes first run on shadow resources (a dev database or shadow tables), and may cut over to production only when **all** of the following hold:
 
-1. 连续 ≥ 2 个调度周期成功运行
-2. 主键唯一性 100%
-3. 金额字段汇总与上游对账一致（精度到分）
-4. PII 字段已按契约脱敏
-5. 质量校验通过且无告警
-6. 任务耗时在 SLA 预算内
+1. Successfully running for ≥ 2 consecutive scheduling cycles
+2. Primary key uniqueness 100%
+3. Amount field totals reconcile with upstream (precision to the cent)
+4. PII fields are redacted per the contract
+5. Quality checks pass with no alerts
+6. Task elapsed time is within the SLA budget
 
-### 5. 重跑 / 回刷
+### 5. Rerun / Backfill
 
-- 必须在 PR 与 `docs/changes/{module}.md` 条目中声明：范围、**幂等方式**、对下游影响
-- 重跑窗口与调度窗口冲突时**先暂停对应调度**
-- 大范围重跑**分批执行**，每批后校验质量规则
+- Must be declared in the PR and in the `docs/changes/{module}.md` entry: scope, **idempotency approach**, downstream impact
+- When the rerun window conflicts with the scheduling window, **pause the corresponding schedule first**
+- Large-scale reruns are **executed in batches**, verifying the quality rules after each batch
 
-### 6. 发布与调度
+### 6. Release and Scheduling
 
-- 🔴 发布顺序：**迁移 → 代码 → 调度**（顺序颠倒会造成代码找不到结构）
-- 🟡 调度任务用薄壳转发（壳只调真身，见 skill `cron-creation-discipline`），逻辑只存一份
+- 🔴 Release order: **migration → code → scheduling** (reversing the order leaves the code unable to find the schema)
+- 🟡 Scheduled tasks forward through a thin shell (the shell only calls the real implementation, see skill `cron-creation-discipline`); the logic is stored in one place only
 
-### 7. 与验收清单的衔接
+### 7. Interface with the Acceptance Checklist
 
-CR 前过 `ACCEPTANCE-CHECKLIST.md`（同级文件）的 **CR Checklist**；上线前过 **Production Readiness Checklist**（数据质量 / 可靠性 / 可观测性 / 部署回滚 / 安全）。
+Before CR, pass the **CR Checklist** of `ACCEPTANCE-CHECKLIST.md` (a file at the same level); before release, pass the **Production Readiness Checklist** (data quality / reliability / observability / deployment rollback / security).
 
-## 【层：data-processing】DEVELOP-FLOW — 开发流程（数据处理类项目）
+## [Layer: data-processing]DEVELOP-FLOW — Development Flow (Data-Processing Projects)
 
-### 1. 流程总览（本类型版）
+### 1. Flow Overview (this type's version)
 
 ```text
-需求 → 表契约设计 → 设计评审 → 迁移脚本 → 管道开发 → 本地测试
-     → 质量接入 → CR → 合并 → 发布（迁移→代码→调度）→ 重跑验证 → 变更留痕
+Requirements → Table contract design → Design review → Migration scripts → Pipeline development → Local testing
+     → Quality wiring → CR → Merge → Release (migration→code→scheduling) → Rerun verification → Change record
 ```
 
-与十阶段基线（本文件 §1）的差异：**「表契约设计」前置于编码**，且「预发验证」在本类型通过**影子表运行**完成。
+Difference from the ten-stage baseline (this file §1): **"table contract design" precedes coding**, and in this type "staging verification" is completed through a **shadow table run**.
 
-### 2. 阶段特有关注点
+### 2. Stage-Specific Focus Points
 
-| 阶段 | 本类型特有动作 |
+| Stage | Action specific to this type |
 |---|---|
-| 需求分析 | 明确粒度（日/小时）、去重与过滤方式、SLA、owner |
-| 方案设计 | **表契约先行**（见结构规范 §3）；含金额或 PII 的表需**双人会签** |
-| 编码实现 | 管道函数签名 `run(ds: str)`；分区参数由调度注入 |
-| 单元测试 | 金额换算、去重/merge、分区过滤**必须有边界用例**（空表、重复键、跨分区） |
-| 集成测试 | 对 dev 环境跑迁移 dry-run + 影子表跑一个周期 |
-| 预发验证 | 影子表验收（见 §3） |
-| 上线部署 | **迁移 → 代码 → 调度**（顺序不可换）🔴 |
-| 线上观测 | 行数/新鲜度/质量告警 |
+| Requirements analysis | Clarify the grain (daily/hourly), the deduplication and filtering method, SLA, owner |
+| Solution design | **Table contract first** (see structure standard §3); tables containing monetary amounts or PII require a **two-person sign-off** |
+| Coding implementation | Pipeline function signature `run(ds: str)`; the partition parameter is injected by the scheduler |
+| Unit testing | Money conversion, deduplication/merge, partition filtering **must have boundary cases** (empty table, duplicate keys, cross-partition) |
+| Integration testing | Run migration dry-run against the dev environment + run a shadow table for one cycle |
+| Staging verification | Shadow table acceptance (see §3) |
+| Go-live deployment | **Migration → Code → Scheduling** (the order cannot be changed) 🔴 |
+| Production observability | Row count / freshness / quality alerts |
 
-### 3. 影子运行验收标准（全满足才可切生产）
+### 3. Shadow Run Acceptance Criteria (all must be satisfied to go to production)
 
-1. 连续 ≥ 2 个调度周期成功运行
-2. 影子表与上游源表行数偏差 < 1%
-3. 主键唯一性 100%
-4. 金额字段汇总与上游对账一致（精度到分）
-5. PII 字段已按契约脱敏
-6. 质量校验通过且无告警
-7. 任务耗时在 SLA 预算内
+1. Successfully run for ≥ 2 consecutive scheduling cycles
+2. Row count deviation between the shadow table and the upstream source table < 1%
+3. Primary key uniqueness 100%
+4. Monetary field totals reconcile with upstream (precision to the cent)
+5. PII fields are masked per the contract
+6. Quality checks pass with no alerts
+7. Task elapsed time is within the SLA budget
 
-### 4. 回刷（Backfill）
+### 4. Backfill
 
-- 必须在 PR 与变更条目中声明：**分区范围、幂等方式**（分区 overwrite / MERGE）、对下游影响
-- 回刷窗口与调度窗口冲突时**先暂停对应 DAG**
-- 大范围回刷**分批执行**，每批后校验质量规则
+- Must be declared in the PR and the change entry: **partition range, idempotency method** (partition overwrite / MERGE), impact on downstream
+- When the backfill window conflicts with the scheduling window, **pause the corresponding DAG first**
+- Large-range backfills are **executed in batches**, with the quality rules validated after each batch
 
-### 5. 调度与发布 🔴
+### 5. Scheduling and Release 🔴
 
-- 发布顺序：**迁移 → 代码 → DAG**（顺序不可换）
-- 新 DAG 默认**关闭补跑**（`catchup=False`）；需历史回刷必须显式声明并走 §4
-- 🔴 任务分区参数统一由调度注入（`ds`），**禁止代码内读取系统当前时间**
-- 🟡 新任务先在 dev catalog / 影子表跑一个周期，校验行数与主键唯一后再切生产表
+- Release order: **Migration → Code → DAG** (the order cannot be changed)
+- New DAGs have **catchup disabled** by default (`catchup=False`); if historical backfill is needed it must be explicitly declared and go through §4
+- 🔴 The task partition parameter is uniformly injected by the scheduler (`ds`); **reading the system's current time inside the code is forbidden**
+- 🟡 A new task first runs for one cycle in the dev catalog / shadow table; only after verifying the row count and primary key uniqueness does it switch to the production table
 
-### 6. 回滚与事故
+### 6. Rollback and Incidents
 
-- 数据回滚优先级：**分区级 overwrite 重跑 > 快照回溯恢复 > 上游重算**
-- 🔴 执行快照过期 / orphan 文件清理前，必须确认保留窗口内**无在途回刷与回溯读取**
-- 事故复盘记录进 `docs/changes/{module}.md`
+- Data rollback priority: **partition-level overwrite rerun > snapshot time-travel restore > upstream recompute**
+- 🔴 Before executing snapshot expiry / orphan file cleanup, you must confirm there are **no in-flight backfills or time-travel reads** within the retention window
+- Incident postmortems are recorded in `docs/changes/{module}.md`

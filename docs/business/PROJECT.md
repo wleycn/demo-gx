@@ -124,6 +124,7 @@ The following known issues are documented in [KNOWN-ISSUE.md](KNOWN-ISSUE.md):
 | `#no-snapshot-lifecycle` | No snapshot layer; partition directories are overwritten directly |
 | `#amount-float` | `amount` column uses `float64` instead of `DECIMAL` |
 | `#table-contract-approval` | No approval chain for table contracts |
+| `#clock-reads-outside-data-stamping` | Telemetry modules still read the clock; no data-stamping site does |
 
 Resolved migration items are listed under "Resolved Migration Items" in [KNOWN-ISSUE.md](KNOWN-ISSUE.md).
 

@@ -93,7 +93,7 @@ Items that were registered as migration items and have since been migrated out. 
 | `#now-timestamp` | Pipeline code read the system clock for processing timestamps | `docs/changes/engineering.md` (20260914) — `--run-timestamp` injected at the entry boundary and threaded down |
 | `#layout-flat-pipeline` | Flat namespace packages instead of an installable src layout | `docs/changes/engineering.md` (20260914) — moved to `src/demo_gx/`, per-package `__init__.py`, `pyproject.toml` |
 
-### Residual boundaries after #now-timestamp
+### #clock-reads-outside-data-stamping — Residual boundaries after the run-timestamp change
 
 Two clock reads survive by design and are not defects:
 

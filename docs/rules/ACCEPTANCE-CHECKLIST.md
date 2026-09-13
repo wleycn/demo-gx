@@ -1,60 +1,60 @@
-# ACCEPTANCE-CHECKLIST — 验收 checklist（基线）
+# ACCEPTANCE-CHECKLIST — Acceptance checklist (baseline)
 
-> **本文件不含类型标记**：装配 = 基线 + 栈 + 类型**直接拼接**，无需人肉裁剪。项目里若出现 `[数据类]` 之类标记，说明装配有误（机器复核会报），**不得在项目里手工删**。
+> **This file contains no type markers**: assembly = baseline + stack + type **concatenated directly**, with no manual trimming needed. If a marker such as `[data-type]` appears in a project, the assembly is wrong (machine review will report it), and **it must not be deleted by hand in the project**.
 
-## 一、CR Checklist（合并请求前）
+## I. CR Checklist (before the merge request)
 
-- [ ] 无 🔴 红线违反（本栈 / 本项目的红线见 `CODING-STANDARD.md`）
-- [ ] 契约 / 接口文档同步更新（API 契约 + `docs/business/` 对应文档；数据类型另见表契约）
-- [ ] 单测覆盖新增逻辑，**含边界**（数值精度、去重键、空值、超限）
-- [ ] 迁移脚本编号正确且 `dry-run` 通过
-- [ ] 日志与运行指标齐全（关键对象标识、处理数量、耗时）
-- [ ] **AI 生成代码已标记**（文件头 + commit message）
-- [ ] 无 Prompt 注入风险：生成的代码未把外部数据当指令执行
-- [ ] 无敏感上下文泄露：代码中无生产数据样本、日志片段、凭证
-- [ ] 破坏性操作（DROP / DELETE / 批量覆盖）已有人类显式授权记录
-- [ ] Agent 行为合规：**无「顺手改进」的相邻代码变更**（一次任务只动授权范围）
+- [ ] No 🔴 red line violations (the red lines for this stack / this project are in `CODING-STANDARD.md`)
+- [ ] Contract / interface documents updated in sync (API contract + the corresponding documents under `docs/business/`; for data types see also the table contract)
+- [ ] Unit tests cover the new logic, **including boundaries** (numeric precision, dedup keys, null values, over-limit)
+- [ ] Migration script numbering is correct and the `dry-run` passes
+- [ ] Logging and runtime metrics are complete (key object identifiers, processed counts, elapsed time)
+- [ ] **AI-generated code is marked** (file header + commit message)
+- [ ] No prompt injection risk: the generated code does not execute external data as instructions
+- [ ] No sensitive context leakage: no production data samples, log fragments or credentials in the code
+- [ ] Destructive operations (DROP / DELETE / bulk overwrite) have a recorded explicit human authorization
+- [ ] Agent behavior compliant: **no "incidental improvements" to adjacent code** (one task touches only the authorized scope)
 
-## 二、Production Readiness Checklist（上线前）
+## II. Production Readiness Checklist (before going live)
 
-### 可靠性
-- [ ] 失败通知已配置（email / webhook / event hook）
-- [ ] 重试策略已定义，**且以幂等写入为前提**
+### Reliability
+- [ ] Failure notification is configured (email / webhook / event hook)
+- [ ] Retry policy is defined, **and assumes idempotent writes**
 
-### 可观测性
-- [ ] 每次运行输出：运行标识 / 目标对象 / 处理数量 / 耗时
-- [ ] 关键指标已接入监控
-- [ ] 日志字段结构化，可被日志系统索引
+### Observability
+- [ ] Every run outputs: run identifier / target object / processed count / elapsed time
+- [ ] Key metrics are wired into monitoring
+- [ ] Log fields are structured and indexable by the logging system
 
-### 部署与回滚
-- [ ] 迁移 `dry-run` 通过
-- [ ] 回滚脚本已验证（不是「写了就算」）
-- [ ] 影子运行 / 灰度验收通过
-- [ ] 变更记录已写入 `docs/changes/{module}.md`（条目含验证与回滚）
+### Deployment and rollback
+- [ ] Migration `dry-run` passes
+- [ ] Rollback script has been verified (it is not "written, therefore done")
+- [ ] Shadow run / canary acceptance passed
+- [ ] Change record written to `docs/changes/{module}.md` (entry includes verification and rollback)
 
-### 安全
-- [ ] 无硬编码凭证 / endpoint / 路径
-- [ ] PII 字段已按契约脱敏
-- [ ] AI 生成代码已标记
+### Security
+- [ ] No hardcoded credentials / endpoints / paths
+- [ ] PII fields masked per the contract
+- [ ] AI-generated code is marked
 
-## 【层：data-processing】ACCEPTANCE-CHECKLIST — 验收 checklist（数据处理类专项）
+## [Layer: data-processing]ACCEPTANCE-CHECKLIST — Acceptance Checklist (data-processing specific)
 
-### 一、CR Checklist 补充（合并请求前）
+### 1. CR Checklist Additions (before the merge request)
 
-- [ ] 质量规则已接入并配置**失败阻断**（不只是告警）
+- [ ] Quality rules are wired in and configured for **failure blocking** (not just alerting)
 
-### 二、Production Readiness 补充（上线前）
+### 2. Production Readiness Additions (before go-live)
 
-#### 数据质量
-- [ ] 每个输出数据集至少 1 条 **fail-fast** 质量规则
-- [ ] warn / drop / fail 阈值按业务影响分级，非统一设置
-- [ ] 阈值已写入表契约文档，变更走 PR
+#### Data Quality
+- [ ] Every output dataset has at least 1 **fail-fast** quality rule
+- [ ] warn / drop / fail thresholds are graded by business impact, not set uniformly
+- [ ] Thresholds are written into the table contract document; changes go through a PR
 
-#### 可靠性与调度
-- [ ] 调度 **catchup 关闭**（除非显式声明要回刷）
-- [ ] 有状态流的 **checkpoint 恢复流程已文档化并测试**
-- [ ] 表契约状态机：`status != approved` 时禁止对应迁移合入 `main`
+#### Reliability and Scheduling
+- [ ] Scheduling has **catchup disabled** (unless a backfill is explicitly declared)
+- [ ] For stateful flows the **checkpoint recovery procedure is documented and tested**
+- [ ] Table contract state machine: when `status != approved` the corresponding migration is blocked from merging into `main`
 
-#### 可观测性（收窄基线要求）
+#### Observability (narrows the baseline requirement)
 
-- [ ] 每次运行输出含**分区清单**与读写行数（基线只要求处理数量）
+- [ ] Every run's output includes the **partition list** and rows read/written (the baseline only requires the processed count)
