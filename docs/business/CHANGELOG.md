@@ -4,6 +4,7 @@ Version-level changes, reverse chronological order. Source: `git log --date=shor
 
 ## 2026-09-14
 
+- `2018807` docs: record the blocking line-ending check in the change trail
 - `99a7001` docs: fix the double-CR line endings in AGENTS.md and normalise the index
 - `e6f78e4` docs: record the line-ending fix and re-assemble the rules set
 - `14ab112` docs: record the type-marker gate fix in the change trail
