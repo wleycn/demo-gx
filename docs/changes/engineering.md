@@ -61,3 +61,12 @@
 - **Verification**: `rules_assembly.py --stack python --type website --check <memo-ledger>` to PASS and `--stack python --type data-processing --check .` to PASS. Both reported four mismatched files before the fix.
 - **Rollback**: revert. Recorded here because this tool produces this repository's `docs/rules/` set, even though it lives outside the repository.
 - **Related**: commit hash in `git log`.
+
+## 20260914 · gate-type-marker-languages — Teach the type-marker check the English markers
+
+- **Motivation**: the language migration produced English `docs/rules/` materials in which the abolished type marker is spelled `[data-type]` rather than `[数据类]`. The gate's type-marker residue check only knew the three Chinese spellings, so a residue in an English project would have gone unnoticed. The check now knows both language layers.
+- **Scope**: `ng/tools/pre_commit_gate.py` (`TYPE_MARKS`). No file in this repository changed for this fix.
+- **Behaviour and contract changes**: none for either live project. A mention of the marker inside a blockquote stays exempt, so the upstream materials that describe the marker do not trip the check.
+- **Verification**: `pre_commit_gate.py --repo . --agents-strict` to exit 0 and `--repo <memo-ledger>` to exit 0, so no false positive was introduced. A negative fixture with `[data-type]` in prose now reports "残留类型标记 ['[data-type]']", which it did not before.
+- **Rollback**: revert. Recorded here because this gate decides whether this repository's commits are blocked.
+- **Related**: `docs/changes/engineering.md` (same date, `english-doc-assets`) / commit hash in `git log`.
