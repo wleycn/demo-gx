@@ -5,6 +5,7 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-14
 
+- `4515435` docs: align the project documents with the repository [AI]
 - `53b3324` docs(rules): name the shared logging entry point logger.py [AI]
 - `a06f010` docs(rules): stop the project layers from mandating system-side files [AI]
 - `99fd54e` docs(rules): make the skeleton conditional instead of mandatory [AI]
