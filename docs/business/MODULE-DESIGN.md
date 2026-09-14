@@ -2,7 +2,7 @@
 
 ## 1. Module Overview
 
-Each module is responsible for one thing only and communicates via standardized DataFrame contracts. All configuration (paths, validation thresholds) is managed centrally by `common/config`. Hardcoding is prohibited.
+Each module is responsible for one thing only and communicates via standardized DataFrame contracts. Configuration (paths, validation thresholds) is managed centrally by `common/config`. Hardcoding is prohibited.
 
 | Module directory | Script file | Core responsibility | Exposed interface |
 |---|---|---|---|
@@ -27,8 +27,8 @@ All paths in this section are relative to `src/demo_gx/`.
 **Description**: Auto-selects the read engine based on the file path suffix (`.json`, `.csv`, `.parquet`). After reading, each row retains its original JSON string in the `_raw_json` column for audit and replay.
 **Input**: file path (string or Path object).
 **Output**: Pandas DataFrame containing the raw data and a `_raw_json` column.
-**Exception handling**: a missing file or an unsupported suffix raises immediately (fail fast, never a silent skip). The CLI logs the error and exits non-zero. Retry is the orchestration layer's responsibility, not the CLI's.
-**`write_bronze`**: archives every raw record to Bronze, partitioned by `source_system` and ingestion date. The `_raw_json` column is excluded from the archive. Missing `source_system` falls back to `unknown`; missing or unparseable `ingestion_timestamp` falls back to the injected run date. Returns the count of records written.
+**Exception handling**: a missing file or an unsupported suffix raises immediately (fail fast, never a silent skip). The CLI logs the error and exits non-zero. Retry belongs to the orchestration layer, not the CLI.
+**`write_bronze`**: archives every raw record to Bronze, partitioned by `source_system` and ingestion date. The `_raw_json` column is excluded from the archive. Missing `source_system` falls back to `unknown`. Missing or unparseable `ingestion_timestamp` falls back to the injected run date. Returns the count of records written.
 
 ### 2.2 validation/schema_validator.py
 
@@ -61,7 +61,7 @@ All paths in this section are relative to `src/demo_gx/`.
 
 ### 2.5 curation/builder.py
 
-**Description**: aggregates Silver-layer detail data into analysis-oriented data products.
+**Description**: aggregates Silver-layer detail data into analysis-oriented data products. It reads the full on-disk Silver snapshot (see DATA-DESIGN.md section 2.4), never the in-memory batch.
 
 - **Fact table**: groups by `event_date`, `customer_id`, `event_type` and computes `event_count`, `total_amount`, `avg_amount`.
 - **Dimension tables**: extracts `dim_customer` (unique customer IDs with `first_seen_date`) and `dim_event_type` (unique event types) from the Silver layer.
@@ -88,7 +88,7 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 ### 2.9 Pipeline Entry cli.py
 
 **Description**: parses CLI arguments (`--env`, `--input`, optional `--event-date`, optional `--run-timestamp`), calls each module in sequence.
-**Run timestamp**: resolved once at the top of `main()` and threaded into every consumer. When `--run-timestamp` is absent the boundary reads the wall clock; that single read is the only place the pipeline stamps data from the system clock (AGENTS.md section 3 red line 10).
+**Run timestamp**: resolved once at the top of `main()` and threaded into every consumer. When `--run-timestamp` is absent, the boundary reads the wall clock. That single read is the only place the pipeline stamps data from the system clock (AGENTS.md section 3 red line 10).
 **Execution order**:
 
 1. Load configuration and set up logging.
@@ -134,7 +134,7 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 ## 4. Cross-Module Communication
 
 - **Data carrier**: all modules pass data via Pandas DataFrame.
-- **Metadata passing**: DataFrame `attrs` is a documented option for lightweight metadata such as the processing timestamp or the source filename. The current implementation does not rely on it: that metadata travels in explicit columns, for example `_processed_timestamp`.
+- **Metadata passing**: DataFrame `attrs` is a documented option for lightweight metadata such as the processing timestamp or the source filename. The current implementation does not rely on it. That metadata travels in explicit columns, for example `_processed_timestamp`.
 - **Error passing**: validation and cleaning modules do not raise exceptions to interrupt the flow. They pass problem data downstream or to the quarantine area via the returned `invalid_df` or flag columns.
 - **No global state**: modules do not share global variables. All configuration flows through `common/config`.
 

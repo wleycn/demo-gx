@@ -59,15 +59,15 @@ The pipeline reads a JSON file and distributes each record through three layers.
 ### Key Flow Branches
 
 **Bad data path**: Records that fail validation (missing required fields, type mismatch, extra fields, future timestamp) are quarantined to `errors/bad_schema/` with an error envelope. The pipeline continues processing valid data without interruption.
-**Type change path**: Type and format violations (non-numeric amount, timestamp parse failures) are quarantined at the validation stage together with schema violations. They do not reach Silver. The validator's error reason distinguishes them with `error_type=type_coercion_failed`. A separate "flag and pass to Silver" path is not enabled; the decision and its rationale are recorded in KNOWN-ISSUE.md under "Fail-safe isolation over flag-and-pass".
+**Type change path**: Type and format violations (non-numeric amount, timestamp parse failures) are quarantined at the validation stage together with schema violations. They do not reach Silver. The validator uses `error_type=type_coercion_failed` to distinguish them. A separate "flag and pass to Silver" path is not enabled. The decision and its rationale are recorded in KNOWN-ISSUE.md under "Fail-safe isolation over flag-and-pass".
 **Deduplication path**: Silver deduplicates by `event_id`. The rule and its tie-break live in the table contract: [../tables/silver_events.md](../tables/silver_events.md).
-**Backfill path**: When `--event-date YYYY-MM-DD` is given, only rows whose `event_timestamp` falls on that date are processed. Rows whose timestamp does not parse are kept in scope so the validator can quarantine them. Bronze always archives the full arriving batch. Gold is rebuilt from the full on-disk Silver snapshot; section 2.4 explains why that makes a partial run safe.
+**Backfill path**: When `--event-date YYYY-MM-DD` is given, only rows whose `event_timestamp` falls on that date are processed. Rows whose timestamp does not parse are kept in scope so the validator can quarantine them. Bronze always archives the full arriving batch. Gold is rebuilt from the full on-disk Silver snapshot. Section 2.4 explains why that makes a partial run safe.
 
 ## 2. Data Structure Definitions
 
 ### 2.1 Storage Layout
 
-Environment-isolated directory structure. Each environment has its own root, taken from the `storage.base_path` config setting and split into `input/` (inbound) and `output/` (what the pipeline writes). INTERFACE-DESIGN.md section 3.1 lists the root for each environment.
+Environment-isolated directory structure. Each environment has its own root, taken from the `storage.base_path` config setting. The root is split into `input/` (inbound) and `output/` (what the pipeline writes). INTERFACE-DESIGN.md section 3.1 lists the root for each environment.
 
 ```text
 {storage.base_path}/output/
@@ -100,7 +100,7 @@ Environment-isolated directory structure. Each environment has its own root, tak
 
 ### 2.2 Bronze Layer (Raw JSON Lines)
 
-**Storage**: one `events.json` per partition. JSON Lines format, one raw event per line. Archived as ingested: no cleaning, no quality judgement. Values keep their JSON types (pandas round-trips a JSON integer like `10` as `10.0`). Rows that are later quarantined at the Silver gate are still present here.
+**Storage**: one `events.json` per partition in JSON Lines format, one raw event per line. Archived as ingested: no cleaning, no quality judgement. Values keep their JSON types (pandas round-trips a JSON integer like `10` as `10.0`). Rows that are later quarantined at the Silver gate are still present here.
 **Partition keys**: `source_system` (top-level directory) plus `dt` (ingestion date derived from `ingestion_timestamp`). Missing source or timestamp falls back to `unknown` and the run date respectively.
 **Idempotency**: partition-scoped overwrite. Re-running the same batch rewrites the same `events.json` for each partition. A production Bronze would append new files instead.
 
@@ -133,7 +133,7 @@ Partition, grain, and business key for each table live in its own contract.
 | `dim_event_type` | Dimension | [../tables/dim_event_type.md](../tables/dim_event_type.md) |
 | `wide_daily_user_events` | Wide | [../tables/wide_daily_user_events.md](../tables/wide_daily_user_events.md) |
 
-Gold is always rebuilt from the full on-disk Silver snapshot, never from the in-memory batch. This ensures that dimension tables and the wide table are full snapshots, so a backfill run for one date does not lose rows or shrink dimensions.
+Gold is always rebuilt from the full on-disk Silver snapshot, never from the in-memory batch. This ensures that dimension tables and the wide table are full snapshots. A backfill run for one date does not lose rows or shrink dimensions.
 
 ### 2.5 Error Records
 
@@ -143,11 +143,11 @@ Errors are written to `errors/bad_schema/` as JSON Lines, one error object per l
 
 - **Batch window**: the pipeline processes the full input batch and distributes rows to Silver partitions by their `event_timestamp` date. There is no default "previous day" filter. `--event-date` is the only single-day scoping mechanism.
 - **Late data**: if a record's `event_timestamp` belongs to a past date, the pipeline writes it to the corresponding historical partition. Bronze retains the original JSON for replay at any time.
-- **Safe backfill**: `--event-date` reprocesses only one date. Bronze archives the full arriving batch. Gold is rebuilt from the full Silver snapshot; section 2.4 explains why a partial run stays safe.
+- **Safe backfill**: `--event-date` reprocesses only one date. Bronze archives the full arriving batch. Gold is rebuilt from the full Silver snapshot. Section 2.4 explains why a partial run stays safe.
 
 ### 2.7 Production Table Format Reference (Apache Iceberg)
 
-The Bronze/Silver/Gold layouts above are directory and file layouts that the single-machine demo writes today. In the target big-data environment, the same layers would be managed as Iceberg tables: data files remain Parquet, but a catalog plus metadata layer adds ACID transactions, partition evolution, snapshot isolation, and time travel.
+The Bronze/Silver/Gold layouts above are directory and file layouts that the single-machine demo writes today. In the target big-data environment the same layers would be managed as Iceberg tables. Data files remain Parquet, but a catalog plus metadata layer adds ACID transactions, partition evolution, snapshot isolation, and time travel.
 Prepared Iceberg DDL assets (Spark SQL dialect) are available in the archived `docs/archive/data-design.md` section 6. These document the target shape and are ready to run once a big-data environment is available. They are not executable in this repository's current environment.
 The mapping between demo and production equivalents. Paths start at `{storage.base_path}/output/`:
 

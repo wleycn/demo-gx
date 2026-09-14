@@ -24,7 +24,7 @@ python -m demo_gx.cli --env dev --input /tmp/other.json
 
 The CLI anchors all relative paths (storage, logs, metrics, input) to the project root, so it behaves identically regardless of the caller's working directory.
 
-The run timestamp is read exactly once, at this entry boundary, and then threaded down as a parameter. Modules never read the system clock for data stamping, which is what makes the injected value authoritative.
+The run timestamp is read exactly once at the entry boundary and then threaded down as a parameter. Modules never read the system clock for data stamping. That single read makes the injected value authoritative.
 
 ## 2. Input Format
 
