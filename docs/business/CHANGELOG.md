@@ -5,6 +5,8 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-15
 
+- `ca9605d` refactor(show-data): finish the show rename inside the viewer [AI]
+- `80ec9f2` fix(make): read selectors only from the command line and treat SCHEMA as a switch [AI]
 - `490a662` fix(make): accept the inspection selectors in either case [AI]
 
 ## 2026-09-14
