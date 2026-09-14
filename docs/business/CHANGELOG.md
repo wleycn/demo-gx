@@ -3,8 +3,14 @@
 Version-level changes, reverse chronological order. Source: `git log --date=short --pretty=format:'%ad %h %s'`.
 A commit that only updates this file cannot list itself, so the newest hash here always trails `git log` by one entry.
 
+## 2026-09-15
+
+- `490a662` fix(make): accept the inspection selectors in either case [AI]
+
 ## 2026-09-14
 
+- `c4ab4fb` docs: give the two inspection commands their own subsections [AI]
+- `7000dd3` docs: list the show-data viewer in the README, PROJECT and AGENTS [AI]
 - `2cf5b89` feat(show-data): add a read-only viewer for the run output [AI]
 - `f6d03db` feat(check-data): add a read-only verifier for the run output [AI]
 - `5519396` docs: list make lint in the quick start and the verification commands [AI]
