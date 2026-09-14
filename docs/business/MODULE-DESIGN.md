@@ -117,11 +117,13 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 
 - `config/dev.yaml`, `config/test.yaml`, `config/prod.yaml`.
 - Core config items:
-  - `storage.base_path`: data storage root directory. INTERFACE-DESIGN.md section 3.1 lists the root for each environment.
-  - `storage.bronze_subpath` / `silver_subpath` / `gold_subpath` / `errors_subpath`: subdirectory names under the base path.
+  - `storage.base_path`: environment root. INTERFACE-DESIGN.md section 3.1 lists the root for each environment.
+  - `storage.input_subpath` / `input_file`: the inbound drop directory and the default input file name, used when `--input` is omitted.
+  - `storage.output_subpath`: the subdirectory under the environment root that holds everything the pipeline writes.
+  - `storage.bronze_subpath` / `silver_subpath` / `gold_subpath` / `errors_subpath`: subdirectory names under the output root.
   - `logging.level`: log level (INFO/DEBUG).
-  - `logging.file`: log file path, anchored under the storage base path.
-  - `metrics.output_file`: metrics JSON path, anchored under the storage base path.
+  - `logging.file`: log file path, anchored under the output root.
+  - `metrics.output_file`: metrics JSON path, anchored under the output root.
   - `alert.slack_webhook`: alert callback URL. Reserved but not wired. All environments ship it empty.
 
 ### 3.2 Data Contract

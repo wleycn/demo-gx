@@ -8,7 +8,7 @@ Entry point: `demo_gx.cli`, run as `python -m demo_gx.cli`
 
 | Parameter | Required | Default | Choices | Description |
 |---|---|---|---|---|
-| `--input` | Yes | none | file path | Path to the input file (JSON, CSV, or Parquet) |
+| `--input` | No | `<env root>/input/sample_data.json` | file path | Path to the input file (JSON, CSV, or Parquet). When omitted it resolves to `storage.input_root` joined with `storage.input_file` |
 | `--env` | No | `dev` | `dev`, `test`, `prod` | Environment configuration to load |
 | `--event-date` | No | none | `YYYY-MM-DD` | Scope processing to one event date (safe backfill) |
 | `--run-timestamp` | No | wall clock at the entry boundary | ISO-8601 | Run instant injected by the orchestrator. Stamps `_processed_timestamp` and the error envelope. Passing it makes a run byte-reproducible. |
@@ -16,9 +16,10 @@ Entry point: `demo_gx.cli`, run as `python -m demo_gx.cli`
 Example:
 
 ```bash
-python -m demo_gx.cli --input data/sample_data.json --env dev
-python -m demo_gx.cli --input data/sample_data.json --env test --event-date 2026-09-09
-python -m demo_gx.cli --input data/sample_data.json --env test --run-timestamp 2026-09-14T00:00:00Z
+python -m demo_gx.cli --env dev
+python -m demo_gx.cli --env test --event-date 2026-09-09
+python -m demo_gx.cli --env test --run-timestamp 2026-09-14T01:00:00Z
+python -m demo_gx.cli --env dev --input /tmp/other.json
 ```
 
 The CLI anchors all relative paths (storage, logs, metrics, input) to the project root, so it behaves identically regardless of the caller's working directory.
@@ -60,16 +61,24 @@ Strict mode rejects unknown fields not in this list.
 
 | Environment | `storage.base_path` | Config file |
 |---|---|---|
-| dev | `./data` | `config/dev.yaml` |
-| test | `./test/data` | `config/test.yaml` |
-| prod | `./data_prod` | `config/prod.yaml` |
+| dev | `./data/dev` | `config/dev.yaml` |
+| test | `./data/test` | `config/test.yaml` |
+| prod | `./data/prod` | `config/prod.yaml` |
 
-All run artifacts live under the environment's storage root.
+Each environment root splits by direction:
+
+```text
+{storage.base_path}/
+├── input/          # inbound drop location; where --input defaults to
+└── output/         # everything the pipeline writes
+```
+
+Every path shape below is relative to `output/`, written `{output_root}`.
 
 ### 3.2 Bronze
 
 ```text
-{base_path}/bronze/{source_system}/dt={YYYY-MM-DD}/events.json
+{output_root}/bronze/{source_system}/dt={YYYY-MM-DD}/events.json
 ```
 
 JSON Lines format. One file per `source_system` plus `dt` partition combination. Partition-scoped overwrite (idempotent).
@@ -77,7 +86,7 @@ JSON Lines format. One file per `source_system` plus `dt` partition combination.
 ### 3.3 Silver
 
 ```text
-{base_path}/silver/event_date={YYYY-MM-DD}/data.parquet
+{output_root}/silver/event_date={YYYY-MM-DD}/data.parquet
 ```
 
 Parquet format. One file per `event_date` partition. Partition-scoped overwrite (idempotent).
@@ -85,7 +94,7 @@ Parquet format. One file per `event_date` partition. Partition-scoped overwrite 
 ### 3.4 Gold
 
 ```text
-{base_path}/gold/
+{output_root}/gold/
 ├── fact_daily_events/event_date={YYYY-MM-DD}/data.parquet
 ├── dim_customer/data.parquet
 ├── dim_event_type/data.parquet
@@ -97,7 +106,7 @@ Fact and wide tables are partitioned by `event_date`. Dimension tables are full 
 ### 3.5 Errors
 
 ```text
-{base_path}/errors/
+{output_root}/errors/
 ├── bad_schema/{timestamp}_errors.json    # JSON Lines
 └── duplicates.log                        # Plain text, appended
 ```
@@ -107,8 +116,8 @@ There is no separate type-conversion quarantine directory. Every rejected row go
 ### 3.6 Metrics and Logs
 
 ```text
-{base_path}/metrics.json
-{base_path}/logs/pipeline.log
+{output_root}/metrics.json
+{output_root}/logs/pipeline.log
 ```
 
 ## 4. Error Envelope Fields
@@ -131,7 +140,7 @@ Invalid records are written to `errors/bad_schema/{timestamp}_errors.json` in JS
 
 ## 5. Metrics Fields
 
-Written to `{base_path}/metrics.json` at the end of each run. Metrics are always persisted, even on failure.
+Written to `{output_root}/metrics.json` at the end of each run. Metrics are always persisted, even on failure.
 
 | Field | Type | Description |
 |---|---|---|

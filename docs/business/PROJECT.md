@@ -41,6 +41,7 @@ demo-gx/
 │   ├── curation/builder.py              # GoldBuilder (fact / dims / wide)
 │   └── common/               # config.py, logger.py, metrics.py, time_utils.py
 ├── config/                   # dev.yaml / test.yaml / prod.yaml + schema.yaml (data contract)
+├── data/                     # Per-env storage: {env}/input committed, {env}/output ignored
 ├── docs/
 │   ├── business/             # Seven business documents (this directory)
 │   ├── tables/               # Per-table contracts (one file per table)
@@ -58,15 +59,16 @@ demo-gx/
 
 The package is installed in editable mode by `make setup`, so the entry point is
 `python -m demo_gx.cli`. Run artifacts (sample input, Bronze/Silver/Gold, metrics, logs) live
-under environment storage dirs (`data/`, `test/data/`, `data_prod/`) and are git-ignored.
+under each environment's `output/` directory (`data/{env}/output/`) and are git-ignored.
 
 ## Contract Summary
 
 - **Data contract**: `config/schema.yaml` defines 8 required fields with types, enum values,
   regex patterns, and minimum values. Strict mode rejects unknown fields.
 - **Environment config**: `config/{dev,test,prod}.yaml` controls storage paths, logging,
-  metrics, and alert endpoints. Each environment writes to its own directory: dev to
-  `data/`, test to `test/data/`, prod to `data_prod/`.
+  metrics, and alert endpoints. Each environment writes under its own root, split into
+  `input/` and `output/`: dev under `data/dev/`, test under `data/test/`, prod under
+  `data/prod/`.
 - **AI constraints**: `AGENTS.md` at the project root defines red lines and behavior rules
   for AI coding tools.
 
@@ -97,7 +99,7 @@ make run
 # Run tests
 make test
 # Or manually
-.venv/bin/python -m demo_gx.cli --input data/sample_data.json --env dev
+.venv/bin/python -m demo_gx.cli --env dev
 .venv/bin/python -m pytest tests/ -q
 ```
 

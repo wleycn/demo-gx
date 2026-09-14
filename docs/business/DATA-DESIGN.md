@@ -67,10 +67,10 @@ The pipeline reads a JSON file and distributes each record through three layers.
 
 ### 2.1 Storage Layout
 
-Environment-isolated directory structure. The root comes from the `storage.base_path` config setting; INTERFACE-DESIGN.md section 3.1 lists the root for each environment.
+Environment-isolated directory structure. Each environment has its own root, taken from the `storage.base_path` config setting and split into `input/` (inbound) and `output/` (what the pipeline writes). INTERFACE-DESIGN.md section 3.1 lists the root for each environment.
 
 ```text
-{storage.base_path}/
+{storage.base_path}/output/
 ├── bronze/                        # Raw JSON archive (immutable)
 │   └── {source_system}/
 │       └── dt={YYYY-MM-DD}/

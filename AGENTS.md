@@ -15,7 +15,7 @@ When you find existing code conflicting with a higher-level rule, **do not silen
 ## 1. Tech Stack
 
 - **Language and runtime**: Python 3.11 (minimum 3.10). The virtual environment lives inside the project at `.venv/`, is not committed, and commands always start with `.venv/bin/python`
-- **Storage engine**: local filesystem, no database. The three data layers land in `data/`, the test environment in `test/data/`, isolated by the `storage.base_path` config item
+- **Storage engine**: local filesystem, no database. Every environment writes under one root, `data/{env}/`, split by direction: `input/` holds what is fed in, `output/` holds Bronze / Silver / Gold / errors / logs. The root is the `storage.base_path` config item
 - **Orchestration**: `src/demo_gx/cli.py`, invoked as `python -m demo_gx.cli`, no scheduler. The partition parameter is injected by `--event-date` and the run timestamp by `--run-timestamp`; the entry point reads the system clock once, and only when neither was injected
 - **Table format**: Parquet partition directories `event_date=YYYY-MM-DD`, no Iceberg, no catalog
 - **Dependencies and toolchain**: `pyproject.toml` (the single entry point for dependencies and toolchain), `Makefile`, `.gitlab-ci.yml`
@@ -105,8 +105,8 @@ Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which sk
 | Environment config | `config/dev.yaml`, `config/test.yaml`, `config/prod.yaml` | Storage paths / logging / metrics / alerting |
 | Product code | `src/demo_gx/` | Installable package; entry `cli.py`, modules `common` / `ingestion` / `validation` / `transformation` / `curation` |
 | Dependencies and toolchain | `pyproject.toml` | The single entry point for dependency declarations, packaging and pytest config |
-| Sample data generation | `scripts/generate_sample_data.py` | Generates `data/sample_data.json`, carries no business logic |
-| Run artefacts | `data/`, `test/data/`, `data_prod/` | Bronze / Silver / Gold / errors; rebuildable, do not hand-edit |
+| Sample data generation | `scripts/generate_sample_data.py` | Generates `data/{env}/input/sample_data.json` from a fixed seed, carries no business logic |
+| Run artefacts | `data/{env}/output/` | Bronze / Silver / Gold / errors / logs; rebuildable, do not hand-edit. The layer skeleton is committed, the data is not |
 | Change trail | `docs/changes/{module}.md` | One per module, append-only change entries |
 | Gate | `scripts/hooks/pre-commit`, installed as `.git/hooks/pre-commit` | Calls `ng/tools/pre_commit_gate.py` |
 

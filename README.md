@@ -11,7 +11,7 @@ Python 3.10 or later, and `make` (Linux/macOS). Every step has a `make` target; 
 | Step | Command | What it does |
 |---|---|---|
 | 1 | `make setup` | First run only: create `.venv` and install the package in editable mode |
-| 2 | `make data` | Generate `data/sample_data.json` (107 records with injected anomalies) |
+| 2 | `make data` | Generate `data/{env}/input/sample_data.json` (107 records with injected anomalies) |
 | 3 | `make run` | Run the pipeline (default env `dev`; override with `ENV=test make run`) |
 | 4 | `make test` | Run the pytest suite |
 | 5 | `make clean` | Remove all run artifacts for a clean re-run |
@@ -27,7 +27,7 @@ python3 -m venv .venv
 .venv/bin/python scripts/generate_sample_data.py
 
 # 3. Run the pipeline
-.venv/bin/python -m demo_gx.cli --input data/sample_data.json --env dev
+.venv/bin/python -m demo_gx.cli --env dev
 
 # 4. Run tests
 .venv/bin/python -m pytest tests/
@@ -52,6 +52,7 @@ demo-gx/
 │   ├── curation/builder.py              # GoldBuilder (fact / dims / wide)
 │   └── common/               # config.py, logger.py, metrics.py, time_utils.py
 ├── config/                   # dev.yaml / test.yaml / prod.yaml + schema.yaml (data contract)
+├── data/                     # Per-env storage: {env}/input committed, {env}/output ignored
 ├── docs/
 │   ├── business/             # Project, data, module, interface, glossary, changelog, known issues
 │   ├── tables/               # Per-table contracts (one file per table)
@@ -68,7 +69,9 @@ demo-gx/
 └── README.md
 ```
 
-Run artifacts (sample input, Bronze/Silver/Gold, metrics, logs) live under the environment storage dirs (`data/`, `test/data/`, `data_prod/`) and are git-ignored.
+Each environment writes under `data/{env}/`. What you feed in goes to `input/`, which is
+committed so a fresh clone runs out of the box. Everything the pipeline writes goes to
+`output/`, which is git-ignored and rebuildable: `make clean` then `make run`.
 
 ## Pre-commit Gate
 
