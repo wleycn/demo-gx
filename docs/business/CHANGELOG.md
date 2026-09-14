@@ -5,6 +5,8 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-14
 
+- `9c7f463` docs: move the deviation record out of AGENTS.md into KNOWN-ISSUE.md [AI]
+- `24945f3` docs: split clause-chained sentences into one statement each [AI]
 - `011c432` docs: make the table contract the single source for the dedup rule
 - `667bd59` docs: align the table contracts with the artefacts and retire two phantom fields
 - `0ee0860` docs: complete the table contracts and retract the duplicated table detail
