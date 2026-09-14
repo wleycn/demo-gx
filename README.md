@@ -103,3 +103,9 @@ For architecture, data design, module interfaces, CLI contract, glossary, change
 - [docs/business/DOMAIN-LANGUAGE.md](docs/business/DOMAIN-LANGUAGE.md) - Project glossary
 - [docs/business/CHANGELOG.md](docs/business/CHANGELOG.md) - Version-level changes
 - [docs/business/KNOWN-ISSUE.md](docs/business/KNOWN-ISSUE.md) - Known pitfalls, design decisions, and rejected alternatives
+
+## Credits
+
+Built by **Rocky** and **Cheese** in collaboration. Rocky owns the requirements,
+the design decisions and the review. Cheese is the AI operator responsible for
+the implementation, the tests and the documentation.
