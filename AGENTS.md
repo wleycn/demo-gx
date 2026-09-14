@@ -57,7 +57,9 @@ Read through in this order before starting:
 ## 5. Output Requirements
 
 - Give only code or an explicit diff, with no unrelated explanation mixed in
-- Add a `[AI-GENERATED] model=<m> date=<d> reviewed_by=<human>` comment at the head of each changed file. The commit message contains `[AI]`.
+- Add a `[AI-GENERATED] model=<m> date=<d> reviewed_by=<human>` comment at the head of each changed **code** file. Two kinds of file are exempt: what an assembly tool generates, and documents. Their provenance is the commit marker below plus the change trail.
+- `reviewed_by=pending` means no human has reviewed the file yet; the reviewer replaces it with their own name.
+- An agent-authored commit message must contain `[AI]`; a human commit carries no marker. The machine gate blocks an agent-session commit whose message lacks `[AI]`, and warns about a changed code file without the header. The rule therefore does not rest on anyone remembering it.
 - A single change must not exceed **40%** of the file total. If it exceeds that, split it into several changes and verify step by step.
 - Comments and docstrings must be changed in the same commit as the code. Comments that contradict the implementation must not be left behind. A comment explains "**why**", it does not restate "what". For details see the comments section of `docs/rules/CODING-STANDARD.md`.
 - Before writing documents, writing reports or writing delivery notes, load the `docs-writing-discipline` skill and read through once against its checklist before delivering
@@ -90,7 +92,7 @@ Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which sk
 
 ### 9.1 Project Map (file index)
 
-> Generation rule: fill the table below with files that **actually exist in the project**, and delete inapplicable rows. Paths in the table must be really reachable; the machine gate checks the referenced files under `docs/`, `src/`, `scripts/`, `tests/` and `data/` plus the root files it names, so a directory path or a `config/*.yaml` entry has to be verified by the reviewer.
+> Generation rule: fill the table below with files that **actually exist in the project**, and delete inapplicable rows. Paths in the table must be really reachable. The machine gate checks the referenced files under `docs/`, `src/`, `scripts/`, `tests/` and `data/` plus the root files it names. A directory path or a `config/*.yaml` entry has to be verified by the reviewer.
 
 | Category | Location | Purpose |
 |---|---|---|
@@ -108,7 +110,7 @@ Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which sk
 | Sample data generation | `scripts/generate_sample_data.py` | Generates `data/{env}/input/sample_data.json` from a fixed seed, carries no business logic |
 | Run artefacts | `data/{env}/output/` | Bronze / Silver / Gold / errors / logs; rebuildable, do not hand-edit. The layer skeleton is committed, the data is not |
 | Change trail | `docs/changes/{module}.md` | One per module, append-only change entries |
-| Gate | `scripts/hooks/pre-commit`, installed as `.git/hooks/pre-commit` | Calls `ng/tools/pre_commit_gate.py` |
+| Gate | `scripts/hooks/pre-commit` and `scripts/hooks/commit-msg`, installed as `.git/hooks/pre-commit` / `.git/hooks/commit-msg` | Calls `ng/tools/pre_commit_gate.py` |
 
 ### 9.2 Skill Map (stage → skill)
 
@@ -134,6 +136,13 @@ Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which sk
 
 ## 10. Rule Provenance and Deviations
 
-- **Provenance**: this project's rules = this file plus the `docs/rules/` four-piece set, assembled from the upstream core and trimmed to this stack; project facts live in `docs/business/`.
-- **Deviation discipline**: this project's deviations from the upstream rules, together with their applicability boundaries and cost-and-rollback notes, are registered in `docs/business/KNOWN-ISSUE.md`, section "Skeleton Deviations". A deviation is allowed only when all four conditions hold. It is registered item by item, its disposition points to an anchor that actually exists, and it states why the standard practice is not adopted. It also records the cost and the rollback cost. Silently lowering the standard is forbidden.
-- **Fixed structure**: eleven headings in total, the ten core sections §0–§9 plus this pointer section. No new section may be added, and project-level additions go into the corresponding section (§3 red lines, §4 conduct, §5 output, §9 maps); the machine gate warns about a self-added section. Do not add a second "anti-pattern" comparison table duplicating §3. A deviation not yet resolved is registered as a known issue in `docs/business/KNOWN-ISSUE.md`.
+- **Provenance**: this project's rules = this file + the `docs/rules/` four-piece set. The four-piece set is assembled verbatim by the assembly tool in three layers: **baseline → tech stack → project type** (`rules_assembly.py`). Assembly only lowers heading levels; it does not change the text of an upper layer, nor delete an upper-layer entry. **Not hand-edited per project**.
+- **Where deviations live**: a place where this project disagrees with the upstream rules is registered item by item in `docs/business/KNOWN-ISSUE.md`, in that file's deviation section. This section holds the discipline and points there; it holds no table of its own.
+- **Deviation discipline**: the standard practice is the **default** and a deviation is the exception. A deviation is allowed only when all four conditions hold:
+  - ① It is registered item by item.
+  - ② Its disposition column points to an anchor that actually exists; writing only "already explained" is forbidden.
+  - ③ It states **why the standard practice is not adopted**; empty reasons such as "this project is special" are forbidden.
+  - ④ It records the cost and the rollback cost.
+- **Silently lowering the standard without registering it is forbidden**. "This is just a one-off case" is not a reason for exemption from registration.
+- A deviation not yet resolved counts as a **known issue**: it is registered in `docs/business/KNOWN-ISSUE.md`.
+- **The structure of this file is fixed**: the ten core sections §0–§9, plus this single pointer section §10. **No new section may be added.** Project-level additions go into the corresponding section: red lines into §3, conduct into §4, output requirements into §5, maps into §9.1 / §9.2, and any disagreement with upstream into `docs/business/KNOWN-ISSUE.md`. The machine gate warns about a self-added section. In particular, do not add another "anti-pattern" comparison table that duplicates §3.

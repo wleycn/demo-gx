@@ -62,6 +62,7 @@ demo-gx/
 ├── tests/                    # pytest suite (27 tests)
 ├── scripts/generate_sample_data.py
 ├── scripts/hooks/pre-commit  # Pre-commit gate hook (copy into .git/hooks)
+├── scripts/hooks/commit-msg  # Commit-message provenance hook (same install step)
 ├── Makefile                  # setup / data / run / test / clean
 ├── pyproject.toml            # Single entry for dependencies, packaging and pytest config
 ├── .gitlab-ci.yml            # CI skeleton (test -> data-quality -> promote)
@@ -78,7 +79,10 @@ committed so a fresh clone runs out of the box. Everything the pipeline writes g
 The gate script lives in the shared toolchain, so the hook is installed once per clone:
 
 ```bash
-mkdir -p .git/hooks && cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+mkdir -p .git/hooks \
+  && cp scripts/hooks/pre-commit .git/hooks/pre-commit \
+  && cp scripts/hooks/commit-msg .git/hooks/commit-msg \
+  && chmod +x .git/hooks/pre-commit .git/hooks/commit-msg
 ```
 
 The gate blocks a commit when any of these checks fails:
@@ -88,9 +92,11 @@ The gate blocks a commit when any of these checks fails:
 - oversized files
 - test suite
 - `AGENTS.md` structure check
+- commit-message provenance: an agent-session commit must carry the `[AI]` marker
 
 The test command uses the project venv (`.venv/bin/python -m pytest -q`), so no external interpreter is required.
-The hook source lives in `scripts/hooks/pre-commit`, which keeps it reviewable and reproducible.
+The hook sources live in `scripts/hooks/`, which keeps them reviewable and reproducible. The
+commit-message hook runs `pre_commit_gate.py --commit-msg`; it asks nothing of a human commit.
 
 ## Documentation
 
