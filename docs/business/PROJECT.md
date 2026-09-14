@@ -19,7 +19,7 @@ pipeline: Bronze (raw archive) to Silver (cleaned detail) to Gold (curated star 
 | Data engine | Pandas (single machine) | Data volume assumption < 10 GB per batch; lightweight and fast |
 | Table format | Parquet (partitioned directories) | Columnar, high compression, analytics-friendly |
 | Config | YAML (environment-specific) | Sensitive values injected via environment variables |
-| Testing | pytest | 35 tests, all passing |
+| Testing | pytest | 45 tests, all passing |
 | CI | GitLab CI (`.gitlab-ci.yml`) | Required by the assignment |
 | Orchestration | Makefile + CLI; Airflow blueprint only | No runnable DAG in this repo |
 
@@ -48,11 +48,12 @@ demo-gx/
 │   ├── changes/              # Per-module change logs
 │   ├── rules/                # Engineering rules (structure / coding / flow / acceptance)
 │   └── archive/              # Superseded documents (architecture / data-design / module-design / requirements / change-logs / known-issues) + raw/ (original prompt)
-├── tests/                    # pytest suite (35 tests)
+├── tests/                    # pytest suite (45 tests)
 ├── scripts/generate_sample_data.py
+├── scripts/check_data.py     # Read-only artefact verifier behind `make check-data`
 ├── scripts/hooks/pre-commit  # Pre-commit gate hook (copy into .git/hooks)
 ├── scripts/hooks/commit-msg  # Commit-message provenance hook (same install step)
-├── Makefile                  # setup / data / run / test / lint / clean
+├── Makefile                  # setup / data / run / test / lint / check-data / clean
 ├── pyproject.toml            # Single entry for dependencies, packaging and pytest config
 ├── .gitlab-ci.yml            # CI skeleton: test + lint -> data-quality -> manual promote
 ├── .gitattributes            # Line-ending policy (md=CRLF, code=LF)
@@ -105,6 +106,8 @@ make run
 make test
 # Lint, format check and type check
 make lint
+# Inspect what a run wrote, against the table contracts
+make check-data
 # Or manually
 .venv/bin/python -m demo_gx.cli --env dev
 .venv/bin/python -m pytest tests/ -q

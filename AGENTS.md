@@ -108,6 +108,7 @@ Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which sk
 | Product code | `src/demo_gx/` | Installable package; entry `cli.py`, modules `common` / `ingestion` / `validation` / `transformation` / `curation` |
 | Dependencies and toolchain | `pyproject.toml` | The single entry point for dependency declarations, packaging and pytest config |
 | Sample data generation | `scripts/generate_sample_data.py` | Generates `data/{env}/input/sample_data.json` from a fixed seed, carries no business logic |
+| Artefact verification | `scripts/check_data.py` | Read-only verifier for a run's output, behind `make check-data`; pairs each layer with `docs/tables/{table}.md` |
 | Run artefacts | `data/{env}/output/` | Bronze / Silver / Gold / errors / logs; rebuildable, do not hand-edit. The layer skeleton is committed, the data is not |
 | Change trail | `docs/changes/{module}.md` | One per module, append-only change entries |
 | Gate | `scripts/hooks/pre-commit` and `scripts/hooks/commit-msg`, installed as `.git/hooks/pre-commit` / `.git/hooks/commit-msg` | Calls `ng/tools/pre_commit_gate.py` |

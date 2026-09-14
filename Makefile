@@ -1,10 +1,14 @@
 # demo-gx pipeline — unified command entry points.
-# Usage: make setup | data | run | test | clean
+# Usage: make setup | data | run | test | lint | check-data | clean
 
 PYTHON := .venv/bin/python
 ENV    ?= dev
+# check-data selectors: LAYER=all|bronze|silver|gold|errors, TABLE=<name>, DATE=YYYY-MM-DD
+LAYER  ?= all
+TABLE  ?=
+DATE   ?=
 
-.PHONY: setup data run test lint clean
+.PHONY: setup data run test lint check-data clean
 
 ## First run only: create the virtualenv and install the package in editable mode.
 ## Dependencies are declared once in pyproject.toml; there is no separate lock file.
@@ -30,6 +34,15 @@ lint:
 	$(PYTHON) -m ruff check src scripts tests
 	$(PYTHON) -m ruff format --check src scripts tests
 	$(PYTHON) -m mypy
+
+## Inspect what a run actually wrote, and compare it with docs/tables/*.md.
+## Read-only: nothing under data/ is written. Exit 3 means nothing was scanned.
+##   make check-data                          every layer, every table
+##   make check-data LAYER=gold               one layer
+##   make check-data LAYER=gold TABLE=fact_daily_events
+##   make check-data DATE=2026-09-01          one partition only
+check-data:
+	$(PYTHON) scripts/check_data.py --env $(ENV) --layer $(LAYER) --table "$(TABLE)" $(if $(DATE),--event-date $(DATE),)
 
 ## Remove run artefacts. Committed sample inputs and the layer skeleton stay.
 ## NOTE: do not reduce this to `rm -rf data/*/output/*`. That expands to the

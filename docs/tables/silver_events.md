@@ -29,7 +29,7 @@ for post-hoc review.
 `event_date={YYYY-MM-DD}/data.parquet`.
 
 - **Rationale**: every downstream read filters or groups by date. A date partition lets one run rewrite a single day without touching the others.
-- **Estimated volume**: 1 to 7 rows per partition in the demo sample. The sample holds 102 rows across 30 partitions, about 16 KB per partition.
+- **Estimated volume**: 1 to 7 rows per partition in the demo sample. The sample holds 101 rows across 30 partitions, about 11 KB per partition.
 
 ## Field List
 

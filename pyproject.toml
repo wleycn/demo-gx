@@ -42,13 +42,15 @@ warn_unused_ignores = true
 no_implicit_optional = true
 
 [[tool.mypy.overrides]]
-# pandas and PyYAML ship no type information and this project does not vendor
-# stub packages. The frame-boundary code is duck-typed on purpose.
-module = ["pandas", "pandas.*", "yaml"]
+# pandas, PyYAML and pyarrow ship no type information and this project does not
+# vendor stub packages. The frame- and read-boundary code is duck-typed on
+# purpose.
+module = ["pandas", "pandas.*", "yaml", "pyarrow", "pyarrow.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 # The package is installable (`pip install -e .`), which is the primary path.
 # This entry is the zero-install fallback so `pytest` works from a bare clone.
-pythonpath = ["src"]
+# `scripts` is here so the tests can import the standalone verifier.
+pythonpath = ["src", "scripts"]
 testpaths = ["tests"]

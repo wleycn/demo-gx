@@ -65,11 +65,12 @@ demo-gx/
 │   ├── changes/              # Per-module change logs
 │   ├── rules/                # Engineering rules (structure / coding / flow / acceptance)
 │   └── archive/              # Superseded documents and the original assessment prompt
-├── tests/                    # pytest suite (35 tests)
+├── tests/                    # pytest suite (45 tests)
 ├── scripts/generate_sample_data.py
+├── scripts/check_data.py     # Read-only artefact verifier behind `make check-data`
 ├── scripts/hooks/pre-commit  # Pre-commit gate hook (copy into .git/hooks)
 ├── scripts/hooks/commit-msg  # Commit-message provenance hook (same install step)
-├── Makefile                  # setup / data / run / test / lint / clean
+├── Makefile                  # setup / data / run / test / lint / check-data / clean
 ├── pyproject.toml            # Single entry for dependencies, packaging and pytest config
 ├── .gitlab-ci.yml            # CI skeleton: test + lint -> data-quality -> manual promote
 ├── .gitattributes            # Line-ending policy (md=CRLF, code=LF)
@@ -81,6 +82,26 @@ demo-gx/
 Each environment writes under `data/{env}/`. What you feed in goes to `input/`, which is
 committed so a fresh clone runs out of the box. Everything the pipeline writes goes to
 `output/`, which is git-ignored and rebuildable: `make clean` then `make run`.
+
+## Inspecting the Output
+
+`make check-data` reads what a run produced and compares it with the table contracts in `docs/tables/`.
+It is read-only, and it exits non-zero when a check fails, so it serves as a verification step too.
+
+```bash
+make check-data                               # every layer, every table
+make check-data LAYER=gold                    # one layer
+make check-data LAYER=gold TABLE=fact_daily_events
+make check-data DATE=2026-09-01               # one partition only
+```
+
+The layer is a parameter, because the layers are structural. The table is discovered from disk, so a
+table added to the pipeline is checked without editing the tool. Exit codes: `0` every check passed,
+`1` a check failed, `2` no such table, `3` nothing was scanned.
+
+It reports file and partition counts, row counts, column and type parity against the contract, the
+declared partition key, business primary key uniqueness, and whether every field under
+`pii.masked_fields` is masked. The layer layout is in `docs/business/DATA-DESIGN.md`.
 
 ## Pre-commit Gate
 
