@@ -68,16 +68,11 @@ class DataCleaner:
 
     @staticmethod
     def check_amount(df: pd.DataFrame) -> pd.DataFrame:
-        """Ensure amount is numeric and flag negative values.
+        """Ensure amount is numeric and back up the pre-cleaner value.
 
-        The original amount value is backed up to ``_raw_amount``.  The
-        column is coerced to numeric.  Negative values are flagged with
-        ``_validation_status = "type_mismatch"`` but otherwise left
-        unchanged for downstream handling.
-
-        Per the error-handling strategy, negative-amount quarantine is
-        already performed by the validator (minimum check), so this method
-        does not re-process them.
+        The original amount value is backed up to ``_raw_amount``, and the
+        column is coerced to numeric.  Negative values never reach this
+        method: the validator's minimum check quarantines them first.
 
         Args:
             df (pandas.DataFrame): DataFrame containing an ``amount``

@@ -32,7 +32,6 @@ None. Full snapshot, non-partitioned. Written as a single `data.parquet` file.
 | Field | Type | Description |
 |---|---|---|
 | `event_type` | string | Primary key, unique |
-| `category` | string | Reserved for business category; currently blank |
 
 ## Monetary Convention
 

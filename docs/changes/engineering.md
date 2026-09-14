@@ -108,3 +108,13 @@
 - **Incidental finding**: DATA-DESIGN.md section 2.7 still named the artefact paths that the environment-storage-layout change had replaced, so one document carried two shapes at once. The table now states its base path once and lists the three rows relative to it.
 - **Rollback**: revert the commit. No code or data depends on this documentation.
 - **Related**: `CHANGELOG.md` entry for this date / `docs/rules/PROJECT-STRUCTURE.md` section 3 / `docs/business/DATA-DESIGN.md` sections 2.3, 2.4 and 2.7.
+
+## 20260914 · retract-phantom-fields — Align the contracts with the artefacts and retire two fields that were never built
+
+- **Motivation**: completing the table contracts exposed a drift. Two fields described in the documentation do not exist in the written artefacts, and two further surfaces repeated the same claim. The names came from the archived pre-migration design, which reserved them for a path the project later rejected. `_validation_status` belonged to the "yellow path" recorded under "Decision: Fail-safe isolation over flag-and-pass", and `category` was a placeholder that `curation/builder.py` mentions only in a comment.
+- **Scope**: `docs/tables/silver_events.md` (one Field List row removed, and the list reordered to the artefact column order); `docs/tables/dim_event_type.md` and `docs/tables/wide_daily_user_events.md` (Field List, `category` removed); `docs/tables/dim_customer.md` (a Future-extension line named a column this table never had); `docs/business/KNOWN-ISSUE.md` (the reason text no longer claims the column exists); `docs/business/INTERFACE-DESIGN.md` (the type-change sentence no longer judges a row by that column); `src/demo_gx/transformation/cleaner.py` (docstring only, no logic touched).
+- **Behaviour and contract changes**: none. No artefact gained or lost a column; only the descriptions moved.
+- **Verification**: each contract's Field List now matches its artefact column by column and in order, 5 of 5. `pytest` reports 27 passed. The changed Markdown keeps CRLF with no bare LF and no double CR, the changed module keeps LF, and nothing carries CJK.
+- **Decision**: the documentation follows the implementation. Adding the columns to satisfy the text was rejected: a column that always holds `"passed"` carries no information, and the change would invalidate the byte-identical artefact evidence from the storage-layout change.
+- **Rollback**: revert the commit.
+- **Related**: `CHANGELOG.md` entry for this date / `KNOWN-ISSUE.md` (Decision: Fail-safe isolation over flag-and-pass) / `docs/tables/`.

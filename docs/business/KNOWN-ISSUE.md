@@ -67,7 +67,7 @@ The `AGENTS.md` section 10 deviation table points to the five anchors below. Ite
 
 **Chosen**: type and format violations are quarantined at the validation stage. They never reach Silver.
 **Rejected**: a "yellow path" that flags suspect rows with `_validation_status = "type_mismatch"` and passes them to Silver for downstream handling.
-**Reason**: the single-machine demo chooses fail-safe isolation over carrying suspect rows downstream. The `_validation_status` column exists in the Silver schema but always contains `"passed"` in the current implementation. The `type_mismatch` value is reserved for the future yellow path.
+**Reason**: the single-machine demo chooses fail-safe isolation over carrying suspect rows downstream. The flag-and-pass path was never built, so no `_validation_status` column exists in the written Silver artefacts. The `type_mismatch` value is reserved for that path if it is ever built.
 
 ### Decision: Gold always reads from on-disk Silver snapshot
 

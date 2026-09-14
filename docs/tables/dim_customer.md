@@ -50,8 +50,6 @@ Not applicable. This table carries no monetary field.
 - **Source**: built from the full on-disk Silver snapshot, so a backfill run cannot lose
   customers or reset `first_seen_date`. Rule: DATA-DESIGN.md section 2.4.
 - **Retention**: no retention policy. The table is overwritten on each run.
-- **Future extension**: the `category` field is reserved for a business classification but
-  is currently not populated.
 - **Compaction and snapshot retention**: not implemented. See KNOWN-ISSUE.md `#no-snapshot-lifecycle`.
 
 ## Freshness SLA and Owner

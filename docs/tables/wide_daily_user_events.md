@@ -40,7 +40,6 @@ deduplication happens in Silver.
 | `total_amount` | double | Total amount | fact table |
 | `avg_amount` | double | Average amount | fact table |
 | `first_seen_date` | date | First seen date for the customer | dim_customer (left join on `customer_id`) |
-| `category` | string | Reserved business category (currently blank) | dim_event_type (left join on `event_type`) |
 
 ## Monetary Convention
 

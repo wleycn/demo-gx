@@ -111,7 +111,7 @@ Fact and wide tables are partitioned by `event_date`. Dimension tables are full 
 └── duplicates.log                        # Plain text, appended
 ```
 
-There is no separate type-conversion quarantine directory. Every rejected row goes into the single `bad_schema/` envelope, including rows whose `_validation_status` is `type_mismatch`: they are filed with `error_type=type_coercion_failed`.
+There is no separate type-conversion quarantine directory. Every rejected row goes into the single `bad_schema/` envelope, including rows whose type conversion failed: they are filed with `error_type=type_coercion_failed`.
 
 ### 3.6 Metrics and Logs
 
