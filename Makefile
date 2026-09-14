@@ -1,14 +1,20 @@
 # demo-gx pipeline — unified command entry points.
-# Usage: make setup | data | run | test | lint | check-data | clean
+# Usage: make setup | data | run | test | lint | check-data | show-data | clean
 
 PYTHON := .venv/bin/python
 ENV    ?= dev
-# check-data selectors: LAYER=all|bronze|silver|gold|errors, TABLE=<name>, DATE=YYYY-MM-DD
+# check-data and show-data selectors:
+#   LAYER=all|bronze|silver|gold|errors, TABLE=<name>, DATE=YYYY-MM-DD
 LAYER  ?= all
 TABLE  ?=
 DATE   ?=
+# show-data only: LIMIT=<rows or lines>, COLUMNS=a,b, FORMAT=table|json|csv, SCHEMA=1
+LIMIT  ?= 10
+COLUMNS ?=
+FORMAT ?= table
+SCHEMA ?=
 
-.PHONY: setup data run test lint check-data clean
+.PHONY: setup data run test lint check-data show-data clean
 
 ## First run only: create the virtualenv and install the package in editable mode.
 ## Dependencies are declared once in pyproject.toml; there is no separate lock file.
@@ -43,6 +49,20 @@ lint:
 ##   make check-data DATE=2026-09-01          one partition only
 check-data:
 	$(PYTHON) scripts/check_data.py --env $(ENV) --layer $(LAYER) --table "$(TABLE)" $(if $(DATE),--event-date $(DATE),)
+
+## Show the rows a run actually wrote. Read-only, and never a failing gate:
+## a table that breaks its contract is exactly the table you want to look at.
+##   make show-data                                     every layer, 10 rows each
+##   make show-data LAYER=gold TABLE=fact_daily_events LIMIT=5
+##   make show-data LAYER=gold TABLE=dim_customer SCHEMA=1
+##   make show-data LAYER=gold TABLE=fact_daily_events COLUMNS=event_date,total_amount
+##   make show-data LAYER=gold TABLE=fact_daily_events FORMAT=json   (rows on stdout)
+## The recipe is silent (`@`) because FORMAT=json|csv puts rows on stdout: an
+## echoed command line would land in the pipe. The tool prints its own header.
+show-data:
+	@$(PYTHON) scripts/show_data.py --env $(ENV) --layer $(LAYER) --table "$(TABLE)" --limit $(LIMIT) \
+		--format $(FORMAT) $(if $(DATE),--event-date $(DATE),) \
+		$(if $(COLUMNS),--columns "$(COLUMNS)",) $(if $(SCHEMA),--schema,)
 
 ## Remove run artefacts. Committed sample inputs and the layer skeleton stay.
 ## NOTE: do not reduce this to `rm -rf data/*/output/*`. That expands to the

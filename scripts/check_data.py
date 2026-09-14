@@ -151,7 +151,7 @@ def parse_contract(table: str) -> Contract | None:
     )
 
 
-def _resolve(value: str) -> Path:
+def resolve_path(value: str) -> Path:
     """Resolve a configured path.
 
     Relative values are anchored at the project root, so the report describes
@@ -161,12 +161,28 @@ def _resolve(value: str) -> Path:
     return path if path.is_absolute() else PROJECT_ROOT / path
 
 
-def _partition_dirs(root: Path, key: str, event_date: str | None) -> list[Path]:
+def partition_dirs(root: Path, key: str, event_date: str | None) -> list[Path]:
     """Return the hive-style ``key=value`` directories under ``root``."""
     dirs = sorted(p for p in root.glob(f"{key}=*") if p.is_dir())
     if event_date:
         dirs = [p for p in dirs if p.name == f"{key}={event_date}"]
     return dirs
+
+
+def parquet_files(root: Path, key: str, event_date: str | None) -> list[Path]:
+    """The Parquet files to read, resolved from the on-disk layout.
+
+    A partitioned table holds one ``data.parquet`` inside each partition
+    directory, so choosing the directories is what prunes the read. A snapshot
+    table holds bare ``*.parquet`` files instead. Both shapes are resolved here
+    and nowhere else: the verifier and the viewer must never disagree about
+    where the data lives.
+    """
+    dirs = partition_dirs(root, key, event_date)
+    files = sorted(path / "data.parquet" for path in dirs if (path / "data.parquet").is_file())
+    if files:
+        return files
+    return sorted(path for path in root.glob("*.parquet") if path.stat().st_size)
 
 
 def _schema_of(files: list[Path]) -> dict[str, str]:
@@ -252,10 +268,8 @@ def check_parquet_table(
 ) -> list[Finding]:
     """Checks for a partitioned Parquet table or a single-file snapshot."""
     key = PARTITION_KEY["gold"]
-    dirs = _partition_dirs(root, key, event_date)
-    files = sorted(path / "data.parquet" for path in dirs if (path / "data.parquet").is_file())
-    if not files:
-        files = sorted(path for path in root.glob("*.parquet") if path.stat().st_size)
+    dirs = partition_dirs(root, key, event_date)
+    files = parquet_files(root, key, event_date)
     if not files:
         return [Finding("artefact", FAIL, f"no Parquet file under {root}")]
 
@@ -384,7 +398,7 @@ def discover(cfg: dict[str, Any], layer: str) -> list[tuple[str, Path]]:
     edit here.
     """
     storage = cfg["storage"]
-    output = _resolve(storage["output_root"])
+    output = resolve_path(storage["output_root"])
     if layer == "gold":
         root = output / storage["gold_subpath"]
         if not root.is_dir():
@@ -403,7 +417,7 @@ def missing_tables(cfg: dict[str, Any]) -> list[str]:
     A run is expected to write every table its contract describes, so this is a
     failure once the environment has run.
     """
-    gold_root = _resolve(cfg["storage"]["output_root"]) / cfg["storage"]["gold_subpath"]
+    gold_root = resolve_path(cfg["storage"]["output_root"]) / cfg["storage"]["gold_subpath"]
     on_disk = {path.name for path in gold_root.iterdir() if path.is_dir()} if gold_root.is_dir() else set()
     declared = {path.stem for path in (PROJECT_ROOT / "docs" / "tables").glob("*.md")}
     return sorted(declared - on_disk - {SINGLE_TABLE["silver"]})
@@ -416,19 +430,19 @@ def run_marker(cfg: dict[str, Any]) -> Path:
     than a failure. Reporting an unrun environment as broken would be a false
     red, and a false red teaches the reader to ignore the tool.
     """
-    return _resolve(cfg["metrics"]["output_file"])
+    return resolve_path(cfg["metrics"]["output_file"])
 
 
 def report_run(cfg: dict[str, Any]) -> None:
     """Print the run envelope: where the input came from and what metrics say."""
     storage = cfg["storage"]
-    metrics_file = _resolve(cfg["metrics"]["output_file"])
+    metrics_file = resolve_path(cfg["metrics"]["output_file"])
     if metrics_file.is_file():
         data = json.loads(metrics_file.read_text(encoding="utf-8"))
         print("  metrics   " + "  ".join(f"{key}={data.get(key)}" for key in RUN_METRIC_KEYS if key in data))
     else:
         print(f"  metrics   not found: {metrics_file.relative_to(PROJECT_ROOT)}")
-    print(f"  input     {_resolve(storage['input_root'])}")
+    print(f"  input     {resolve_path(storage['input_root'])}")
 
 
 def main(argv: list[str] | None = None) -> int:
