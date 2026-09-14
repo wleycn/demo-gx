@@ -4,6 +4,10 @@
 
 Silver (cleaned detail)
 
+## Subject
+
+Events. One row per deduplicated event, unified across every source system.
+
 ## Grain
 
 One row per unique event (after deduplication by `event_id`).
@@ -22,6 +26,9 @@ DATA-DESIGN.md section 1.
 
 `event_date` (date, derived from `event_timestamp`). Partition directory format:
 `event_date={YYYY-MM-DD}/data.parquet`.
+
+- **Rationale**: every downstream read filters or groups by date. A date partition lets one run rewrite a single day without touching the others.
+- **Estimated volume**: 1 to 7 rows per partition in the demo sample. The sample holds 102 rows across 30 partitions, about 16 KB per partition.
 
 ## Field List
 
@@ -44,6 +51,21 @@ DATA-DESIGN.md section 1.
 | `_validation_status` | string | Validation status | Always `passed` in the current implementation (`type_mismatch` is a reserved value) |
 | `_processed_timestamp` | timestamp (us, UTC) | Pipeline processing time | Added at write time |
 
+## Monetary Convention
+
+- **Unit**: `amount` holds a decimal in the currency's major unit, not its minor unit. `12.34` with `currency=USD` means 12.34 US dollars.
+- **Precision**: two decimal places at most. The validator quarantines finer values.
+- **Accepted codes**: five. `USD`, `EUR`, `GBP`, `CNY`, and `JPY`. Any other value is replaced with `USD` and flagged in `_is_invalid_currency`.
+- **No conversion**: amounts are never converted between currencies. The pipeline has no exchange rate.
+- **Aggregation caveat**: `amount` carries no currency dimension, so a sum across rows mixes currencies. The Gold aggregates inherit this caveat.
+
+## PII and Masking
+
+- **Direct identifiers**: `customer_id` is the only one. `event_id` is a surrogate key and carries no personal data.
+- **Raw copy**: `_raw_json` holds the full original record, so it holds `customer_id` as well.
+- **Masking today**: none. This demo stores `customer_id` in clear text.
+- **Production rule**: mask at the Bronze entry boundary. Masking later leaves the clear value inside `_raw_json`, which is the copy kept for replay.
+
 ## Lifecycle
 
 - **Write mode**: partition-scoped overwrite (idempotent). Each partition's `data.parquet`
@@ -52,3 +74,28 @@ DATA-DESIGN.md section 1.
 - **Retention**: no retention policy. All partitions persist until manually cleaned.
 - **Reprocessing**: `--event-date` reprocesses one date. Late data writes to the
   corresponding historical partition.
+- **Compaction and snapshot retention**: not implemented. See KNOWN-ISSUE.md `#no-snapshot-lifecycle`.
+
+## Freshness SLA and Owner
+
+- **Freshness SLA**: none. The demo runs on demand, with no schedule and no alert wired.
+- **Owner**: the repository maintainers.
+- **Production rule**: SLA and alerting belong in the orchestration layer. See DATA-DESIGN.md section 3.
+
+## Dependencies
+
+- **Upstream**: the environment's inbound file, read by `ingestion.read_input`. It accepts `.json` lines, `.csv`, and `.parquet`.
+- **Downstream**: `fact_daily_events`, `dim_customer`, `dim_event_type`, and `wide_daily_user_events`. Each reads the full on-disk Silver snapshot.
+
+## Quality Rules
+
+1. All eight declared fields must be present and non-null. A missing or null field quarantines the row.
+2. A record carrying an undeclared key is quarantined. Strict mode judges this from `_raw_json`, so a null extra value still counts as present.
+3. `event_id` must match the UUID v4 pattern.
+4. `source_system` must be one of `web`, `mobile`, or `api`.
+5. `event_type` must be at most 64 characters.
+6. `amount` must be numeric, at least 0, finite, and at most two decimal places.
+7. `currency` must match three upper-case letters.
+8. Both timestamps must parse and must not be later than the run instant.
+9. `event_id` is unique after deduplication.
+10. A quarantined row never reaches this table. Validation failure sends it to `errors/bad_schema/`.

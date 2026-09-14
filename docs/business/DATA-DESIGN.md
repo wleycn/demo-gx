@@ -118,20 +118,20 @@ Environment-isolated directory structure. Each environment has its own root, tak
 ### 2.3 Silver Layer (Cleaned Parquet)
 
 **Partition key**: `event_date` (the date extracted from `event_timestamp`, typed as `date`).
-**Idempotency**: file-level overwrite per date partition. Each partition's `data.parquet` is rewritten per run. Empty partitions from earlier batches are not pruned. A full clean re-run (`make clean`) removes all artifacts.
-**Deduplication**: by `event_id`, keeping the latest `ingestion_timestamp`.
-Detailed schema and per-table contract: see [../tables/silver_events.md](../tables/silver_events.md).
+Write mode, empty-partition handling, the deduplication rule, and the column contract live in the table contract: see [../tables/silver_events.md](../tables/silver_events.md).
 
 ### 2.4 Gold Layer (Star Schema)
 
 The Gold layer adopts a star schema with one fact table, two dimension tables, and one denormalized wide table.
 
-| Table | Type | Partition | Grain | Contract |
-|---|---|---|---|---|
-| `fact_daily_events` | Fact | `event_date` | per day per customer per event type | [../tables/fact_daily_events.md](../tables/fact_daily_events.md) |
-| `dim_customer` | Dimension | none (full snapshot) | one row per customer | [../tables/dim_customer.md](../tables/dim_customer.md) |
-| `dim_event_type` | Dimension | none (full snapshot) | one row per event type | [../tables/dim_event_type.md](../tables/dim_event_type.md) |
-| `wide_daily_user_events` | Wide | `event_date` | same as fact, denormalized | [../tables/wide_daily_user_events.md](../tables/wide_daily_user_events.md) |
+Partition, grain, and business key for each table live in its own contract.
+
+| Table | Type | Contract |
+|---|---|---|
+| `fact_daily_events` | Fact | [../tables/fact_daily_events.md](../tables/fact_daily_events.md) |
+| `dim_customer` | Dimension | [../tables/dim_customer.md](../tables/dim_customer.md) |
+| `dim_event_type` | Dimension | [../tables/dim_event_type.md](../tables/dim_event_type.md) |
+| `wide_daily_user_events` | Wide | [../tables/wide_daily_user_events.md](../tables/wide_daily_user_events.md) |
 
 Gold is always rebuilt from the full on-disk Silver snapshot, never from the in-memory batch. This ensures that dimension tables and the wide table are full snapshots, so a backfill run for one date does not lose rows or shrink dimensions.
 
@@ -149,13 +149,13 @@ Errors are written to `errors/bad_schema/` as JSON Lines, one error object per l
 
 The Bronze/Silver/Gold layouts above are directory and file layouts that the single-machine demo writes today. In the target big-data environment, the same layers would be managed as Iceberg tables: data files remain Parquet, but a catalog plus metadata layer adds ACID transactions, partition evolution, snapshot isolation, and time travel.
 Prepared Iceberg DDL assets (Spark SQL dialect) are available in the archived `docs/archive/data-design.md` section 6. These document the target shape and are ready to run once a big-data environment is available. They are not executable in this repository's current environment.
-The mapping between demo and production equivalents:
+The mapping between demo and production equivalents. Paths start at `{storage.base_path}/output/`:
 
 | Demo (this repo, Pandas) | Production equivalent (Iceberg/Spark) |
 |---|---|
-| `data/bronze/{source}/dt=.../events.json` | `bronze.events` table, append-only, 30-day retention |
-| `data/silver/event_date=.../data.parquet` | `silver.events` table, `DELETE+INSERT` / `MERGE INTO` |
-| `data/gold/fact_daily_events/...` | `gold.fact_daily_events` table, `INSERT OVERWRITE` |
+| `bronze/{source}/dt=.../events.json` | `bronze.events` table, append-only, 30-day retention |
+| `silver/event_date=.../data.parquet` | `silver.events` table, `DELETE+INSERT` / `MERGE INTO` |
+| `gold/fact_daily_events/...` | `gold.fact_daily_events` table, `INSERT OVERWRITE` |
 | Partition-overwrite (idempotency) | Iceberg transactions plus snapshot isolation |
 | `_raw_json` audit column | Full Bronze replay via snapshot and time travel |
 
