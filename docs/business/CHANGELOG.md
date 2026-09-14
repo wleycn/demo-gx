@@ -4,6 +4,11 @@ Version-level changes, reverse chronological order. Source: `git log --date=shor
 
 ## 2026-09-14
 
+- `1f91b73` docs: sync the documentation to the new storage layout
+- `3b7711f` chore: commit the demo data skeleton and make the sample reproducible
+- `f28f68e` feat: let --input default to the environment's inbound drop location
+- `13a6654` refactor: restructure the environment storage layout into data/{env}/{input,output}
+
 - `2018807` docs: record the blocking line-ending check in the change trail
 - `99a7001` docs: fix the double-CR line endings in AGENTS.md and normalise the index
 - `e6f78e4` docs: record the line-ending fix and re-assemble the rules set
