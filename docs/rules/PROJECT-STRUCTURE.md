@@ -12,7 +12,7 @@
 │   ├── __init__.py
 │   ├── config.py             # 🔴 single entry point: env / secret loading, typed config
 │   ├── <domain>/             # Split by business module
-│   └── utils/                # Single entry point for cross-module shared capabilities
+│   └── {shared}/             # Single entry point for cross-module shared capabilities
 ├── scripts/                  # Entry scripts and thin shells (forward only, no business logic)
 ├── tests/                    # Tests, mirroring the src structure
 │   └── fixtures/
@@ -38,15 +38,17 @@
 
 ## 3. Single Entry Point Files (Single Entry Point Principle)
 
+> **The path follows the project structure layer**: `{shared}/` is the cross-module capability directory, for example `utils/` or `common/`. The module name follows the structure layer as well. The constraint is **one implementation per capability**, not one particular file name. A capability the project genuinely does not need does not require a module. Once it is needed, it goes through the entry point in this table.
+
 | Single entry point | File | Responsibility |
 |---|---|---|
 | Configuration and credentials | `config.py` | env / secret loading, typed output (Pydantic Settings), with validation |
 | Paths | `path_anchor.py` / `path_resolve.py` | **No** `Path.home()` / `expanduser` / direct `import dotenv`; unified `load_shared_env()` |
 | Paths (project root) | `Path(__file__).resolve().parents[k]` | Projects always derive from `__file__` and **do not depend on an external shared library** (a shared `path_anchor` applies only to system scripts hosted under a unified infrastructure directory) |
-| Logging | `utils/log.py` | `get_logger(__name__)`, with run_id / target / row count / elapsed time |
-| Retry | `utils/retry.py` | Unified retry and conflict handling; **unified gate**: all four categories -- non-zero exit / empty output / timeout / exception -- trigger |
-| Data access | `utils/db.py` | Unified connection and query entry (for PG operations see skill `pg-query`) |
-| Redaction | `utils/mask.py` | Phone numbers / ID documents / addresses / bank cards |
+| Logging | `{shared}/log.py` | `get_logger(__name__)`, with run_id / target / row count / elapsed time |
+| Retry | `{shared}/retry.py` | Unified retry and conflict handling; **unified gate**: all four categories -- non-zero exit / empty output / timeout / exception -- trigger |
+| Data access | `{shared}/db.py` | Unified connection and query entry (for PG operations see skill `pg-query`) |
+| Redaction | `{shared}/mask.py` | Phone numbers / ID documents / addresses / bank cards |
 
 > 🔴 **The same capability must not be reimplemented outside the single entry point** (including retry, redaction regexes, connection parameter tuning, logging handlers). New scripts must pass `path_governance_audit.py` with zero violations.
 
@@ -100,7 +102,7 @@
 | `dags/` | Task orchestration and dependency assembly | Writing transform logic, reading/writing tables directly |
 | `pipelines/` | Read/write transforms by business domain | Orchestrating dependencies, hardcoded config |
 | `models/` | schema and type definitions | Business logic |
-| `utils/` | Single entry point for cross-module shared capabilities | Referencing concrete business modules |
+| `{shared}/` | Single entry point for cross-module shared capabilities | Referencing concrete business modules |
 | `sql/migrations/` | schema evolution incremental scripts | Modifying an already-committed number, manual execution in production |
 | `notebooks/` | Exploratory analysis | Referenced by production scheduling, committing outputs and credentials |
 
@@ -140,13 +142,15 @@ version: 3
 
 ### 5. Single Entry Points (single-entry principle)
 
+> **The path follows the project structure layer**: `{shared}/` is the cross-module capability directory, for example `utils/` or `common/`. The module name follows the structure layer as well. The constraint is **one implementation per capability**, not one particular file name. A capability the project genuinely does not need does not require a module. Once it is needed, it goes through the entry point in this table.
+
 | Single entry point | File | Responsibility |
 |---|---|---|
 | Compute and catalog | `catalog.py` | Session / catalog / table loading / snapshot expiry / compaction trigger |
 | Config and credentials | `config.py` | env / secret loading, typed output |
-| Money | `utils/money.py` | cents↔yuan conversion, rounding mode |
-| Masking | `utils/mask.py` | phone number / ID document / address masking |
-| Quality | `utils/quality.py` | `check_table(df, rules)` |
-| Logging and metrics | `utils/log.py` | logger + run metrics (row count / partitions / elapsed) |
+| Money | `{shared}/money.py` | cents↔yuan conversion, rounding mode |
+| Masking | `{shared}/mask.py` | phone number / ID document / address masking |
+| Quality | `{shared}/quality.py` | `check_table(df, rules)` |
+| Logging and metrics | `{shared}/log.py` | logger + run metrics (row count / partitions / elapsed) |
 
 🔴 Outside the single entry points you must not reimplement equivalent capabilities on your own (including session parameter tuning, masking regexes, retry logic).

@@ -6,7 +6,7 @@
 
 - 🔴 All functions carry **type hints**; CI runs `mypy` (at least strict on new modules)
 - 🟡 Unified `ruff` lint + format, configuration centralized in `pyproject.toml` (no scattered flake8/pylint configs)
-- 🔴 Production code **must not use `print`**; uniformly use `utils/log.get_logger`
+- 🔴 Production code **must not use `print`**; uniformly use `{shared}/log.get_logger`
 - 🔴 **No bare `except:`** and no `except Exception: pass` (silent failure = troubleshooting blind spot)
 - 🔴 Dependencies must go into `pyproject.toml` with the lock file committed; ad-hoc `pip install` is forbidden
 - 🟡 Prefer the standard library and existing single entry point files; do not pull in a heavy dependency for a single-purpose need
@@ -22,7 +22,7 @@
 
 - 🔴 **Unified gate**: non-zero exit / empty output / timeout / exception -- **all four** categories must trigger a fallback or an alert; checking only the non-zero exit is not acceptable
 - 🔴 A failure must **leave a trail** (log + state file/DB table); silently swallowing exceptions is forbidden
-- 🔴 Retries go through `utils/retry.py`; **retry must presuppose idempotency** (otherwise retry = creating duplicate data)
+- 🔴 A retry goes through the shared retry module (`{shared}/retry.py`); **retry must presuppose idempotency** (otherwise retry = creating duplicate data)
 - 🟡 External calls must have a timeout; a network call without a timeout counts as a defect
 
 ```python
@@ -67,7 +67,7 @@ except Exception:
 ## 7. Security and Redaction
 
 - 🔴 PII (phone numbers / ID numbers / detailed addresses / bank cards) must be redacted or hashed in the outward-facing layer; plaintext is allowed only in the raw layer and with access control configured
-- 🔴 Redaction implementations are centralized in `utils/mask.py`; hand-written regexes scattered around are forbidden
+- 🔴 Redaction implementations are centralized in `{shared}/mask.py`; hand-written regexes scattered around are forbidden
 - 🔴 No leakage of sensitive context: code / logs / commits must not contain production data samples or credentials (see skill `secret-sprawl-audit`)
 
 ## 8. Testing
@@ -132,7 +132,7 @@ Type-specific red lines (data processing: write idempotency / partition pruning 
 - Incremental dedup tables must use `MERGE INTO` or **partition-level overwrite**; 🔴 **bare append is forbidden** (a rerun duplicates)
 - **Single writer** per table / per partition; concurrent production must be serialized through orchestration
 - Partition overwrite mode (dynamic overwrite) is **set uniformly at the session single entry point**; ad-hoc toggling in scripts is forbidden
-- Commit conflicts (optimistic concurrency conflicts) are caught and retried via `utils/retry.py`; 🔴 silently skipping is forbidden
+- Commit conflicts (optimistic concurrency conflicts) are caught and retried via `{shared}/retry.py`; 🔴 silently skipping is forbidden
 - 🔴 Destructive operations (`DROP` / `DELETE` / snapshot expiry / orphan cleanup) must have an explicit human authorization record
 
 ```sql
@@ -167,7 +167,7 @@ df.writeTo("dwd.trade.order_di").overwritePartitions()
 ### 4. Data Quality 🔴
 
 - 🔴 After `dwd` / `dws` tables are written, quality validation must be wired in: **primary key uniqueness, non-null rate of key fields, period-over-period row count drift, partition freshness**
-- Unified entry point `utils/quality.check_table(df, rules)`; 🔴 a failed check **blocks downstream tasks**
+- Unified entry point `{shared}/quality.check_table(df, rules)`; 🔴 a failed check **blocks downstream tasks**
 - 🟡 Thresholds and the rule list are written into the **table contract** (not hardcoded in code); changes go through a PR
 
 ```yaml
@@ -183,7 +183,7 @@ quality_rules:
 ### 5. Monetary Amounts and Numerics (narrows the requirements of this type) 🔴
 
 - 🔴 Money must not use `float`/`double`; on the DB side `DECIMAL(18,2)` (yuan), high-precision fields `DECIMAL(24,6)` and must be declared in the contract
-- 🔴 The cents→yuan conversion is done **only once, at the boundary of the ingest layer** (via `utils/money.cents_to_yuan`); a hand-written `/100` anywhere else in the pipeline is forbidden
+- 🔴 The cents→yuan conversion is done **only once, at the boundary of the ingest layer** (via `{shared}/money.cents_to_yuan`); a hand-written `/100` anywhere else in the pipeline is forbidden
 - 🔴 Aggregations operate directly on DECIMAL; converting to float mid-way is forbidden; ratios are uniformly expressed as decimals (`0.1234` = 12.34%) and must not be mixed with percentages
 - 🔴 All DECIMAL fields must be **explicitly cast**; relying on automatic inference is forbidden; the rounding mode (half-up / half-even) is declared in the contract
 
@@ -196,7 +196,7 @@ quality_rules:
 ### 7. Data Security 🔴
 
 - 🔴 PII (phone number, ID document number, detailed address, bank card) must be **masked or hashed at the detail layer**; plaintext is allowed only in the ingest layer and with access control configured
-- 🔴 Masking implementations are centralized in `utils/mask.py`; hand-written regexes scattered around are forbidden
+- 🔴 Masking implementations are centralized in `{shared}/mask.py`; hand-written regexes scattered around are forbidden
 - 🔴 External tables and data-service responses must not contain plaintext PII
 - 🟡 Column-level permissions are declared uniformly in the catalog / permission system
 
@@ -204,5 +204,5 @@ quality_rules:
 
 - 🔴 Orchestration files only orchestrate (import pipeline functions, assemble dependencies and scheduling parameters); **writing transform logic is forbidden**
 - 🔴 Task function signatures are uniformly `run(ds: str, ...)`; partitions are injected by the scheduler; **implicitly using the system's current time is forbidden** (otherwise reruns are not reproducible)
-- 🟡 Task-level retries are configured in the orchestration layer; business-level retries go through `utils/retry.py`; retries presuppose idempotent writes
-- 🟡 Every run outputs metrics via `utils/log`: `run_id`, table, partition list, rows read/written, elapsed time
+- 🟡 Task-level retries are configured in the orchestration layer; business-level retries go through `{shared}/retry.py`; retries presuppose idempotent writes
+- 🟡 Every run outputs metrics via `{shared}/log`: `run_id`, table, partition list, rows read/written, elapsed time
