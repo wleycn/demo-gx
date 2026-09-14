@@ -5,6 +5,7 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-14
 
+- `99fd54e` docs(rules): make the skeleton conditional instead of mandatory [AI]
 - `572100c` docs(rules): decouple the shared rules material from a project layout [AI]
 - `9ed1aa4` feat(pii): mask direct identifiers at the ingestion boundary [AI]
 - `69e3d3c` chore(lint): make the ruff and mypy claims in CODING-STANDARD true [AI]
