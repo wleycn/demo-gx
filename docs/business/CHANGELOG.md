@@ -5,6 +5,8 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-14
 
+- `572100c` docs(rules): decouple the shared rules material from a project layout [AI]
+- `9ed1aa4` feat(pii): mask direct identifiers at the ingestion boundary [AI]
 - `69e3d3c` chore(lint): make the ruff and mypy claims in CODING-STANDARD true [AI]
 - `1da42c6` chore(provenance): retrofit the AI-generation header on all 22 code files [AI]
 - `88c3d41` feat(gate): enforce the AI provenance marker on agent commits [AI]
