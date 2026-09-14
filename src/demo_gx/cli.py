@@ -29,7 +29,7 @@ from demo_gx.curation.builder import GoldBuilder
 def main():
     """Run the pipeline end-to-end from the command line.
 
-    Parses ``--env``, ``--input``, and optional ``--event-date`` arguments,
+    Parses ``--env`` and the optional ``--input`` / ``--event-date`` arguments,
     then executes the six-stage ETL flow (read, validate, clean, deduplicate,
     write Silver, build and write Gold).  Metrics are always persisted, even
     on failure.
@@ -42,7 +42,9 @@ def main():
     os.chdir(PROJECT_ROOT)
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="dev", choices=["dev", "test", "prod"])
-    parser.add_argument("--input", required=True, help="Path to input file")
+    parser.add_argument("--input",
+                        help="Path to the input file; defaults to the environment's "
+                             "inbound drop location (<env root>/input/sample_data.json)")
     parser.add_argument("--event-date", help="Override event date for processing (YYYY-MM-DD)")
     parser.add_argument(
         "--run-timestamp",
@@ -62,17 +64,24 @@ def main():
 
     # Load environment configuration
     config = load_config(args.env)
+    # The input path defaults to the environment's inbound drop location, so a
+    # bare `python -m demo_gx.cli --env test` runs with no path argument. Both
+    # the directory and the file name come from config, never from a literal
+    # here (AGENTS.md section 3 red line 5).
+    input_path = args.input or str(
+        Path(config["storage"]["input_root"]) / config["storage"]["input_file"]
+    )
     logger = setup_logging(
         level=config["logging"]["level"],
         log_file=config["logging"].get("file")
     )
-    logger.info(f"Starting pipeline with env={args.env}, input={args.input}")
+    logger.info(f"Starting pipeline with env={args.env}, input={input_path}")
     metrics = MetricsCollector()
 
     try:
         # 1. Read input
         logger.info("Reading input...")
-        raw_df = read_input(args.input)
+        raw_df = read_input(input_path)
         metrics.increment("input_rows", len(raw_df))
         logger.info(f"Read {len(raw_df)} rows")
 

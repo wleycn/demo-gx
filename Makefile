@@ -3,7 +3,6 @@
 
 PYTHON := .venv/bin/python
 ENV    ?= dev
-INPUT  ?= data/$(ENV)/input/sample_data.json
 
 .PHONY: setup data run test clean
 
@@ -20,7 +19,7 @@ data:
 
 ## Run the full pipeline (override env: ENV=test make run)
 run: data
-	$(PYTHON) -m demo_gx.cli --input $(INPUT) --env $(ENV)
+	$(PYTHON) -m demo_gx.cli --env $(ENV)
 
 ## Run the pytest suite
 test:

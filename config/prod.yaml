@@ -1,6 +1,7 @@
 storage:
   base_path: "./data/prod"      # environment root
   input_subpath: "input"      # inbound drop location
+  input_file: "sample_data.json"   # default input when --input is omitted
   output_subpath: "output"    # everything the pipeline writes
   bronze_subpath: "bronze"
   silver_subpath: "silver"
