@@ -103,9 +103,14 @@ under each environment's `output/` directory (`data/{env}/output/`) and are git-
 make run
 # Run tests
 make test
+# Lint, format check and type check
+make lint
 # Or manually
 .venv/bin/python -m demo_gx.cli --env dev
 .venv/bin/python -m pytest tests/ -q
+.venv/bin/python -m ruff check src scripts tests
+.venv/bin/python -m ruff format --check src scripts tests
+.venv/bin/python -m mypy
 ```
 
 ## Document Navigation

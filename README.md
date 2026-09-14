@@ -14,7 +14,8 @@ Python 3.10 or later, and `make` (Linux/macOS). Every step has a `make` target; 
 | 2 | `make data` | Generate `data/{env}/input/sample_data.json` (107 records with injected anomalies) |
 | 3 | `make run` | Run the pipeline (default env `dev`; override with `ENV=test make run`) |
 | 4 | `make test` | Run the pytest suite |
-| 5 | `make clean` | Remove all run artifacts for a clean re-run |
+| 5 | `make lint` | Check lint, formatting and type annotations (ruff + mypy) |
+| 6 | `make clean` | Remove all run artifacts for a clean re-run |
 
 Manual equivalents (no `make`):
 
@@ -31,6 +32,11 @@ python3 -m venv .venv
 
 # 4. Run tests
 .venv/bin/python -m pytest tests/
+
+# 5. Lint, format check and type check. All three read pyproject.toml.
+.venv/bin/python -m ruff check src scripts tests
+.venv/bin/python -m ruff format --check src scripts tests
+.venv/bin/python -m mypy
 ```
 
 `pip install -e .` is what makes `python -m demo_gx.cli` work from any directory.
