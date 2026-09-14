@@ -2,17 +2,21 @@
 # Usage: make setup | data | run | test | lint | check-data | show-data | clean
 
 PYTHON := .venv/bin/python
-ENV    ?= dev
-# check-data and show-data selectors:
-#   LAYER=all|bronze|silver|gold|errors, TABLE=<name>, DATE=YYYY-MM-DD
-LAYER  ?= all
-TABLE  ?=
-DATE   ?=
-# show-data only: LIMIT=<rows or lines>, COLUMNS=a,b, FORMAT=table|json|csv, SCHEMA=1
-LIMIT  ?= 10
-COLUMNS ?=
-FORMAT ?= table
-SCHEMA ?=
+# Selectors are read in either case: `make show-data DATE=...` and
+# `make show-data date=...` behave the same. The uppercase form is the documented
+# one, and the lowercase form is what people type on the way there. Mixed case
+# (`Date=`) is still a typo, because make compares variable names exactly.
+#   check-data and show-data: ENV=dev|test|prod, LAYER=all|bronze|silver|gold|errors,
+#                             TABLE=<name>, DATE=YYYY-MM-DD
+#   show-data only: LIMIT=<rows or lines>, COLUMNS=a,b, FORMAT=table|json|csv, SCHEMA=1
+ENV     ?= $(or $(env),dev)
+LAYER   ?= $(or $(layer),all)
+TABLE   ?= $(table)
+DATE    ?= $(date)
+LIMIT   ?= $(or $(limit),10)
+COLUMNS ?= $(columns)
+FORMAT  ?= $(or $(format),table)
+SCHEMA  ?= $(schema)
 
 .PHONY: setup data run test lint check-data show-data clean
 

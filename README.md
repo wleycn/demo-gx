@@ -65,7 +65,7 @@ demo-gx/
 │   ├── changes/              # Per-module change logs
 │   ├── rules/                # Engineering rules (structure / coding / flow / acceptance)
 │   └── archive/              # Superseded documents and the original assessment prompt
-├── tests/                    # pytest suite (64 tests)
+├── tests/                    # pytest suite (77 tests)
 ├── scripts/generate_sample_data.py
 ├── scripts/check_data.py     # Read-only artefact verifier behind `make check-data`
 ├── scripts/show_data.py      # Read-only viewer behind `make show-data`
@@ -87,7 +87,8 @@ committed so a fresh clone runs out of the box. Everything the pipeline writes g
 ## Inspecting the Output
 
 Two read-only commands inspect a run. `make check-data` judges it against the table contracts, and
-`make show-data` prints the rows themselves. Both take the same selectors: `LAYER`, `TABLE` and `DATE`.
+`make show-data` prints the rows themselves. Both take the same selectors: `LAYER`, `TABLE` and `DATE`,
+and either case works, so `DATE=2026-09-01` and `date=2026-09-01` are the same selector.
 
 ### Verify a run
 
@@ -99,6 +100,7 @@ make check-data                               # every layer, every table
 make check-data LAYER=gold                    # one layer
 make check-data LAYER=gold TABLE=fact_daily_events
 make check-data DATE=2026-09-01               # one partition only
+make check-data LAYER=gold TABLE=fact_daily_events date=2026-09-01   # the same, lowercase
 ```
 
 The layer is a parameter, because the layers are structural. The table is discovered from disk, so a
@@ -121,6 +123,8 @@ make show-data LAYER=gold TABLE=dim_customer SCHEMA=1     # names and types only
 make show-data LAYER=gold TABLE=fact_daily_events COLUMNS=event_date,total_amount
 make show-data LAYER=gold TABLE=fact_daily_events FORMAT=json   # rows on stdout
 make show-data DATE=2026-09-01                            # one partition only
+make show-data LAYER=gold TABLE=fact_daily_events date=2026-09-01   # the same, lowercase
+make show-data LAYER=gold TABLE=wide_daily_user_events date=2026-09-01
 ```
 
 Exit codes: `0` something was shown,
