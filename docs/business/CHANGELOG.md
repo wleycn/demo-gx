@@ -1,9 +1,12 @@
 # Changelog
 
 Version-level changes, reverse chronological order. Source: `git log --date=short --pretty=format:'%ad %h %s'`.
+A commit that only updates this file cannot list itself, so the newest hash here always trails `git log` by one entry.
 
 ## 2026-09-14
 
+- `0ee0860` docs: complete the table contracts and retract the duplicated table detail
+- `431c9d2` docs: credit the project authors in the README
 - `1f91b73` docs: sync the documentation to the new storage layout
 - `3b7711f` chore: commit the demo data skeleton and make the sample reproducible
 - `f28f68e` feat: let --input default to the environment's inbound drop location
