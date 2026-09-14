@@ -65,12 +65,13 @@ demo-gx/
 │   ├── changes/              # Per-module change logs
 │   ├── rules/                # Engineering rules (structure / coding / flow / acceptance)
 │   └── archive/              # Superseded documents and the original assessment prompt
-├── tests/                    # pytest suite (45 tests)
+├── tests/                    # pytest suite (64 tests)
 ├── scripts/generate_sample_data.py
 ├── scripts/check_data.py     # Read-only artefact verifier behind `make check-data`
+├── scripts/show_data.py      # Read-only viewer behind `make show-data`
 ├── scripts/hooks/pre-commit  # Pre-commit gate hook (copy into .git/hooks)
 ├── scripts/hooks/commit-msg  # Commit-message provenance hook (same install step)
-├── Makefile                  # setup / data / run / test / lint / check-data / clean
+├── Makefile                  # setup / data / run / test / lint / check-data / show-data / clean
 ├── pyproject.toml            # Single entry for dependencies, packaging and pytest config
 ├── .gitlab-ci.yml            # CI skeleton: test + lint -> data-quality -> manual promote
 ├── .gitattributes            # Line-ending policy (md=CRLF, code=LF)
@@ -102,6 +103,24 @@ table added to the pipeline is checked without editing the tool. Exit codes: `0`
 It reports file and partition counts, row counts, column and type parity against the contract, the
 declared partition key, business primary key uniqueness, and whether every field under
 `pii.masked_fields` is masked. The layer layout is in `docs/business/DATA-DESIGN.md`.
+
+`make show-data` prints the rows themselves, so it answers "what does the data look like". It never
+fails on a data defect: a table that breaks its contract is exactly the table you want to look at.
+
+```bash
+make show-data                                            # every layer, 10 rows each
+make show-data LAYER=gold TABLE=fact_daily_events LIMIT=5
+make show-data LAYER=gold TABLE=dim_customer SCHEMA=1     # names and types only
+make show-data LAYER=gold TABLE=fact_daily_events COLUMNS=event_date,total_amount
+make show-data LAYER=gold TABLE=fact_daily_events FORMAT=json   # rows on stdout
+make show-data DATE=2026-09-01                            # one partition only
+```
+
+`--layer`, `--table` and `--event-date` mean the same as above. Exit codes: `0` something was shown,
+`2` the request does not match the data, `3` nothing to look at. With `FORMAT=json` or `csv` the rows
+go to stdout and the report moves to stderr, so a pipe carries data only. Without `DATE` the read
+starts at the first partition in name order, and the report names every partition the shown rows came
+from.
 
 ## Pre-commit Gate
 
