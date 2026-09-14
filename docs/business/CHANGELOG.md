@@ -5,6 +5,7 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-14
 
+- `011c432` docs: make the table contract the single source for the dedup rule
 - `667bd59` docs: align the table contracts with the artefacts and retire two phantom fields
 - `0ee0860` docs: complete the table contracts and retract the duplicated table detail
 - `431c9d2` docs: credit the project authors in the README
