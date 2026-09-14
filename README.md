@@ -86,8 +86,13 @@ committed so a fresh clone runs out of the box. Everything the pipeline writes g
 
 ## Inspecting the Output
 
+Two read-only commands inspect a run. `make check-data` judges it against the table contracts, and
+`make show-data` prints the rows themselves. Both take the same selectors: `LAYER`, `TABLE` and `DATE`.
+
+### Verify a run
+
 `make check-data` reads what a run produced and compares it with the table contracts in `docs/tables/`.
-It is read-only, and it exits non-zero when a check fails, so it serves as a verification step too.
+It exits non-zero when a check fails, so it serves as a verification step too.
 
 ```bash
 make check-data                               # every layer, every table
@@ -104,6 +109,8 @@ It reports file and partition counts, row counts, column and type parity against
 declared partition key, business primary key uniqueness, and whether every field under
 `pii.masked_fields` is masked. The layer layout is in `docs/business/DATA-DESIGN.md`.
 
+### Show the rows
+
 `make show-data` prints the rows themselves, so it answers "what does the data look like". It never
 fails on a data defect: a table that breaks its contract is exactly the table you want to look at.
 
@@ -116,7 +123,7 @@ make show-data LAYER=gold TABLE=fact_daily_events FORMAT=json   # rows on stdout
 make show-data DATE=2026-09-01                            # one partition only
 ```
 
-`--layer`, `--table` and `--event-date` mean the same as above. Exit codes: `0` something was shown,
+Exit codes: `0` something was shown,
 `2` the request does not match the data, `3` nothing to look at. With `FORMAT=json` or `csv` the rows
 go to stdout and the report moves to stderr, so a pipe carries data only. Without `DATE` the read
 starts at the first partition in name order, and the report names every partition the shown rows came
