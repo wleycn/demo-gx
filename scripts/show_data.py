@@ -194,7 +194,7 @@ def _write_machine(rows: list[dict[str, Any]], columns: list[str], fmt: str) -> 
         writer.writerow([_cell(row.get(name)) for name in columns])
 
 
-def peek_parquet(
+def show_parquet(
     layer: str,
     name: str,
     root: Path,
@@ -250,7 +250,7 @@ def peek_parquet(
     return None
 
 
-def peek_json(layer: str, name: str, root: Path, event_date: str, limit: int, schema_only: bool, report: Any) -> None:
+def show_json(layer: str, name: str, root: Path, event_date: str, limit: int, schema_only: bool, report: Any) -> None:
     """Show the lines of one JSON Lines layer."""
     files = _json_files(layer, root, event_date)
     if not files:
@@ -332,9 +332,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"\n{layer.upper()}")
             print(f"  {name}")
         if layer in JSON_LAYERS:
-            peek_json(layer, name, root, event_date, args.limit, args.schema, report)
+            show_json(layer, name, root, event_date, args.limit, args.schema, report)
             continue
-        code = peek_parquet(layer, name, root, event_date, columns_arg, args.limit, args.schema, machine, report)
+        code = show_parquet(layer, name, root, event_date, columns_arg, args.limit, args.schema, machine, report)
         if code is not None:
             return code
     return 0

@@ -302,3 +302,11 @@
 - **Evidence**: 88 tests pass. `ruff check` exits 0, `ruff format --check` reports 29 files formatted, `mypy` reports no issues in 21 source files and the pre-commit gate exits 0.
 - **Rollback**: revert the commit. No artefact needs rebuilding, and an exported variable simply stops selecting again.
 - **Related**: `README.md` section "Inspecting the Output" / `Makefile` selector block / `tests/test_makefile_selectors.py`.
+## 20260915 · show-naming-completion — Finish the rename inside the viewer
+
+- **Motivation**: the tool was renamed to `show` two changes earlier, in `show_data.py` and `make show-data`, but two functions inside the file still carried the old `peek` prefix. Nothing failed, and a search for the new name cannot find an old name: the tests call `main()`, so no test ever read either identifier.
+- **Scope**: `scripts/show_data.py` only. `peek_parquet` and `peek_json` become `show_parquet` and `show_json`, at both definitions and both call sites. No behaviour changes.
+- **Verification**: a repository-wide search for `peek` finds nothing left in `scripts/`, `src/` or `tests/`. Both new names import and print from a fresh interpreter. Every output path was then run against the real artefacts: the Parquet table path, the JSON Lines paths for Bronze and for the error quarantine, `FORMAT=json`, `FORMAT=csv` and `SCHEMA=yes`.
+- **Evidence**: 88 tests pass. `ruff check` exits 0, `ruff format --check` reports 29 files formatted, `mypy` reports no issues in 21 source files and the pre-commit gate exits 0.
+- **Rollback**: revert the commit or rename back. Nothing outside the file refers to either name.
+- **Related**: `scripts/show_data.py` / the `show-data-viewer` entry in this file.
