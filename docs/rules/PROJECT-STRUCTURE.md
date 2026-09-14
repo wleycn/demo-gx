@@ -15,7 +15,7 @@
 ├── src/{pkg}/                # Product code (an installable package, not flat scripts)
 │   ├── __init__.py
 │   ├── <domain>/             # Split by business module
-│   └── {shared}/             # Single entry point for cross-module shared capabilities: config.py / log.py / mask.py, see §3
+│   └── {shared}/             # Single entry point for cross-module shared capabilities: config.py / logger.py / mask.py, see §3
 ├── scripts/                  # Entry scripts and thin shells (only when there are entries invoked as commands by shell / cron; forward only, no business logic)
 ├── tests/                    # Tests, mirroring the src structure
 │   └── fixtures/             # Small sample files (only when tests need sample data on disk)
@@ -48,7 +48,7 @@
 | Configuration and credentials | `{shared}/config.py` | env / secret loading, typed output (Pydantic Settings), with validation |
 | Paths | In a project: the project root anchor in the next row; system scripts: `path_anchor.py` / `path_resolve.py` (see skill `path-ssot-governance`) | **No** `Path.home()` / `expanduser` / direct `import dotenv` |
 | Paths (project root) | `Path(__file__).resolve().parents[k]` | Projects always derive from `__file__` and **do not depend on an external shared library** (a shared `path_anchor` applies only to system scripts hosted under a unified infrastructure directory) |
-| Logging | `{shared}/log.py` | `get_logger(__name__)`, with run_id / target / row count / elapsed time |
+| Logging | `{shared}/logger.py` | `get_logger(__name__)`, with run_id / target / row count / elapsed time |
 | Retry | `{shared}/retry.py` | Unified retry and conflict handling; **unified gate**: all four categories -- non-zero exit / empty output / timeout / exception -- trigger |
 | Data access | `{shared}/db.py` | Unified connection and query entry (for PG operations see skill `pg-query`) |
 | Redaction | `{shared}/mask.py` | Phone numbers / ID documents / addresses / bank cards |
@@ -163,6 +163,6 @@ version: 3
 | Money | `{shared}/money.py` | cents↔yuan conversion, rounding mode (only when money amounts are converted) |
 | Masking | `{shared}/mask.py` | phone number / ID document / address masking (only when PII fields exist) |
 | Quality | `{shared}/quality.py` | `check_table(df, rules)` (only when there are quality rules) |
-| Logging and metrics | `{shared}/log.py` | logger + run metrics (row count / partitions / elapsed) |
+| Logging and metrics | `{shared}/logger.py` | logger + run metrics (row count / partitions / elapsed) |
 
 🔴 Outside the single entry points you must not reimplement equivalent capabilities on your own (including session parameter tuning, masking regexes, retry logic).

@@ -6,7 +6,7 @@
 
 - 🔴 All functions carry **type hints**; CI runs `mypy` (at least strict on new modules)
 - 🟡 Unified `ruff` lint + format, configuration centralized in `pyproject.toml` (no scattered flake8/pylint configs)
-- 🔴 Production code **must not use `print`**; uniformly use `{shared}/log.get_logger`
+- 🔴 Production code **must not use `print`**; uniformly use `{shared}/logger.get_logger`
 - 🔴 **No bare `except:`** and no `except Exception: pass` (silent failure = troubleshooting blind spot)
 - 🔴 Dependencies must go into `pyproject.toml` with the lock file committed; ad-hoc `pip install` is forbidden
 - 🟡 Prefer the standard library and existing single entry point files; do not pull in a heavy dependency for a single-purpose need
