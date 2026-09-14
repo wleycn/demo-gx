@@ -5,6 +5,7 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-14
 
+- `f6d03db` feat(check-data): add a read-only verifier for the run output [AI]
 - `5519396` docs: list make lint in the quick start and the verification commands [AI]
 - `0edbf50` docs: tidy the storage tree comment alignment [AI]
 - `4515435` docs: align the project documents with the repository [AI]
