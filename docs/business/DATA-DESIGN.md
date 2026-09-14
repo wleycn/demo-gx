@@ -72,7 +72,7 @@ Environment-isolated directory structure. Each environment has its own root, set
 ```text
 data/dev/output/
 ├── bronze/                        # Raw JSON archive (immutable)
-│   └── {source_system}/             # the sample data uses api / web / mobile / unknown
+│   └── {source_system}/           # the sample data uses api / web / mobile / unknown
 │       └── dt={YYYY-MM-DD}/
 │           └── events.json
 ├── silver/                        # Cleaned detail layer (Parquet)
