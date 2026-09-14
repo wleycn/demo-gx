@@ -5,6 +5,7 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-14
 
+- `1da42c6` chore(provenance): retrofit the AI-generation header on all 22 code files [AI]
 - `88c3d41` feat(gate): enforce the AI provenance marker on agent commits [AI]
 - `9c7f463` docs: move the deviation record out of AGENTS.md into KNOWN-ISSUE.md [AI]
 - `24945f3` docs: split clause-chained sentences into one statement each [AI]
