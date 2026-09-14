@@ -16,7 +16,7 @@ When you find existing code conflicting with a higher-level rule, **do not silen
 
 - **Language and runtime**: Python 3.11 (minimum 3.10). The virtual environment lives inside the project at `.venv/`, is not committed, and commands always start with `.venv/bin/python`
 - **Storage engine**: local filesystem, no database. Every environment writes under one root, `data/{env}/`, split by direction: `input/` holds what is fed in, `output/` holds Bronze / Silver / Gold / errors / logs. The root is the `storage.base_path` config item
-- **Orchestration**: `src/demo_gx/cli.py`, invoked as `python -m demo_gx.cli`, no scheduler. The partition parameter is injected by `--event-date` and the run timestamp by `--run-timestamp`; the entry point reads the system clock once, and only when neither was injected
+- **Orchestration**: `src/demo_gx/cli.py`, invoked as `python -m demo_gx.cli`, no scheduler. The partition parameter is injected by `--event-date` and the run timestamp by `--run-timestamp`; the entry point reads the system clock once, and only when `--run-timestamp` was not injected
 - **Table format**: Parquet partition directories `event_date=YYYY-MM-DD`, no Iceberg, no catalog
 - **Dependencies and toolchain**: `pyproject.toml` (the single entry point for dependencies and toolchain), `Makefile`, `.gitlab-ci.yml`
 - **Target shape**: designed for a Spark + Iceberg big-data shape, verified locally on single-machine Pandas. For the technology choices and the rejected alternatives see `docs/business/PROJECT.md`
@@ -90,7 +90,7 @@ Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which sk
 
 ### 9.1 Project Map (file index)
 
-> Generation rule: fill the table below with files that **actually exist in the project**, and delete inapplicable rows. Paths in the table must be really reachable; `pre_commit_gate.py` checks them.
+> Generation rule: fill the table below with files that **actually exist in the project**, and delete inapplicable rows. Paths in the table must be really reachable; the machine gate checks the referenced files under `docs/`, `src/`, `scripts/`, `tests/` and `data/` plus the root files it names, so a directory path or a `config/*.yaml` entry has to be verified by the reviewer.
 
 | Category | Location | Purpose |
 |---|---|---|
@@ -131,63 +131,9 @@ Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which sk
 | Cross-cutting (any stage) | `doc-code-drift` (contract and code drift), `post-change-cleanup` (post-change cleanup), `module-retirement` (retiring an old module), `docs-writing-discipline` (before writing documents and reports); daily discipline `ops-basics-discipline` / `path-ssot-governance` / `secret-sprawl-audit` | Stage completion / before delivery / when drift is found |
 | Any stage (specific to this type) | `data-layer-design` (schema and query plan); `verify-data-layer` (independent verification of a data-layer handover); `pg-query`; `performance-benchmarking` | When tables / partitions / a data pipeline are involved |
 
+
 ## 10. Rule Provenance and Deviations
 
-- **Provenance**: this project's rules = this file + the `docs/rules/` four-piece set. The four-piece set is assembled verbatim by the assembly tool in three layers: **baseline → tech stack → project type** (`rules_assembly.py`). Assembly only lowers heading levels; it does not change the text of an upper layer, nor delete an upper-layer entry. **Not hand-edited per project**.
-- **Deviation registration**: every place where this project disagrees with the upstream rules is listed item by item in this section, in four columns: issue / upstream wording / this project's practice / disposition. "Disposition" must point to a document anchor that actually exists; writing only "already explained" is forbidden.
-- A deviation not yet resolved counts as a **known issue**: register it in `docs/business/KNOWN-ISSUE.md` and leave an index row here.
-
-**Deviations registered for this project** (every place where this project disagrees with the upstream rules):
-
-| Issue | Upstream wording | This project | Disposition |
-|---|---|---|---|
-| Environment setup | Commit a `uv.lock` lock file | Dependencies declared in `pyproject.toml`; venv plus pip install; no lock file | See "Deviation rationale and cost" below |
-| Orchestration directory | `dags/` holds task orchestration and dependency assembly | No scheduler; orchestration doubles as the in-package entry point `src/demo_gx/cli.py` | See "Data-processing skeleton applicability boundaries" below |
-| Transformation module split | `src/{pkg}/pipelines/{domain}/`, by business domain | Split by pipeline stage: `ingestion` / `validation` / `transformation` / `curation` | See "Data-processing skeleton applicability boundaries" below |
-| Contract model layer | `src/{pkg}/models/` holds schema and type definitions | Field contract in `config/schema.yaml`, table contracts in `docs/tables/`; no Python model layer | See "Data-processing skeleton applicability boundaries" below |
-| SQL assets | `sql/migrations/` incremental DDL and `sql/transforms/` | No `sql/` assets and no SQL engine; Parquet is written straight to disk. Iceberg DDL exists as an archived reference only and is not on the execution path | See "Data-processing skeleton applicability boundaries" below |
-| Test directory | `tests/` mirrors `src/` | Flat `tests/test_{module}.py` | See "Data-processing skeleton applicability boundaries" below |
-| Data layer naming | `ods` to `dwd` to `dws` to `ads` | Bronze to Silver to Gold | See the `data layer mapping` term in `docs/business/DOMAIN-LANGUAGE.md` |
-| Coverage gate | Projects with CI require unit-test coverage of 80% or more | No coverage tooling enabled; the floor is "at least one assertion per requirement" | See `docs/business/KNOWN-ISSUE.md#coverage-gate-off` |
-| Computation and catalog entry point | `catalog.py` unifies session and table loading | No catalog: local Parquet, the session concept does not exist | See `docs/business/KNOWN-ISSUE.md#no-catalog` |
-| Snapshot and compaction policy | Every table configures a retention period and a compaction job | Partition directories are overwritten in place, no snapshot layer | See `docs/business/KNOWN-ISSUE.md#no-snapshot-lifecycle` |
-| Amount precision | Amounts must not use `float`; use DECIMAL with a single conversion | The `amount` column is pandas `float64` | See `docs/business/KNOWN-ISSUE.md#amount-float` |
-| Table contract approval | Contract frontmatter carries `status: approved` and CI blocks unreviewed migrations | Local reference implementation, no approval chain | See `docs/business/KNOWN-ISSUE.md#table-contract-approval` |
-| Stage model | The baseline ten stages, including pre-release, deployment and observability | Stage 8 is replaced by an end-to-end smoke run; stages 9 and 10 do not apply | See "Stage model applicability boundaries" below |
-| Clock reads outside data stamping | Red line 10 forbids code reading the system's current time | `common/metrics.py` and `common/logger.py` still read the clock, for telemetry only; no data-stamping site reads it | See `docs/business/KNOWN-ISSUE.md#clock-reads-outside-data-stamping` |
-
-**Stage model applicability boundaries**: this project is a local reference implementation. It has no pre-release environment, no production deployment, and no release chain beyond CI. Of the baseline ten stages, stages 1-7 apply in full; stage 8 is replaced by an end-to-end smoke run, and its interface checks do not apply; stages 9 and 10 do not apply. The CI gate and commit discipline still apply.
-
-**Data-processing skeleton applicability boundaries**: the data-processing structure skeleton assumes a technology stack of Spark plus Iceberg plus a scheduler. This project is a single-machine Pandas reference implementation (for the choices and the rejected alternatives see `docs/business/PROJECT.md`), so the skeleton entries that depend on that stack are registered here as inapplicable:
-
-- **No `dags/`**: there is no scheduler, so orchestration doubles as the in-package entry point and `python -m demo_gx.cli` is the invocation. The skeleton's "merging is allowed" boundary requires all three conditions; this project **satisfies only the first**: there is one entry, but it hardcodes the three `--env` values and their default, so condition two fails, and `tests/` imports four pipeline components as libraries (`GoldBuilder`, `DataCleaner`, `Deduplicator`, `SchemaValidator`), so condition three fails as well. The project still merges, because there is only this one entry and no second caller; the cost is that the entry carries command-line side effects, and a future split would have to separate argument parsing from library code.
-- **Transformation modules split by pipeline stage**: the project has a single business domain, events, so splitting by domain would produce single-element directories; the stage boundaries are the real reusable boundaries. `common/` is the cross-stage shared layer: it is not in the skeleton's list, but it matches the intent of `utils/`.
-- **No `src/demo_gx/models/`**: the single source of truth for the field contract is `config/schema.yaml`, and table contracts live in `docs/tables/`. A separate Python model layer would create a second definition.
-- **No `sql/`**: there is no SQL engine, so schema changes are kept in step through `schema.yaml` and the table contracts. Iceberg DDL does exist in the repository, but only under `docs/archive/` as a production-shape reference, and it is not on the execution path.
-- **Tests are flat rather than mirroring `src/`**: one file per module; mirroring would add a directory level for each of the four test files. Names do not mirror their module exactly: `test_validation.py` covers `validation/schema_validator.py`.
-- **Layering keeps Bronze / Silver / Gold**: the mapping to the upstream `ods` / `dwd` / `dws` / `ads` is recorded under the `data layer mapping` term in `docs/business/DOMAIN-LANGUAGE.md`.
-
-**Modules with no direct unit test**: `ingestion/reader.py`, `validation/error_envelope.py`, `common/*` and `cli.py` currently have end-to-end smoke coverage only, with no direct unit tests. This is the concrete form of `#coverage-gate-off`.
-
-**Deviation rationale and cost**
-
-Cost and rollback for the six skeleton rows above: moving to Spark plus Iceberg means the first four items need their directories rebuilt and the logic re-placed inside them; the last two are naming and organisation differences with zero rollback cost.
-
-Cost and rollback for the remaining rows:
-
-- **Environment setup**: uv is not installed in this environment and the upstream fallback is an equivalent lock kept in a plain requirements file, whereas this project folds the dependency declaration into `pyproject.toml` and commits no lock file. Cost: dependency resolution is not pinned, so a fresh environment can resolve different versions. Rollback cost: low, add `uv lock`, or pin the environment with `pip freeze` into a requirements file.
-- **Coverage gate**: no coverage tooling is enabled. Cost: a regression that no test asserts can pass CI unnoticed. Rollback cost: low, add pytest-cov and a threshold.
-- **Computation and catalog entry point**: there is no catalog and no session concept to unify. Cost: introducing Iceberg later means adding a `catalog.py` and re-pointing every read and write. Rollback cost: medium.
-- **Snapshot and compaction policy**: partitions are overwritten in place. Cost: no point-in-time recovery and no small-file compaction. Rollback cost: medium, re-registering the data as an Iceberg table.
-- **Amount precision**: the `amount` column is `float64`, which cannot represent decimal amounts exactly, so equality comparisons and sums are approximate. Cost: monetary rounding has to be handled by explicit rounding at the boundary. Rollback cost: medium, switch the column to `decimal.Decimal` and re-lock the affected tests and the table contract.
-- **Table contract approval**: no approval chain exists. Cost: nothing blocks an unreviewed contract change. Rollback cost: low, add a CI check on the frontmatter.
-- **Stage model**: stages 9 and 10 have no practice here. Cost: release and observability discipline is not exercised. Rollback cost: both stages must be reinstated once this becomes a deployed service.
-- **Clock reads outside data stamping**: `common/metrics.py` and `common/logger.py` still read the clock, for telemetry only; no data-stamping site reads it. Cost: telemetry timestamps are not reproducible across runs. Rollback cost: low, inject the run instant into the telemetry path too.
-
-- **Deviation discipline**: the standard practice is the **default** and a deviation is the exception. A deviation is allowed, but it must satisfy all three conditions at once:
-  - ① Register it item by item in this section, with the "disposition" column pointing to an anchor that actually exists.
-  - ② State **why the standard practice is not adopted**; empty reasons such as "this project is special" are forbidden.
-  - ③ Note the cost and the rollback cost.
-- **Silently lowering the standard without registering it is forbidden**. "This is just a one-off case" is not a reason for exemption from registration.
-- **Vertical bars inside table cells must be escaped**: when writing content that contains a vertical bar such as `a|b` in a cell, write it as `a\|b`, otherwise Markdown breaks that cell.
-- **The structure of this file is fixed**: eleven sections in total, §0–§10, and **no new section may be added**. Project-level additions go into the corresponding section. Red lines go into §3, conduct into §4, output requirements into §5. Maps go into §9.1 / §9.2, and any disagreement with upstream goes into this section's deviation table. A self-added section would drift apart from the existing ones, and the machine gate warns about it. In particular, do not add another "anti-pattern" comparison table that duplicates §3.
+- **Provenance**: this project's rules = this file plus the `docs/rules/` four-piece set, assembled from the upstream core and trimmed to this stack; project facts live in `docs/business/`.
+- **Deviation discipline**: this project's deviations from the upstream rules, together with their applicability boundaries and cost-and-rollback notes, are registered in `docs/business/KNOWN-ISSUE.md`, section "Skeleton Deviations". A deviation is allowed only when all four conditions hold. It is registered item by item, its disposition points to an anchor that actually exists, and it states why the standard practice is not adopted. It also records the cost and the rollback cost. Silently lowering the standard is forbidden.
+- **Fixed structure**: eleven headings in total, the ten core sections §0–§9 plus this pointer section. No new section may be added, and project-level additions go into the corresponding section (§3 red lines, §4 conduct, §5 output, §9 maps); the machine gate warns about a self-added section. Do not add a second "anti-pattern" comparison table duplicating §3. A deviation not yet resolved is registered as a known issue in `docs/business/KNOWN-ISSUE.md`.
