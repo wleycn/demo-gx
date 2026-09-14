@@ -16,10 +16,10 @@ The deviation table in `AGENTS.md` §10 points to the anchors in this document. 
 ### #no-catalog — No catalog or session management
 
 **Symptom**: the project has no `catalog.py` and no concept of a unified compute session. Bronze, Silver, and Gold are plain directory paths on the local file system.
-**Root cause**: the upstream rule requires a central catalog for compute and table loading. This project runs on Pandas with local Parquet files. There is no Spark session, no Iceberg catalog, and no table registry.
+**Root cause**: the skeleton provides a `catalog.py` entry point only for projects that have a catalog (Iceberg / Hive); this project has none. It runs on Pandas with local Parquet files. There is no Spark session, no Iceberg catalog, and no table registry.
 **Impact**: table metadata (schema, partitions) is implicit in the directory structure, not registered in a catalog. Time travel and snapshot isolation are not available.
 **Disposition**: accepted for the local demo. The production shape would use an Iceberg catalog. See DATA-DESIGN section 2.7 for the Iceberg DDL reference.
-**Related**: DATA-DESIGN.md (section 2.7, production table format reference), AGENTS.md (deviation: catalog).
+**Related**: DATA-DESIGN.md (section 2.7, production table format reference), KNOWN-ISSUE.md "Skeleton Deviations" (conditional skeleton item, not a deviation).
 ---
 
 ### #no-snapshot-lifecycle — No snapshot layer or retention policy
@@ -117,24 +117,20 @@ Silently lowering the standard without registering it is forbidden, and "this is
 
 | Issue | Upstream | This project | Disposition |
 |---|---|---|---|
-| Environment setup | Commit a `uv.lock` lock file | `pyproject.toml` only; venv + pip install; no lock file | Low rollback cost |
-| Orchestration directory | `dags/` for task orchestration | No scheduler; orchestration is `src/demo_gx/cli.py` | See skeleton boundaries below |
-| Transformation module split | `src/{pkg}/pipelines/{domain}/` by business domain | Split by pipeline stage: `ingestion` / `validation` / `transformation` / `curation` | See skeleton boundaries below |
-| Contract model layer | `src/{pkg}/models/` for schema and type definitions | Field contract in `config/schema.yaml`; table contracts in `docs/tables/`; no Python model layer | See skeleton boundaries below |
-| SQL assets | `sql/migrations/` and `sql/transforms/` | No `sql/` assets; Parquet written directly. Iceberg DDL archived in `docs/archive/` only | See skeleton boundaries below |
-| Test directory | `tests/` mirrors `src/` structure | Flat `tests/test_{module}.py` | See skeleton boundaries below |
-| Data layer naming | `ods` → `dwd` → `dws` → `ads` | Bronze → Silver → Gold | See `DOMAIN-LANGUAGE.md` `data layer mapping` |
+| Environment setup | Commit a `uv.lock` lock file (`uv` is installed here, so the "no uv" escape does not apply) | `pyproject.toml` with `>=` floors only; venv + pip install; no lock file | See cost and rollback summary |
 | Coverage gate | ≥80% coverage required for CI projects | No coverage tooling; floor is one assertion per requirement | `#coverage-gate-off` |
-| Catalog entry point | `catalog.py` unifies session and table loading | No catalog; local Parquet, no session concept | `#no-catalog` |
 | Snapshot policy | Every table has retention and compaction | Partition directories overwritten in place; no snapshot layer | `#no-snapshot-lifecycle` |
 | Amount precision | DECIMAL type required; no `float` for money | `amount` column is pandas `float64` | `#amount-float` |
 | Table contract approval | `status: approved` frontmatter; CI blocks unreviewed | Local reference implementation; no approval chain | `#table-contract-approval` |
 | Stage model | Ten stages including pre-release, deployment, observability | Stage 8 replaced by end-to-end smoke; stages 9–10 N/A | See skeleton boundaries below |
 | Clock reads | Code reading system time forbidden | `common/metrics.py` and `common/logger.py` read clock for telemetry only | `#clock-reads-outside-data-stamping` |
 
-**Skeleton applicability boundaries**: the data-processing skeleton assumes Spark + Iceberg + scheduler. This project is a single-machine Pandas reference implementation (`docs/business/PROJECT.md`), so skeleton entries depending on that stack are inapplicable:
+Items that the skeleton presents as **conditional** are not deviations. Upstream `PROJECT-STRUCTURE.md` §1 marks `dags/`, `src/{pkg}/pipelines/{domain}/`, `src/{pkg}/models/`, `sql/`, `catalog.py`, `tests/{fixtures,pipelines}/` and the `ods`→`dwd`→`dws`→`ads` layer naming as "created only when that condition holds", and states that not creating them is not a deviation. This project adopts none of them, so they are absent from the table above. Only those rows are departures from an unconditional rule.
 
-- **No `dags/`**: no scheduler; `python -m demo_gx.cli` is the only entry point. The skeleton's merge boundary requires three conditions; this project satisfies only the first (single entry). Conditions two and three fail because the entry hardcodes `--env` values and `tests/` imports four pipeline components as libraries. Merge accepted because there is no second caller; cost is command-line side effects in library code.
+**Skeleton applicability boundaries**: the conditional skeleton items appear only with a given technology choice (a scheduler, a catalog, a SQL engine). This project is a single-machine Pandas reference implementation (`docs/business/PROJECT.md`) and adopts none of them. What it does instead:
+
+- **No `dags/`**: no scheduler; `python -m demo_gx.cli` is the only entry point.
+- **Entry point inside the package, not in `scripts/`**: the skeleton's merge boundary requires three conditions at once and this project satisfies only the first (single entry). Conditions two and three fail because the entry hardcodes `--env` values and `tests/` imports four pipeline components as libraries. Merge accepted because there is no second caller; cost is command-line side effects in library code.
 - **Transformation by stage not domain**: single business domain (events) means domain-split would produce singleton directories. Stage boundaries are the real reusable boundaries. `common/` fills the cross-stage shared layer role.
 - **No `src/demo_gx/models/`**: `config/schema.yaml` and `docs/tables/` are the single sources of truth. A Python model layer would create a second definition.
 - **No `sql/`**: no SQL engine; schema changes tracked through `schema.yaml` and table contracts. Iceberg DDL exists in `docs/archive/` as production-shape reference only.
@@ -145,8 +141,8 @@ Silently lowering the standard without registering it is forbidden, and "this is
 
 **Uncovered modules**: `ingestion/reader.py`, `validation/error_envelope.py`, `common/*`, and `cli.py` have only end-to-end smoke coverage, no direct unit tests. This is the concrete form of `#coverage-gate-off`.
 
-**Cost and rollback summary** (one line per deviation row; the rows without an anchor are grouped in the first line):
-- Moving to Spark + Iceberg would require rebuilding the directories for the first four skeleton rows; the last two are naming differences with zero rollback cost.
+**Cost and rollback summary** (one line per deviation row; the conditional skeleton items are grouped in the first line):
+- Adopting the conditional skeleton items (`dags/`, `src/{pkg}/pipelines/{domain}/`, `src/{pkg}/models/`, `sql/`) means creating those directories and rewiring the entry point; the layer-name difference (Bronze/Silver/Gold) has zero rollback cost. These are shape choices, not deviations.
 - **Environment setup** — cost: dependency resolution is not pinned, so a fresh environment can resolve different versions; rollback: low, add `uv lock` or pin with `pip freeze`.
 - **Coverage gate** (`#coverage-gate-off`) — cost: a regression that no test asserts can pass CI unnoticed; rollback: low, add pytest-cov and a threshold.
 - **Catalog entry point** (`#no-catalog`) — cost: introducing Iceberg later means adding `catalog.py` and re-pointing every read and write; rollback: medium.
