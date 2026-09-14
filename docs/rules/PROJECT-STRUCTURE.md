@@ -46,14 +46,14 @@
 | Single entry point | File | Responsibility |
 |---|---|---|
 | Configuration and credentials | `{shared}/config.py` | env / secret loading, typed output (Pydantic Settings), with validation |
-| Paths | `path_anchor.py` / `path_resolve.py` | **No** `Path.home()` / `expanduser` / direct `import dotenv`; unified `load_shared_env()` |
+| Paths | In a project: the project root anchor in the next row; system scripts: `path_anchor.py` / `path_resolve.py` (see skill `path-ssot-governance`) | **No** `Path.home()` / `expanduser` / direct `import dotenv` |
 | Paths (project root) | `Path(__file__).resolve().parents[k]` | Projects always derive from `__file__` and **do not depend on an external shared library** (a shared `path_anchor` applies only to system scripts hosted under a unified infrastructure directory) |
 | Logging | `{shared}/log.py` | `get_logger(__name__)`, with run_id / target / row count / elapsed time |
 | Retry | `{shared}/retry.py` | Unified retry and conflict handling; **unified gate**: all four categories -- non-zero exit / empty output / timeout / exception -- trigger |
 | Data access | `{shared}/db.py` | Unified connection and query entry (for PG operations see skill `pg-query`) |
 | Redaction | `{shared}/mask.py` | Phone numbers / ID documents / addresses / bank cards |
 
-> 🔴 **The same capability must not be reimplemented outside the single entry point** (including retry, redaction regexes, connection parameter tuning, logging handlers). New scripts must pass `path_governance_audit.py` with zero violations.
+> 🔴 **The same capability must not be reimplemented outside the single entry point** (including retry, redaction regexes, connection parameter tuning, logging handlers). Changes to system scripts must pass `path_governance_audit.py` with zero violations (see skill `path-ssot-governance`).
 
 ## 4. Naming Conventions
 
