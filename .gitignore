@@ -9,10 +9,16 @@ dist/
 # Virtual environment
 .venv/
 
-# Pipeline run artifacts (env storage dirs; samples/metrics/logs live inside)
-data/
-/data_prod/
-/test/data/
+# Environment storage: the layering skeleton is committed so a fresh clone
+# runs and reads out of the box; run artefacts are rebuildable and untracked.
+data/*/output/*
+!data/*/output/*/
+data/*/output/*/*
+!data/*/output/*/.gitkeep
+# prod receives its inputs from the upstream system: placeholders only, no
+# sample file. Local demo runs of ENV=prod may generate one; it stays ignored.
+data/prod/input/*
+!data/prod/input/.gitkeep
 
 # System and editor
 .DS_Store

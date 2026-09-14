@@ -25,7 +25,10 @@ run: data
 test:
 	$(PYTHON) -m pytest tests/ -v
 
-## Remove ALL run artifacts (data/, test/data/, data_prod/ cover samples,
-## metrics, and logs which all live under the env storage dirs)
+## Remove run artefacts. Committed sample inputs and the layer skeleton stay.
+## NOTE: do not reduce this to `rm -rf data/*/output/*`. That expands to the
+## layer directory names and deletes them recursively, taking the committed
+## .gitkeep placeholders with it and dirtying the worktree.
 clean:
-	rm -rf data test/data data_prod
+	find data -type f -path '*/output/*' ! -name '.gitkeep' -delete
+	find data -type d -path '*/output/*' -empty -delete
