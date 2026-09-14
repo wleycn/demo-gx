@@ -118,3 +118,12 @@
 - **Decision**: the documentation follows the implementation. Adding the columns to satisfy the text was rejected: a column that always holds `"passed"` carries no information, and the change would invalidate the byte-identical artefact evidence from the storage-layout change.
 - **Rollback**: revert the commit.
 - **Related**: `CHANGELOG.md` entry for this date / `KNOWN-ISSUE.md` (Decision: Fail-safe isolation over flag-and-pass) / `docs/tables/`.
+
+## 20260914 · dedup-rule-single-source — Make the table contract the single source for the deduplication rule
+
+- **Motivation**: DATA-DESIGN.md section 1 carried the full Silver deduplication rule under "Key Flow Branches", and the Silver contract carried it a second time while pointing back at section 1. Two write surfaces meant no single source: a reader could not tell which copy to trust, and a change to one could leave the other silently stale. The other three branches in that section describe cross-table behaviour, so only this one belonged to a single table.
+- **Scope**: `docs/business/DATA-DESIGN.md` section 1, where the Deduplication path entry collapsed to an overview plus a pointer; `docs/tables/silver_events.md`, where the Deduplication section now states the tie-break rule in full and no longer points back. Documentation only.
+- **Behaviour and contract changes**: none. Both copies stated the same rule, and that rule matches `transformation/deduplicator.py`.
+- **Verification**: the rule and its tie-break now appear in exactly one place. `grep` finds no `keep-last`, `stable sort`, or `last-occurring` wording left in DATA-DESIGN.md, and the only remaining mention of the tie-break there is the pointer itself. All ten cross-references from the contracts into DATA-DESIGN.md still resolve to a heading that exists. `pytest` reports 27 passed. The gate reports exit 0. Both changed files keep CRLF with no bare LF and no double CR, and carry no CJK.
+- **Rollback**: revert the commit.
+- **Related**: `CHANGELOG.md` entry for this date / `docs/tables/silver_events.md` / `docs/business/DATA-DESIGN.md` sections 1 and 2.3.

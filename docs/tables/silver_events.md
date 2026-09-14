@@ -18,9 +18,10 @@ One row per unique event (after deduplication by `event_id`).
 
 ## Deduplication
 
-By `event_id`, keeping the record with the latest `ingestion_timestamp`. Superseded
-duplicates are written to `errors/duplicates.log`. The tie-break rule lives in
-DATA-DESIGN.md section 1.
+By `event_id`, keeping the record with the latest `ingestion_timestamp`. On an exact
+tie (identical `ingestion_timestamp`), the last-occurring row in the input file wins
+(keep-last; stable sort). Superseded duplicates are written to `errors/duplicates.log`
+for post-hoc review.
 
 ## Partition
 

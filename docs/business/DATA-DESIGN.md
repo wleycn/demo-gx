@@ -60,7 +60,7 @@ The pipeline reads a JSON file and distributes each record through three layers.
 
 **Bad data path**: Records that fail validation (missing required fields, type mismatch, extra fields, future timestamp) are quarantined to `errors/bad_schema/` with an error envelope. The pipeline continues processing valid data without interruption.
 **Type change path**: Type and format violations (non-numeric amount, timestamp parse failures) are quarantined at the validation stage together with schema violations. They do not reach Silver. The validator's error reason distinguishes them with `error_type=type_coercion_failed`. A separate "flag and pass to Silver" path is not enabled; the decision and its rationale are recorded in KNOWN-ISSUE.md under "Fail-safe isolation over flag-and-pass".
-**Deduplication path**: For duplicate `event_id` values, only the record with the latest `ingestion_timestamp` is kept. On an exact tie (identical `ingestion_timestamp`), the last-occurring row in the input file wins (keep-last; stable sort). Superseded duplicates are written to `errors/duplicates.log` for post-hoc review.
+**Deduplication path**: Silver deduplicates by `event_id`. The rule and its tie-break live in the table contract: [../tables/silver_events.md](../tables/silver_events.md).
 **Backfill path**: When `--event-date YYYY-MM-DD` is given, only rows whose `event_timestamp` falls on that date are processed. Rows whose timestamp does not parse are kept in scope so the validator can quarantine them. Bronze always archives the full arriving batch. Gold is rebuilt from the full on-disk Silver snapshot; section 2.4 explains why that makes a partial run safe.
 
 ## 2. Data Structure Definitions
