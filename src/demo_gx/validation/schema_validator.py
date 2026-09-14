@@ -7,11 +7,10 @@ regex patterns, and minimum values, then splits the DataFrame into valid
 and invalid partitions with per-row error reasons.
 """
 
-import pandas as pd
-import re
 import json
-from datetime import datetime
-import uuid
+from typing import Any
+
+import pandas as pd
 
 from demo_gx.common.time_utils import parse_utc_mixed
 
@@ -31,7 +30,7 @@ class SchemaValidator:
             enum, pattern, etc.).
     """
 
-    def __init__(self, schema_config, run_ts: pd.Timestamp):
+    def __init__(self, schema_config: dict[str, Any], run_ts: pd.Timestamp) -> None:
         """Initialize the validator with a schema configuration.
 
         Args:
@@ -88,11 +87,15 @@ class SchemaValidator:
             # column-level notna() is only a fallback (dev-review: batch-
             # dependent judging). Fallback used by unit tests without _raw_json.
             if "_raw_json" in df.columns:
+
                 def _has_extra_key(raw: str) -> bool:
                     try:
                         return bool(set(json.loads(raw)) & extra_fields)
-                    except Exception:
+                    except (TypeError, ValueError):
+                        # Unparseable raw JSON is not an extra-field hit;
+                        # the column-level fallback judges the row.
                         return False
+
                 extra_mask = df["_raw_json"].map(_has_extra_key).astype(bool)
             else:
                 extra_mask = df[list(extra_fields)].notna().any(axis=1)
@@ -101,7 +104,9 @@ class SchemaValidator:
                 df["_error_reason"] = df["_error_reason"] + f" Extra fields (present in input): {extra_fields};"
             else:
                 invalid_mask = invalid_mask | extra_mask
-                df.loc[extra_mask, "_error_reason"] = df.loc[extra_mask, "_error_reason"].fillna("") + f" Extra fields: {extra_fields};"
+                df.loc[extra_mask, "_error_reason"] = (
+                    df.loc[extra_mask, "_error_reason"].fillna("") + f" Extra fields: {extra_fields};"
+                )
             # Drop extra field columns (keep only standard fields + _raw_json)
             df = df.drop(columns=list(extra_fields))
 
@@ -123,32 +128,42 @@ class SchemaValidator:
                 non_scalar = series.apply(lambda v: isinstance(v, (dict, list, tuple)))
                 if non_scalar.any():
                     invalid_mask = invalid_mask | non_scalar
-                    df.loc[non_scalar, "_error_reason"] = df.loc[non_scalar, "_error_reason"].fillna("") + f" Field {field} not a scalar string;"
+                    df.loc[non_scalar, "_error_reason"] = (
+                        df.loc[non_scalar, "_error_reason"].fillna("") + f" Field {field} not a scalar string;"
+                    )
                 # Ensure the column is string-typed
                 if not pd.api.types.is_string_dtype(series):
                     # Attempt conversion
                     try:
                         df[field] = series.astype(str)
-                    except:
+                    except (TypeError, ValueError):
                         invalid_mask = invalid_mask | True
-                        df.loc[series.index, "_error_reason"] = df.loc[series.index, "_error_reason"].fillna("") + f" Field {field} not string;"
+                        df.loc[series.index, "_error_reason"] = (
+                            df.loc[series.index, "_error_reason"].fillna("") + f" Field {field} not string;"
+                        )
                 # Length constraint
                 if "max_length" in rules:
                     too_long = df[field].str.len() > rules["max_length"]
                     if too_long.any():
                         invalid_mask = invalid_mask | too_long
-                        df.loc[too_long, "_error_reason"] = df.loc[too_long, "_error_reason"].fillna("") + f" Field {field} exceeds max length;"
+                        df.loc[too_long, "_error_reason"] = (
+                            df.loc[too_long, "_error_reason"].fillna("") + f" Field {field} exceeds max length;"
+                        )
                 # Regex pattern
                 if "pattern" in rules:
                     pattern = rules["pattern"]
                     match_failed = ~df[field].str.match(pattern, na=False)
                     invalid_mask = invalid_mask | match_failed
-                    df.loc[match_failed, "_error_reason"] = df.loc[match_failed, "_error_reason"].fillna("") + f" Field {field} pattern mismatch;"
+                    df.loc[match_failed, "_error_reason"] = (
+                        df.loc[match_failed, "_error_reason"].fillna("") + f" Field {field} pattern mismatch;"
+                    )
                 # Enum check
                 if "enum" in rules:
                     not_in_enum = ~df[field].isin(rules["enum"])
                     invalid_mask = invalid_mask | not_in_enum
-                    df.loc[not_in_enum, "_error_reason"] = df.loc[not_in_enum, "_error_reason"].fillna("") + f" Field {field} not in enum;"
+                    df.loc[not_in_enum, "_error_reason"] = (
+                        df.loc[not_in_enum, "_error_reason"].fillna("") + f" Field {field} not in enum;"
+                    )
             elif expected_type == "number":
                 # Coerce to numeric without raising: unconvertible values
                 # become NaN and are quarantined row-by-row below (a failed
@@ -159,24 +174,33 @@ class SchemaValidator:
                 non_numeric = df[field].isna() & series.notna()
                 if non_numeric.any():
                     invalid_mask = invalid_mask | non_numeric
-                    df.loc[non_numeric, "_error_reason"] = df.loc[non_numeric, "_error_reason"].fillna("") + f" Field {field} not numeric;"
+                    df.loc[non_numeric, "_error_reason"] = (
+                        df.loc[non_numeric, "_error_reason"].fillna("") + f" Field {field} not numeric;"
+                    )
                 # Minimum value (column is numeric now, so NaN comparisons are safe)
                 if "minimum" in rules:
                     below_min = df[field].notna() & (df[field] < rules["minimum"])
                     invalid_mask = invalid_mask | below_min
-                    df.loc[below_min, "_error_reason"] = df.loc[below_min, "_error_reason"].fillna("") + f" Field {field} below minimum;"
+                    df.loc[below_min, "_error_reason"] = (
+                        df.loc[below_min, "_error_reason"].fillna("") + f" Field {field} below minimum;"
+                    )
                 # Non-finite values (inf after coercion) must not pollute sums
                 non_finite = df[field].isin([float("inf"), float("-inf")])
                 if non_finite.any():
                     invalid_mask = invalid_mask | non_finite
-                    df.loc[non_finite, "_error_reason"] = df.loc[non_finite, "_error_reason"].fillna("") + f" Field {field} not finite;"
+                    df.loc[non_finite, "_error_reason"] = (
+                        df.loc[non_finite, "_error_reason"].fillna("") + f" Field {field} not finite;"
+                    )
                 # Precision: at most N decimal places when schema declares it
                 if "max_decimals" in rules:
                     scaled = df[field] * 10 ** rules["max_decimals"]
                     too_precise = df[field].notna() & ((scaled - scaled.round()).abs() > 1e-6)
                     if too_precise.any():
                         invalid_mask = invalid_mask | too_precise
-                        df.loc[too_precise, "_error_reason"] = df.loc[too_precise, "_error_reason"].fillna("") + f" Field {field} exceeds {rules['max_decimals']} decimal places;"
+                        df.loc[too_precise, "_error_reason"] = (
+                            df.loc[too_precise, "_error_reason"].fillna("")
+                            + f" Field {field} exceeds {rules['max_decimals']} decimal places;"
+                        )
             elif expected_type == "timestamp":
                 # Attempt to parse as datetime and check parseability
                 # Back up the original string first, in case parsing fails
@@ -187,7 +211,9 @@ class SchemaValidator:
                 failed_parse = df[field].notna() & dt_series.isna()
                 if failed_parse.any():
                     invalid_mask = invalid_mask | failed_parse
-                    df.loc[failed_parse, "_error_reason"] = df.loc[failed_parse, "_error_reason"].fillna("") + f" Field {field} timestamp parse failed;"
+                    df.loc[failed_parse, "_error_reason"] = (
+                        df.loc[failed_parse, "_error_reason"].fillna("") + f" Field {field} timestamp parse failed;"
+                    )
                 # Reject future timestamps: the schema contract requires
                 # "<= current time" (see docs/business/PROJECT.md source-schema
                 # table); a record stamped in the future is quarantined here
@@ -196,7 +222,9 @@ class SchemaValidator:
                 in_future = dt_series > now_utc  # NaT > now is False
                 if in_future.any():
                     invalid_mask = invalid_mask | in_future
-                    df.loc[in_future, "_error_reason"] = df.loc[in_future, "_error_reason"].fillna("") + f" Field {field} in future;"
+                    df.loc[in_future, "_error_reason"] = (
+                        df.loc[in_future, "_error_reason"].fillna("") + f" Field {field} in future;"
+                    )
                 df[field] = dt_series  # converted UTC datetime
             # Other types...
         # Handle null values for required fields
@@ -204,7 +232,9 @@ class SchemaValidator:
             if rules.get("required", False) and field in df.columns:
                 missing = df[field].isna()
                 invalid_mask = invalid_mask | missing
-                df.loc[missing, "_error_reason"] = df.loc[missing, "_error_reason"].fillna("") + f" Field {field} is null;"
+                df.loc[missing, "_error_reason"] = (
+                    df.loc[missing, "_error_reason"].fillna("") + f" Field {field} is null;"
+                )
 
         # Split into valid / invalid partitions
         invalid_df = df[invalid_mask].copy()

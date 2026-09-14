@@ -13,15 +13,18 @@ pinned-timestamp commands in the docs stay reproducible.
 
 import argparse
 import json
+import random
 import uuid
 from datetime import datetime, timedelta
-import random
 from pathlib import Path
 
 # Base instant for every generated timestamp. Fixed on purpose: a sample built
 # from the wall clock cannot be committed (it would show a diff on every
 # regeneration) and cannot be replayed by a command that pins --run-timestamp.
-_BASE_TS = datetime(2026, 9, 14, 0, 0, 0)
+# The instant is deliberately offset-free: the input contract carries the raw
+# timestamp as a string and the Silver layer types it as UTC, so a tzinfo here
+# would change the generated payload.
+_BASE_TS = datetime(2026, 9, 14, 0, 0, 0)  # noqa: DTZ001
 
 
 def _det_uuid(rng: random.Random) -> str:
@@ -34,7 +37,12 @@ def _det_uuid(rng: random.Random) -> str:
     return str(uuid.UUID(int=rng.getrandbits(128), version=4))
 
 
-def generate_sample_data(num_records=100, output_path=None, env="dev", seed=42):
+def generate_sample_data(
+    num_records: int = 100,
+    output_path: str | None = None,
+    env: str = "dev",
+    seed: int = 42,
+) -> None:
     """Generate sample event records and write them as JSON Lines.
 
     Produces ``num_records`` valid random records, then appends several
@@ -91,19 +99,95 @@ def generate_sample_data(num_records=100, output_path=None, env="dev", seed=42):
         records.append(rec)
     # Intentionally add some anomalous records
     # 1. Missing event_id
-    records.append({"source_system": "web", "customer_id": "cust_999", "event_type": "purchase", "event_timestamp": base.isoformat(), "amount": 10, "currency": "USD", "ingestion_timestamp": base.isoformat()})
+    records.append(
+        {
+            "source_system": "web",
+            "customer_id": "cust_999",
+            "event_type": "purchase",
+            "event_timestamp": base.isoformat(),
+            "amount": 10,
+            "currency": "USD",
+            "ingestion_timestamp": base.isoformat(),
+        }
+    )
     # 2. Invalid amount (negative)
-    records.append({"event_id": _det_uuid(rng), "source_system": "api", "customer_id": "cust_888", "event_type": "view", "event_timestamp": base.isoformat(), "amount": -5, "currency": "USD", "ingestion_timestamp": base.isoformat()})
+    records.append(
+        {
+            "event_id": _det_uuid(rng),
+            "source_system": "api",
+            "customer_id": "cust_888",
+            "event_type": "view",
+            "event_timestamp": base.isoformat(),
+            "amount": -5,
+            "currency": "USD",
+            "ingestion_timestamp": base.isoformat(),
+        }
+    )
     # 3. Invalid source_system
-    records.append({"event_id": _det_uuid(rng), "source_system": "unknown", "customer_id": "cust_777", "event_type": "click", "event_timestamp": base.isoformat(), "amount": 20, "currency": "EUR", "ingestion_timestamp": base.isoformat()})
+    records.append(
+        {
+            "event_id": _det_uuid(rng),
+            "source_system": "unknown",
+            "customer_id": "cust_777",
+            "event_type": "click",
+            "event_timestamp": base.isoformat(),
+            "amount": 20,
+            "currency": "EUR",
+            "ingestion_timestamp": base.isoformat(),
+        }
+    )
     # 4. Future timestamp
-    records.append({"event_id": _det_uuid(rng), "source_system": "mobile", "customer_id": "cust_666", "event_type": "login", "event_timestamp": (base + timedelta(days=1)).isoformat(), "amount": 0, "currency": "GBP", "ingestion_timestamp": base.isoformat()})
+    records.append(
+        {
+            "event_id": _det_uuid(rng),
+            "source_system": "mobile",
+            "customer_id": "cust_666",
+            "event_type": "login",
+            "event_timestamp": (base + timedelta(days=1)).isoformat(),
+            "amount": 0,
+            "currency": "GBP",
+            "ingestion_timestamp": base.isoformat(),
+        }
+    )
     # 5. Duplicate event_id
     dup_id = _det_uuid(rng)
-    records.append({"event_id": dup_id, "source_system": "web", "customer_id": "cust_555", "event_type": "signup", "event_timestamp": (base - timedelta(hours=1)).isoformat(), "amount": 0, "currency": "USD", "ingestion_timestamp": base.isoformat()})
-    records.append({"event_id": dup_id, "source_system": "web", "customer_id": "cust_555", "event_type": "signup", "event_timestamp": (base - timedelta(hours=2)).isoformat(), "amount": 0, "currency": "USD", "ingestion_timestamp": (base - timedelta(hours=1)).isoformat()})
+    records.append(
+        {
+            "event_id": dup_id,
+            "source_system": "web",
+            "customer_id": "cust_555",
+            "event_type": "signup",
+            "event_timestamp": (base - timedelta(hours=1)).isoformat(),
+            "amount": 0,
+            "currency": "USD",
+            "ingestion_timestamp": base.isoformat(),
+        }
+    )
+    records.append(
+        {
+            "event_id": dup_id,
+            "source_system": "web",
+            "customer_id": "cust_555",
+            "event_type": "signup",
+            "event_timestamp": (base - timedelta(hours=2)).isoformat(),
+            "amount": 0,
+            "currency": "USD",
+            "ingestion_timestamp": (base - timedelta(hours=1)).isoformat(),
+        }
+    )
     # 6. Non-numeric amount (exercises error_type=type_coercion_failed)
-    records.append({"event_id": _det_uuid(rng), "source_system": "api", "customer_id": "cust_444", "event_type": "purchase", "event_timestamp": base.isoformat(), "amount": "not_a_number", "currency": "USD", "ingestion_timestamp": base.isoformat()})
+    records.append(
+        {
+            "event_id": _det_uuid(rng),
+            "source_system": "api",
+            "customer_id": "cust_444",
+            "event_type": "purchase",
+            "event_timestamp": base.isoformat(),
+            "amount": "not_a_number",
+            "currency": "USD",
+            "ingestion_timestamp": base.isoformat(),
+        }
+    )
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
@@ -112,14 +196,14 @@ def generate_sample_data(num_records=100, output_path=None, env="dev", seed=42):
     print(f"Generated {len(records)} records to {output_path}")
 
 
-def _parse_args(argv=None):
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse the generator's command-line arguments."""
     parser = argparse.ArgumentParser(description="Generate sample pipeline input.")
-    parser.add_argument("--env", default="dev", choices=["dev", "test", "prod"],
-                        help="Environment input directory to write into")
+    parser.add_argument(
+        "--env", default="dev", choices=["dev", "test", "prod"], help="Environment input directory to write into"
+    )
     parser.add_argument("--output", help="Explicit output path; overrides --env")
-    parser.add_argument("--records", type=int, default=100,
-                        help="Number of valid random records to generate")
+    parser.add_argument("--records", type=int, default=100, help="Number of valid random records to generate")
     return parser.parse_args(argv)
 
 

@@ -55,12 +55,14 @@ def build_error_envelope(
         original = invalid_df["_raw_json"].astype(str)
     else:
         original = invalid_df.apply(lambda r: r.to_json(date_format="iso"), axis=1)
-    return pd.DataFrame({
-        "original_json": original,
-        "error_type": invalid_df["error_reason"].map(classify_error),
-        "error_details": invalid_df["error_reason"].str.strip(),
-        "ingestion_timestamp": ingestion_timestamp.isoformat(),
-    })
+    return pd.DataFrame(
+        {
+            "original_json": original,
+            "error_type": invalid_df["error_reason"].map(classify_error),
+            "error_details": invalid_df["error_reason"].str.strip(),
+            "ingestion_timestamp": ingestion_timestamp.isoformat(),
+        }
+    )
 
 
 def write_error_envelope(

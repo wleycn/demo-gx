@@ -6,9 +6,9 @@ appends an audit column (``_raw_json``) for full replayability in the
 Bronze layer.
 """
 
-import pandas as pd
 from pathlib import Path
-import json
+
+import pandas as pd
 
 from demo_gx.common.time_utils import parse_utc_mixed
 

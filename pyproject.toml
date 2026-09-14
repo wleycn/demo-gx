@@ -15,10 +15,37 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "ruff>=0.16", "mypy>=2.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+# The sole lint and format tool for this project. Configuration lives here and
+# nowhere else: no flake8, no pylint, no standalone ruff.toml.
+target-version = "py310"
+line-length = 120
+src = ["src", "scripts", "tests"]
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I import order, UP pyupgrade, B bugbear,
+# SIM simplify, C4 comprehensions, DTZ naive datetimes, G logging,
+# BLE blind except, RUF ruff-specific.
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4", "DTZ", "G", "BLE", "RUF"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src", "scripts"]
+# Every function carries parameter and return annotations.
+disallow_untyped_defs = true
+warn_unused_ignores = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+# pandas and PyYAML ship no type information and this project does not vendor
+# stub packages. The frame-boundary code is duck-typed on purpose.
+module = ["pandas", "pandas.*", "yaml"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 # The package is installable (`pip install -e .`), which is the primary path.

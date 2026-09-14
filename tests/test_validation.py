@@ -6,11 +6,13 @@ the failure path (a record missing a required field is correctly
 quarantined with a descriptive error reason).
 """
 
-import pytest
-import pandas as pd
-from demo_gx.validation.schema_validator import SchemaValidator
-import yaml
 from pathlib import Path
+
+import pandas as pd
+import pytest
+import yaml
+
+from demo_gx.validation.schema_validator import SchemaValidator
 
 
 @pytest.fixture
@@ -20,7 +22,7 @@ def schema_config():
     Returns:
         dict: Parsed schema configuration from ``config/schema.yaml``.
     """
-    with open(Path(__file__).parent.parent / "config" / "schema.yaml", "r") as f:
+    with open(Path(__file__).parent.parent / "config" / "schema.yaml") as f:
         return yaml.safe_load(f)
 
 
@@ -45,16 +47,20 @@ def _ts(days_ago: float) -> str:
 
 def test_validation_passes(schema_config):
     """A well-formed record should pass validation with zero invalid rows."""
-    df = pd.DataFrame([{
-        "event_id": "123e4567-e89b-42d3-a456-426614174000",
-        "source_system": "web",
-        "customer_id": "cust_001",
-        "event_type": "purchase",
-        "event_timestamp": _ts(1),
-        "amount": 100.0,
-        "currency": "USD",
-        "ingestion_timestamp": _ts(1)
-    }])
+    df = pd.DataFrame(
+        [
+            {
+                "event_id": "123e4567-e89b-42d3-a456-426614174000",
+                "source_system": "web",
+                "customer_id": "cust_001",
+                "event_type": "purchase",
+                "event_timestamp": _ts(1),
+                "amount": 100.0,
+                "currency": "USD",
+                "ingestion_timestamp": _ts(1),
+            }
+        ]
+    )
     validator = SchemaValidator(schema_config, RUN_TS)
     valid, invalid = validator.validate(df)
     assert len(valid) == 1
@@ -63,15 +69,19 @@ def test_validation_passes(schema_config):
 
 def test_validation_fails_missing_field(schema_config):
     """A record missing event_id should be quarantined with an error reason."""
-    df = pd.DataFrame([{
-        "source_system": "web",
-        "customer_id": "cust_001",
-        "event_type": "purchase",
-        "event_timestamp": _ts(1),
-        "amount": 100.0,
-        "currency": "USD",
-        "ingestion_timestamp": _ts(1)
-    }])
+    df = pd.DataFrame(
+        [
+            {
+                "source_system": "web",
+                "customer_id": "cust_001",
+                "event_type": "purchase",
+                "event_timestamp": _ts(1),
+                "amount": 100.0,
+                "currency": "USD",
+                "ingestion_timestamp": _ts(1),
+            }
+        ]
+    )
     validator = SchemaValidator(schema_config, RUN_TS)
     valid, invalid = validator.validate(df)
     assert len(valid) == 0
@@ -87,16 +97,20 @@ def test_validation_fails_future_timestamp(schema_config):
     violations and must not pass into Silver.
     """
     future = _ts(-1)
-    df = pd.DataFrame([{
-        "event_id": "123e4567-e89b-42d3-a456-426614174000",
-        "source_system": "web",
-        "customer_id": "cust_001",
-        "event_type": "purchase",
-        "event_timestamp": future,
-        "amount": 100.0,
-        "currency": "USD",
-        "ingestion_timestamp": _ts(1)
-    }])
+    df = pd.DataFrame(
+        [
+            {
+                "event_id": "123e4567-e89b-42d3-a456-426614174000",
+                "source_system": "web",
+                "customer_id": "cust_001",
+                "event_type": "purchase",
+                "event_timestamp": future,
+                "amount": 100.0,
+                "currency": "USD",
+                "ingestion_timestamp": _ts(1),
+            }
+        ]
+    )
     validator = SchemaValidator(schema_config, RUN_TS)
     valid, invalid = validator.validate(df)
     assert len(valid) == 0
@@ -122,11 +136,12 @@ def _valid_row(**overrides):
 
 def test_validation_fails_non_numeric_amount(schema_config):
     """A non-numeric amount must quarantine that row, not crash the batch."""
-    df = pd.DataFrame([
-        _valid_row(),
-        _valid_row(event_id="223e4567-e89b-42d3-a456-426614174000",
-                   customer_id="cust_002", amount="abc"),
-    ])
+    df = pd.DataFrame(
+        [
+            _valid_row(),
+            _valid_row(event_id="223e4567-e89b-42d3-a456-426614174000", customer_id="cust_002", amount="abc"),
+        ]
+    )
     validator = SchemaValidator(schema_config, RUN_TS)
     valid, invalid = validator.validate(df)
     assert len(valid) == 1
@@ -156,14 +171,13 @@ def test_validation_fails_non_v4_uuid(schema_config):
 
 def test_validation_passes_mixed_timestamp_formats(schema_config):
     """A column mixing timezones/precisions must parse every row (format='mixed')."""
-    df = pd.DataFrame([
-        _valid_row(event_id="123e4567-e89b-42d3-a456-426614174010",
-                   event_timestamp="2026-01-01T00:00:00Z"),
-        _valid_row(event_id="223e4567-e89b-42d3-a456-426614174011",
-                   event_timestamp="2026-01-01T00:00:00+08:00"),
-        _valid_row(event_id="323e4567-e89b-42d3-a456-426614174012",
-                   event_timestamp="2026-01-01T00:00:00.123456"),
-    ])
+    df = pd.DataFrame(
+        [
+            _valid_row(event_id="123e4567-e89b-42d3-a456-426614174010", event_timestamp="2026-01-01T00:00:00Z"),
+            _valid_row(event_id="223e4567-e89b-42d3-a456-426614174011", event_timestamp="2026-01-01T00:00:00+08:00"),
+            _valid_row(event_id="323e4567-e89b-42d3-a456-426614174012", event_timestamp="2026-01-01T00:00:00.123456"),
+        ]
+    )
     validator = SchemaValidator(schema_config, RUN_TS)
     valid, invalid = validator.validate(df)
     assert len(invalid) == 0

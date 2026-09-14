@@ -7,7 +7,6 @@ columns (prefixed with ``_``) rather than silently overwriting data.
 """
 
 import pandas as pd
-from datetime import datetime
 
 from demo_gx.common.time_utils import parse_utc_mixed
 

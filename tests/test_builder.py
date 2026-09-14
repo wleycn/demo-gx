@@ -6,6 +6,7 @@ these tests protect the aggregation logic (dev-review: previously zero-tested).
 """
 
 import pandas as pd
+
 from demo_gx.curation.builder import GoldBuilder
 
 
@@ -13,19 +14,39 @@ def _silver_df():
     """Two customers across two event dates, one duplicate-key-free sample."""
     rows = [
         # 2026-01-01: cust_a 2 purchases, cust_b 1 purchase
-        {"event_id": "a1", "event_date": pd.Timestamp("2026-01-01").date(),
-         "customer_id": "cust_a", "event_type": "purchase",
-         "event_timestamp": pd.Timestamp("2026-01-01T00:00:00Z"), "amount": 10.0},
-        {"event_id": "a2", "event_date": pd.Timestamp("2026-01-01").date(),
-         "customer_id": "cust_a", "event_type": "purchase",
-         "event_timestamp": pd.Timestamp("2026-01-01T01:00:00Z"), "amount": 20.0},
-        {"event_id": "b1", "event_date": pd.Timestamp("2026-01-01").date(),
-         "customer_id": "cust_b", "event_type": "click",
-         "event_timestamp": pd.Timestamp("2026-01-01T02:00:00Z"), "amount": 5.0},
+        {
+            "event_id": "a1",
+            "event_date": pd.Timestamp("2026-01-01").date(),
+            "customer_id": "cust_a",
+            "event_type": "purchase",
+            "event_timestamp": pd.Timestamp("2026-01-01T00:00:00Z"),
+            "amount": 10.0,
+        },
+        {
+            "event_id": "a2",
+            "event_date": pd.Timestamp("2026-01-01").date(),
+            "customer_id": "cust_a",
+            "event_type": "purchase",
+            "event_timestamp": pd.Timestamp("2026-01-01T01:00:00Z"),
+            "amount": 20.0,
+        },
+        {
+            "event_id": "b1",
+            "event_date": pd.Timestamp("2026-01-01").date(),
+            "customer_id": "cust_b",
+            "event_type": "click",
+            "event_timestamp": pd.Timestamp("2026-01-01T02:00:00Z"),
+            "amount": 5.0,
+        },
         # 2026-01-02: cust_a 1 purchase
-        {"event_id": "a3", "event_date": pd.Timestamp("2026-01-02").date(),
-         "customer_id": "cust_a", "event_type": "purchase",
-         "event_timestamp": pd.Timestamp("2026-01-02T00:00:00Z"), "amount": 7.0},
+        {
+            "event_id": "a3",
+            "event_date": pd.Timestamp("2026-01-02").date(),
+            "customer_id": "cust_a",
+            "event_type": "purchase",
+            "event_timestamp": pd.Timestamp("2026-01-02T00:00:00Z"),
+            "amount": 7.0,
+        },
     ]
     return pd.DataFrame(rows)
 
@@ -62,8 +83,7 @@ def test_wide_table_joins_without_column_collision():
 
 
 def test_builder_handles_empty_input():
-    empty = pd.DataFrame(columns=["event_id", "event_date", "customer_id",
-                                  "event_type", "event_timestamp", "amount"])
+    empty = pd.DataFrame(columns=["event_id", "event_date", "customer_id", "event_type", "event_timestamp", "amount"])
     fact = GoldBuilder.build_fact_table(empty)
     dims = GoldBuilder.build_dimensions(empty)
     wide = GoldBuilder.build_wide_table(fact, dims)

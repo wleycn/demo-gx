@@ -2,6 +2,7 @@
 """Unit tests for the cleaning module (DataCleaner)."""
 
 import pandas as pd
+
 from demo_gx.transformation.cleaner import DataCleaner
 
 
@@ -39,9 +40,11 @@ def test_standardize_timestamps_keeps_existing_raw_backup():
 
 def test_normalize_currency_uppercases_and_flags_non_whitelist():
     """Lowercase codes uppercase; codes outside the whitelist become USD+flag."""
-    df = pd.DataFrame([
-        _clean_df().iloc[0].to_dict(),
-    ])
+    df = pd.DataFrame(
+        [
+            _clean_df().iloc[0].to_dict(),
+        ]
+    )
     df["currency"] = "usd"
     out = DataCleaner.normalize_currency(df)
     assert out["currency"].iloc[0] == "USD"

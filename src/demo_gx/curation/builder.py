@@ -32,9 +32,7 @@ class GoldBuilder:
         if "event_date" not in df.columns:
             df["event_date"] = pd.to_datetime(df["event_timestamp"]).dt.date
         fact = df.groupby(["event_date", "customer_id", "event_type"], as_index=False).agg(
-            event_count=("event_id", "count"),
-            total_amount=("amount", "sum"),
-            avg_amount=("amount", "mean")
+            event_count=("event_id", "count"), total_amount=("amount", "sum"), avg_amount=("amount", "mean")
         )
         return fact
 

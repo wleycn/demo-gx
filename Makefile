@@ -4,7 +4,7 @@
 PYTHON := .venv/bin/python
 ENV    ?= dev
 
-.PHONY: setup data run test clean
+.PHONY: setup data run test lint clean
 
 ## First run only: create the virtualenv and install the package in editable mode.
 ## Dependencies are declared once in pyproject.toml; there is no separate lock file.
@@ -24,6 +24,12 @@ run: data
 ## Run the pytest suite
 test:
 	$(PYTHON) -m pytest tests/ -v
+
+## Lint, format check and type check. All three read pyproject.toml.
+lint:
+	$(PYTHON) -m ruff check src scripts tests
+	$(PYTHON) -m ruff format --check src scripts tests
+	$(PYTHON) -m mypy
 
 ## Remove run artefacts. Committed sample inputs and the layer skeleton stay.
 ## NOTE: do not reduce this to `rm -rf data/*/output/*`. That expands to the

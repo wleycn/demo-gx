@@ -8,6 +8,7 @@ and timing information, then persists them to a JSON file.
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 
 class MetricsCollector:
@@ -18,13 +19,13 @@ class MetricsCollector:
     are saved as a JSON file for monitoring and SLA evaluation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the metrics collector with default values.
 
         The ``start_time`` is recorded at construction; ``end_time`` is set
         when :meth:`save` is called.
         """
-        self.metrics = {
+        self.metrics: dict[str, Any] = {
             "start_time": datetime.now(timezone.utc).isoformat(),
             "input_rows": 0,
             "valid_rows": 0,
@@ -35,7 +36,7 @@ class MetricsCollector:
             "errors": [],
         }
 
-    def increment(self, key, value=1):
+    def increment(self, key: str, value: int = 1) -> None:
         """Increment a metric counter by the given value.
 
         If the key does not yet exist, it is created.
@@ -49,7 +50,7 @@ class MetricsCollector:
         else:
             self.metrics[key] = value
 
-    def set(self, key, value):
+    def set(self, key: str, value: Any) -> None:
         """Set a metric to an explicit value, overwriting any prior value.
 
         Args:
@@ -58,7 +59,7 @@ class MetricsCollector:
         """
         self.metrics[key] = value
 
-    def add_error(self, error_msg):
+    def add_error(self, error_msg: str) -> None:
         """Append an error message to the error list.
 
         Args:
@@ -66,7 +67,7 @@ class MetricsCollector:
         """
         self.metrics["errors"].append(error_msg)
 
-    def save(self, output_path):
+    def save(self, output_path: str) -> None:
         """Persist the collected metrics to a JSON file.
 
         Records the ``end_time``, creates parent directories if needed,

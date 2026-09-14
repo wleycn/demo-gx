@@ -6,8 +6,9 @@ contract (``schema.yaml``) so that no other module needs to hard-code paths.
 """
 
 import os
-import yaml
 from pathlib import Path
+
+import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -33,7 +34,7 @@ def load_config(env: str = "dev") -> dict:
     config_path = PROJECT_ROOT / "config" / f"{env}.yaml"
     if not config_path.exists():
         raise FileNotFoundError(f"Config file {config_path} not found")
-    with open(config_path, "r") as f:
+    with open(config_path) as f:
         config = yaml.safe_load(f)
     # Optional environment-variable override
     # e.g. if STORAGE_BASE_PATH is set, override the configured base path
@@ -77,5 +78,5 @@ def load_schema() -> dict:
     schema_path = PROJECT_ROOT / "config" / "schema.yaml"
     if not schema_path.exists():
         raise FileNotFoundError(f"Schema file {schema_path} not found")
-    with open(schema_path, "r") as f:
+    with open(schema_path) as f:
         return yaml.safe_load(f)

@@ -2,6 +2,7 @@
 """Unit tests for the deduplication module (Deduplicator)."""
 
 import pandas as pd
+
 from demo_gx.transformation.deduplicator import Deduplicator
 
 

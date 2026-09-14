@@ -13,21 +13,22 @@ import argparse
 import os
 import sys
 from pathlib import Path
+
 import pandas as pd
 
 from demo_gx.common.config import PROJECT_ROOT, load_config, load_schema
-from demo_gx.common.logger import setup_logging, get_logger
+from demo_gx.common.logger import setup_logging
 from demo_gx.common.metrics import MetricsCollector
 from demo_gx.common.time_utils import parse_utc_mixed
+from demo_gx.curation.builder import GoldBuilder
 from demo_gx.ingestion.reader import read_input, write_bronze
-from demo_gx.validation.schema_validator import SchemaValidator
-from demo_gx.validation.error_envelope import write_error_envelope
 from demo_gx.transformation.cleaner import DataCleaner
 from demo_gx.transformation.deduplicator import Deduplicator
-from demo_gx.curation.builder import GoldBuilder
+from demo_gx.validation.error_envelope import write_error_envelope
+from demo_gx.validation.schema_validator import SchemaValidator
 
 
-def main():
+def main() -> None:
     """Run the pipeline end-to-end from the command line.
 
     Parses ``--env`` and the optional ``--input`` / ``--event-date`` arguments,
@@ -43,14 +44,16 @@ def main():
     os.chdir(PROJECT_ROOT)
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="dev", choices=["dev", "test", "prod"])
-    parser.add_argument("--input",
-                        help="Path to the input file; defaults to the environment's "
-                             "inbound drop location (<env root>/input/sample_data.json)")
+    parser.add_argument(
+        "--input",
+        help="Path to the input file; defaults to the environment's "
+        "inbound drop location (<env root>/input/sample_data.json)",
+    )
     parser.add_argument("--event-date", help="Override event date for processing (YYYY-MM-DD)")
     parser.add_argument(
         "--run-timestamp",
         help="ISO-8601 run timestamp injected by the orchestrator; "
-             "defaults to the wall clock read once at this entry boundary",
+        "defaults to the wall clock read once at this entry boundary",
     )
     args = parser.parse_args()
 
@@ -69,14 +72,9 @@ def main():
     # bare `python -m demo_gx.cli --env test` runs with no path argument. Both
     # the directory and the file name come from config, never from a literal
     # here (AGENTS.md section 3 red line 5).
-    input_path = args.input or str(
-        Path(config["storage"]["input_root"]) / config["storage"]["input_file"]
-    )
-    logger = setup_logging(
-        level=config["logging"]["level"],
-        log_file=config["logging"].get("file")
-    )
-    logger.info(f"Starting pipeline with env={args.env}, input={input_path}")
+    input_path = args.input or str(Path(config["storage"]["input_root"]) / config["storage"]["input_file"])
+    logger = setup_logging(level=config["logging"]["level"], log_file=config["logging"].get("file"))
+    logger.info("Starting pipeline with env=%s, input=%s", args.env, input_path)
     metrics = MetricsCollector()
 
     try:
@@ -84,7 +82,7 @@ def main():
         logger.info("Reading input...")
         raw_df = read_input(input_path)
         metrics.increment("input_rows", len(raw_df))
-        logger.info(f"Read {len(raw_df)} rows")
+        logger.info("Read %s rows", len(raw_df))
 
         # 1b. Archive every raw record to Bronze (before any quality gate,
         #     so rows later quarantined are still preserved for replay/audit)
@@ -105,9 +103,9 @@ def main():
             # them so the validator quarantines them instead of dropping them
             # silently outside the scope (round-2 writer QC #10)
             raw_df = raw_df[(evt_date == target_date) | evt_date.isna()]
-            logger.info(f"--event-date {args.event_date}: processing {len(raw_df)} scoped rows")
+            logger.info("--event-date %s: processing %s scoped rows", args.event_date, len(raw_df))
             if raw_df.empty:
-                logger.warning(f"No rows with event_date={args.event_date}, stopping.")
+                logger.warning("No rows with event_date=%s, stopping.", args.event_date)
                 metrics.save(config["metrics"]["output_file"])
                 return
 
@@ -118,7 +116,7 @@ def main():
         valid_df, invalid_df = validator.validate(raw_df)
         metrics.increment("valid_rows", len(valid_df))
         metrics.increment("invalid_rows", len(invalid_df))
-        logger.info(f"Valid: {len(valid_df)}, Invalid: {len(invalid_df)}")
+        logger.info("Valid: %s, Invalid: %s", len(valid_df), len(invalid_df))
         # Write invalid records to the error quarantine area
         if not invalid_df.empty:
             errors_path = Path(config["storage"]["output_root"]) / config["storage"]["errors_subpath"] / "bad_schema"
@@ -126,7 +124,7 @@ def main():
             # layer (INTERFACE-DESIGN.md section 4); the orchestrator only
             # supplies the destination and the run timestamp.
             write_error_envelope(invalid_df, errors_path, run_ts)
-            logger.warning(f"Invalid records written to {errors_path}")
+            logger.warning("Invalid records written to %s", errors_path)
 
         if valid_df.empty:
             logger.warning("No valid records, stopping.")
@@ -152,7 +150,7 @@ def main():
             dup_log.parent.mkdir(parents=True, exist_ok=True)
             with open(dup_log, "a") as f:
                 duplicates_df.to_csv(f, index=False, header=False)
-            logger.info(f"Duplicates logged to {dup_log}")
+            logger.info("Duplicates logged to %s", dup_log)
         metrics.increment("silver_rows", len(deduped_df))
         # DATA-DESIGN.md section 2.3: _processed_timestamp is added automatically at
         # write time (pipeline processing timestamp, UTC), injected by the
@@ -167,7 +165,7 @@ def main():
             part_path = silver_path / f"event_date={date_str}"
             part_path.mkdir(parents=True, exist_ok=True)
             group.to_parquet(part_path / "data.parquet", index=False)
-            logger.info(f"Silver data written to {part_path}")
+            logger.info("Silver data written to %s", part_path)
 
         # 6. Build Gold layer — ALWAYS from the on-disk Silver snapshot, never
         #    from the in-memory batch: dims and wide are full snapshots, so a
@@ -214,10 +212,11 @@ def main():
         logger.info("Pipeline completed successfully.")
 
     except Exception as e:
-        logger.error(f"Pipeline failed: {e}", exc_info=True)
+        logger.exception("Pipeline failed: %s", e)
         metrics.add_error(str(e))
         metrics.save(config["metrics"]["output_file"])
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

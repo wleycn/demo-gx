@@ -22,6 +22,17 @@ unit-test:
   script:
     - python -m pytest tests/ -v
 
+lint:
+  stage: test
+  image: python:3.11
+  before_script:
+    - pip install --cache-dir "$PIP_CACHE_DIR" -e ".[dev]"
+  script:
+    # All three tools read their configuration from pyproject.toml.
+    - ruff check src scripts tests
+    - ruff format --check src scripts tests
+    - mypy
+
 data-quality:
   stage: data-quality
   image: python:3.11
