@@ -74,8 +74,9 @@ under each environment's `output/` directory (`data/{env}/output/`) and are git-
 
 ## Security and Privacy
 
-- **Sensitive fields** such as `customer_id` can be configured for masking or hashing. The
-  mask is applied at the Silver layer, so Gold never holds the raw value.
+- **Sensitive fields** are listed under `pii` in the environment config. Each listed field is
+  replaced by a keyed digest at the ingestion boundary, before the `_raw_json` audit copy is
+  built. No layer below ingestion holds the clear value.
 - **Credentials** come from environment variables or a secret manager (for example Vault).
   They never appear in code, config files, or logs.
 - **Audit records**: each run records its input source, output paths, and row counts, so a

@@ -1,19 +1,21 @@
 # [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Input ingestion module.
 
-Provides a unified reader that auto-detects file format by extension and
-appends an audit column (``_raw_json``) for full replayability in the
-Bronze layer.
+Provides a unified reader that auto-detects file format by extension,
+masks direct identifiers at the ingestion boundary and appends an audit column
+(``_raw_json``) for full replayability in the Bronze layer.
 """
 
+from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
 
+from demo_gx.common.mask import mask_columns
 from demo_gx.common.time_utils import parse_utc_mixed
 
 
-def read_input(file_path: str) -> pd.DataFrame:
+def read_input(file_path: str, masked_fields: Iterable[str] | None = None, pepper: str = "") -> pd.DataFrame:
     """Read a structured input file into a DataFrame.
 
     Supports ``.json`` (read line-by-line with ``lines=True``), ``.csv``,
@@ -21,9 +23,16 @@ def read_input(file_path: str) -> pd.DataFrame:
     row containing the row's original JSON string, enabling audit and
     replay in the Bronze layer.
 
+    Masking happens before that audit copy is built, so the masked value is
+    what Bronze, Silver, Gold, the quarantine envelopes and the logs all carry.
+
     Args:
         file_path (str): Path to the input file.  May be a string or
             ``pathlib.Path``.
+        masked_fields (Iterable[str] | None): Columns to replace with a keyed
+            digest.  Supplied by the caller from configuration.
+        pepper (str): Key for the mask digest, see
+            :func:`demo_gx.common.mask.mask_value`.
 
     Returns:
         pandas.DataFrame: The loaded data with an additional ``_raw_json``
@@ -52,6 +61,11 @@ def read_input(file_path: str) -> pd.DataFrame:
     # (dev-review: input-column collision).
     if "_raw_json" in df.columns:
         df = df.rename(columns={"_raw_json": "_raw_json_user"})
+    # Mask direct identifiers before the audit copy below is built. This is the
+    # ingestion boundary the table contracts name, so no clear-text identifier
+    # reaches Bronze, Silver, Gold, the quarantine or the logs.
+    if masked_fields:
+        df = mask_columns(df, masked_fields, pepper)
     # date_format="iso": without it, datetime columns serialize to epoch
     # milliseconds and replay silently lands in 1970 (dev-review critical)
     df["_raw_json"] = df.apply(lambda row: row.to_json(date_format="iso"), axis=1)

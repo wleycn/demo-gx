@@ -62,9 +62,10 @@ for post-hoc review.
 ## PII and Masking
 
 - **Direct identifiers**: `customer_id` is the only one. `event_id` is a surrogate key and carries no personal data.
-- **Raw copy**: `_raw_json` holds the full original record, so it holds `customer_id` as well.
-- **Masking today**: none. This demo stores `customer_id` in clear text.
-- **Production rule**: mask at the Bronze entry boundary. Masking later leaves the clear value inside `_raw_json`, which is the copy kept for replay.
+- **Masking today**: `customer_id` is replaced by a keyed digest at the ingestion boundary. The masked form is `h_` plus 16 hex characters.
+- **Raw copy**: `_raw_json` holds the masked value, because the mask runs before that column is built. Bronze, Silver, Gold and the quarantine envelopes all carry the masked form.
+- **Why a digest and not a redaction**: Gold groups events by `customer_id` and `dim_customer` holds one row per distinct value. A redaction such as `cust_***` would collapse every customer into a single bucket and change the Gold row counts.
+- **Production note**: the demo config leaves `pii.pepper` empty, so the digest is reproducible from the input alone. A real deployment injects the key from the secret store.
 
 ## Lifecycle
 

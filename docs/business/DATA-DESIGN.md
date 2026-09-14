@@ -100,7 +100,7 @@ Environment-isolated directory structure. Each environment has its own root, tak
 
 ### 2.2 Bronze Layer (Raw JSON Lines)
 
-**Storage**: one `events.json` per partition in JSON Lines format, one raw event per line. Archived as ingested: no cleaning, no quality judgement. Values keep their JSON types (pandas round-trips a JSON integer like `10` as `10.0`). Rows that are later quarantined at the Silver gate are still present here.
+**Storage**: one `events.json` per partition in JSON Lines format, one raw event per line. Archived as ingested, with one exception: configured identifiers are already masked at the ingestion boundary. No cleaning and no quality judgement otherwise. Values keep their JSON types (pandas round-trips a JSON integer like `10` as `10.0`). Rows that are later quarantined at the Silver gate are still present here.
 **Partition keys**: `source_system` (top-level directory) plus `dt` (ingestion date derived from `ingestion_timestamp`). Missing source or timestamp falls back to `unknown` and the run date respectively.
 **Idempotency**: partition-scoped overwrite. Re-running the same batch rewrites the same `events.json` for each partition. A production Bronze would append new files instead.
 
@@ -108,7 +108,7 @@ Environment-isolated directory structure. Each environment has its own root, tak
 |---|---|---|---|
 | `event_id` | string | Unique event ID | UUID v4 format |
 | `source_system` | string | Source system (partition key) | Any raw value; no enum check at this layer |
-| `customer_id` | string | Customer ID | None |
+| `customer_id` | string | Customer ID, masked at the ingestion boundary | Keyed digest of the form `h_` plus 16 hex characters |
 | `event_type` | string | Event type | None |
 | `event_timestamp` | string | Event time (ISO-8601, raw) | Kept as original string |
 | `amount` | number | Amount (original) | May be invalid; not yet validated |

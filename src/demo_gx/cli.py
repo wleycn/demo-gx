@@ -78,9 +78,14 @@ def main() -> None:
     metrics = MetricsCollector()
 
     try:
-        # 1. Read input
+        # 1. Read input. Direct identifiers are masked here, at the ingestion
+        #    boundary, so nothing downstream holds a clear-text value.
         logger.info("Reading input...")
-        raw_df = read_input(input_path)
+        pii = config.get("pii", {})
+        masked_fields = pii.get("masked_fields", [])
+        raw_df = read_input(input_path, masked_fields=masked_fields, pepper=pii.get("pepper", ""))
+        if masked_fields:
+            logger.info("Masked %s field(s) at the ingestion boundary", len(masked_fields))
         metrics.increment("input_rows", len(raw_df))
         logger.info("Read %s rows", len(raw_df))
 

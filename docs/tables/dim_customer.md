@@ -41,7 +41,8 @@ Not applicable. This table carries no monetary field.
 ## PII and Masking
 
 - **Direct identifier**: `customer_id`. This table exists to list those identifiers, so the whole table is sensitive.
-- **Masking today**: none in this demo. Production masking belongs at the Bronze entry boundary.
+- **Masking today**: `customer_id` arrives already masked. The pipeline masks it at the ingestion boundary, so this table holds the digest and never the clear value.
+- **Distinctness preserved**: the digest is injective, so "one row per customer" still holds and the row count is unchanged by masking.
 - **Cross-reference**: the full statement lives in [silver_events.md](silver_events.md) under "PII and Masking".
 
 ## Lifecycle

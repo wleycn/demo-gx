@@ -6,7 +6,7 @@ Each module is responsible for one thing only and communicates via standardized 
 
 | Module directory | Script file | Core responsibility | Exposed interface |
 |---|---|---|---|
-| `ingestion/` | `reader.py` | Read raw data (JSON/CSV/Parquet) and append `_raw_json` audit column; archive arriving records to Bronze | `read_input(file_path)`, `write_bronze(raw_df, bronze_base, run_ts)` |
+| `ingestion/` | `reader.py` | Read raw data (JSON/CSV/Parquet), mask configured identifiers, then append the `_raw_json` audit column; archive arriving records to Bronze | `read_input(file_path, masked_fields, pepper)`, `write_bronze(raw_df, bronze_base, run_ts)` |
 | `validation/` | `schema_validator.py` | Strict data-contract validation (field existence, type, enum, pattern, minimum, future time) | `class SchemaValidator` with `__init__(schema_config, run_ts)` and `validate(df) -> (valid_df, invalid_df)` |
 | `validation/` | `error_envelope.py` | Build the quarantine error envelope and map validator reasons to the coarse `error_type` | `classify_error(reason)`, `build_error_envelope(invalid_df, ingestion_timestamp)`, `write_error_envelope(invalid_df, errors_dir, ingestion_timestamp)` |
 | `transformation/` | `cleaner.py` | Timestamp UTC standardization, currency normalization, amount numeric check | `class DataCleaner` with `standardize_timestamps(df)`, `normalize_currency(df)`, `check_amount(df)` |
@@ -16,6 +16,7 @@ Each module is responsible for one thing only and communicates via standardized 
 | `common/` | `logger.py` | Structured JSON logging | `setup_logging(level, log_file)`, `get_logger(name)` |
 | `common/` | `metrics.py` | Run metrics collection and persistence | `class MetricsCollector` |
 | `common/` | `time_utils.py` | Shared timestamp parsing policy | `parse_utc_mixed(series)` |
+| `common/` | `mask.py` | Single entry point for PII masking: keyed digest for configured columns | `mask_value(value, pepper)`, `mask_columns(df, columns, pepper)` |
 | `demo_gx/` | `cli.py` | Package entry point: parse arguments, orchestrate the full pipeline | `main()` |
 
 ## 2. Module Interface Contracts
@@ -24,7 +25,7 @@ All paths in this section are relative to `src/demo_gx/`.
 
 ### 2.1 ingestion/reader.py
 
-**Description**: Auto-selects the read engine based on the file path suffix (`.json`, `.csv`, `.parquet`). After reading, each row retains its original JSON string in the `_raw_json` column for audit and replay.
+**Description**: Auto-selects the read engine based on the file path suffix (`.json`, `.csv`, `.parquet`). Configured identifiers are masked before the audit copy is built, so the masked value is what reaches Bronze and every later layer. After reading, each row retains its JSON string in the `_raw_json` column for audit and replay.
 **Input**: file path (string or Path object).
 **Output**: Pandas DataFrame containing the raw data and a `_raw_json` column.
 **Exception handling**: a missing file or an unsupported suffix raises immediately (fail fast, never a silent skip). The CLI logs the error and exits non-zero. Retry belongs to the orchestration layer, not the CLI.

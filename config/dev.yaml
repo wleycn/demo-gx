@@ -17,3 +17,11 @@ metrics:
 
 alert:
   slack_webhook: ""  # left empty; only configured in production
+
+pii:
+  # Columns replaced by a keyed digest at the ingestion boundary, before the
+  # _raw_json audit copy is built (AGENTS.md section 3 red line 4).
+  masked_fields: ["customer_id"]
+  # HMAC key for the mask digest. Empty in the demo; a real deployment injects
+  # it from the secret store rather than committing it.
+  pepper: ""
