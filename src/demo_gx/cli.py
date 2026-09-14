@@ -79,7 +79,7 @@ def main():
         # 1b. Archive every raw record to Bronze (before any quality gate,
         #     so rows later quarantined are still preserved for replay/audit)
         logger.info("Writing Bronze archive...")
-        bronze_base = Path(config["storage"]["base_path"]) / config["storage"]["bronze_subpath"]
+        bronze_base = Path(config["storage"]["output_root"]) / config["storage"]["bronze_subpath"]
         bronze_written = write_bronze(raw_df, bronze_base, run_ts)
         metrics.increment("bronze_rows", bronze_written)
 
@@ -111,7 +111,7 @@ def main():
         logger.info(f"Valid: {len(valid_df)}, Invalid: {len(invalid_df)}")
         # Write invalid records to the error quarantine area
         if not invalid_df.empty:
-            errors_path = Path(config["storage"]["base_path"]) / config["storage"]["errors_subpath"] / "bad_schema"
+            errors_path = Path(config["storage"]["output_root"]) / config["storage"]["errors_subpath"] / "bad_schema"
             # Envelope fields and reason classification belong to the validation
             # layer (INTERFACE-DESIGN.md section 4); the orchestrator only
             # supplies the destination and the run timestamp.
@@ -138,7 +138,7 @@ def main():
         deduped_df, duplicates_df = deduper.deduplicate(cleaned_df)
         metrics.increment("duplicates_removed", len(duplicates_df))
         if not duplicates_df.empty:
-            dup_log = Path(config["storage"]["base_path"]) / config["storage"]["errors_subpath"] / "duplicates.log"
+            dup_log = Path(config["storage"]["output_root"]) / config["storage"]["errors_subpath"] / "duplicates.log"
             dup_log.parent.mkdir(parents=True, exist_ok=True)
             with open(dup_log, "a") as f:
                 duplicates_df.to_csv(f, index=False, header=False)
@@ -150,7 +150,7 @@ def main():
         deduped_df["_processed_timestamp"] = run_ts
 
         # 5. Write Silver layer
-        silver_path = Path(config["storage"]["base_path"]) / config["storage"]["silver_subpath"]
+        silver_path = Path(config["storage"]["output_root"]) / config["storage"]["silver_subpath"]
         # Partition by event_date
         for date, group in deduped_df.groupby("event_date"):
             date_str = date.strftime("%Y-%m-%d")
@@ -164,7 +164,7 @@ def main():
         #    --event-date scoped (backfill) run must not rebuild them from the
         #    scoped subset or rows/first_seen_date would be lost (round-2 QC #7).
         logger.info("Building Gold layer...")
-        silver_base = Path(config["storage"]["base_path"]) / config["storage"]["silver_subpath"]
+        silver_base = Path(config["storage"]["output_root"]) / config["storage"]["silver_subpath"]
         silver_files = sorted(silver_base.glob("event_date=*/data.parquet"))
         if silver_files:
             gold_input = pd.concat([pd.read_parquet(f) for f in silver_files], ignore_index=True)
@@ -176,7 +176,7 @@ def main():
         wide_df = builder.build_wide_table(fact_df, dims)
 
         # Write Gold outputs
-        gold_base = Path(config["storage"]["base_path"]) / config["storage"]["gold_subpath"]
+        gold_base = Path(config["storage"]["output_root"]) / config["storage"]["gold_subpath"]
         # Fact table (partitioned)
         for date, group in fact_df.groupby("event_date"):
             date_str = date.strftime("%Y-%m-%d")

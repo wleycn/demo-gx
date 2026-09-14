@@ -2,8 +2,8 @@
 # Usage: make setup | data | run | test | clean
 
 PYTHON := .venv/bin/python
-INPUT  := data/sample_data.json
 ENV    ?= dev
+INPUT  ?= data/$(ENV)/input/sample_data.json
 
 .PHONY: setup data run test clean
 
@@ -13,9 +13,10 @@ setup:
 	python3 -m venv .venv
 	$(PYTHON) -m pip install -e ".[dev]"
 
-## Generate sample input data (data/sample_data.json)
+## Generate the sample input for the selected environment
+## (data/$(ENV)/input/sample_data.json)
 data:
-	$(PYTHON) scripts/generate_sample_data.py
+	$(PYTHON) scripts/generate_sample_data.py --env $(ENV)
 
 ## Run the full pipeline (override env: ENV=test make run)
 run: data

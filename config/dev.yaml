@@ -1,5 +1,7 @@
 storage:
-  base_path: "./data"
+  base_path: "./data/dev"      # environment root
+  input_subpath: "input"      # inbound drop location
+  output_subpath: "output"    # everything the pipeline writes
   bronze_subpath: "bronze"
   silver_subpath: "silver"
   gold_subpath: "gold"

@@ -6,6 +6,7 @@ enum, future timestamp, duplicate event_id) for testing validation,
 cleaning, and deduplication logic.
 """
 
+import argparse
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -13,7 +14,7 @@ import random
 from pathlib import Path
 
 
-def generate_sample_data(num_records=100, output_path="data/sample_data.json"):
+def generate_sample_data(num_records=100, output_path=None, env="dev"):
     """Generate sample event records and write them as JSON Lines.
 
     Produces ``num_records`` valid random records, then appends several
@@ -29,10 +30,14 @@ def generate_sample_data(num_records=100, output_path="data/sample_data.json"):
     Args:
         num_records (int): Number of valid random records to generate.
             Defaults to 100.
-        output_path (str): Path to the output JSON Lines file.  Defaults
-            to ``"data/sample_data.json"`` (under the git-ignored artifact
-            directory, keeping the repo root clean).
+        output_path (str | None): Path to the output JSON Lines file.
+            Defaults to ``data/{env}/input/sample_data.json`` — the inbound
+            drop location of the selected environment.
+        env (str): Environment whose input directory receives the file when
+            ``output_path`` is omitted.  One of ``dev``, ``test``, ``prod``.
     """
+    if output_path is None:
+        output_path = f"data/{env}/input/sample_data.json"
     records = []
     random.seed(42)  # pins the random draws only; event_id (uuid4) and the
     # timestamps still differ per run, so the sample file is not byte-stable
@@ -76,5 +81,17 @@ def generate_sample_data(num_records=100, output_path="data/sample_data.json"):
             f.write(json.dumps(rec) + "\n")
     print(f"Generated {len(records)} records to {output_path}")
 
+def _parse_args(argv=None):
+    """Parse the generator's command-line arguments."""
+    parser = argparse.ArgumentParser(description="Generate sample pipeline input.")
+    parser.add_argument("--env", default="dev", choices=["dev", "test", "prod"],
+                        help="Environment input directory to write into")
+    parser.add_argument("--output", help="Explicit output path; overrides --env")
+    parser.add_argument("--records", type=int, default=100,
+                        help="Number of valid random records to generate")
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
-    generate_sample_data()
+    args = _parse_args()
+    generate_sample_data(num_records=args.records, output_path=args.output, env=args.env)
