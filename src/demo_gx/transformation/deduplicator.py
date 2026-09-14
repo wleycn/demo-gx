@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Deduplication module.
 
 Removes duplicate events based on business key (``event_id``), keeping the

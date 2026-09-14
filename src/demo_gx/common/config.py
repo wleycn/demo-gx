@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Configuration and schema loading utilities.
 
 This module centralizes access to YAML configuration files and the data

@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Unit tests for the Gold-layer builder (GoldBuilder).
 
 The fact/dimension/wide construction is the numeric heart of the Gold layer;

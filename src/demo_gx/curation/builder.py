@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Gold-layer curation module.
 
 Builds the star-schema data products (fact table, dimension tables, and a

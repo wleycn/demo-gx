@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Unit tests for the schema validation module.
 
 Tests cover the happy path (a fully valid record passes validation) and

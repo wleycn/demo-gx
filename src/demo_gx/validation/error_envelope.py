@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-14 reviewed_by=pending
 """Error envelope construction and quarantine write for schema validation failures.
 
 Owns two things the orchestrator must not: the mapping from a validator

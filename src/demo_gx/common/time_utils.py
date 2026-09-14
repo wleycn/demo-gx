@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Shared time-parsing utilities for the pipeline.
 
 Timestamp-parsing policy lives in ONE place so the validator, cleaner, CLI,

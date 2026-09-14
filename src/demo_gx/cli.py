@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Command-line entry point for the data pipeline.
 
 The CLI orchestrates the full ETL flow:

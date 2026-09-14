@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Schema validation module.
 
 Implements strict-mode validation against the data contract defined in

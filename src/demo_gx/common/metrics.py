@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Metrics collection for pipeline runs.
 
 Provides a lightweight collector that tracks row counts, error messages,

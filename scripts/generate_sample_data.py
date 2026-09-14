@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Sample data generator for the pipeline.
 
 Generates a representative JSON Lines file with valid records plus

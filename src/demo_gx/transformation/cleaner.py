@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Data cleaning and normalization module.
 
 Provides transformations that standardize timestamps, normalize currency

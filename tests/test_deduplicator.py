@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Unit tests for the deduplication module (Deduplicator)."""
 
 import pandas as pd

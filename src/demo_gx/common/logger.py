@@ -1,3 +1,4 @@
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
 """Structured logging utilities for the pipeline.
 
 Provides a JSON-formatted logger that outputs one JSON object per log line,
