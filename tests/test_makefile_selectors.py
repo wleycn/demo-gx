@@ -107,3 +107,50 @@ def test_check_data_reads_the_same_selectors_in_either_case():
     lower = command_for("check-data", "env=test", "layer=gold", "table=dim_customer")
     assert upper == lower
     assert value_of(upper, "--layer") == "gold"
+
+
+def test_an_exported_variable_sharing_a_selector_name_is_ignored():
+    # make imports the whole environment, and shells set COLUMNS for terminal
+    # width, so an exported name must never turn into a selector on its own.
+    argv = command_for(
+        "show-data",
+        COLUMNS="80",
+        ENV="prod",
+        TABLE="fact_daily_events",
+        FORMAT="json",
+        LIMIT="1",
+    )
+    assert "--columns" not in argv
+    assert value_of(argv, "--env") == "dev"
+    assert value_of(argv, "--table") == ""
+    assert value_of(argv, "--format") == "table"
+    assert value_of(argv, "--limit") == "10"
+
+
+def test_an_exported_lowercase_alias_is_ignored():
+    argv = command_for("show-data", columns="customer_id", layer="gold", schema="1")
+    assert "--columns" not in argv
+    assert "--schema" not in argv
+    assert value_of(argv, "--layer") == "all"
+
+
+@pytest.mark.parametrize("value", ["1", "yes", "true", "on"])
+def test_schema_turns_on(value):
+    assert "--schema" in command_for("show-data", f"SCHEMA={value}")
+
+
+@pytest.mark.parametrize("value", ["0", "no", "false", "off"])
+def test_schema_turns_off(value):
+    assert "--schema" not in command_for("show-data", f"SCHEMA={value}")
+
+
+def test_schema_stops_the_build_on_a_value_that_is_neither_on_nor_off():
+    result = subprocess.run(
+        ["make", "-n", "show-data", "SCHEMA=maybe"],
+        cwd=REPO_ROOT,
+        env=_environment(),
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0, result.stdout
+    assert "SCHEMA" in result.stderr

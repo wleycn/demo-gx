@@ -65,7 +65,7 @@ demo-gx/
 │   ├── changes/              # Per-module change logs
 │   ├── rules/                # Engineering rules (structure / coding / flow / acceptance)
 │   └── archive/              # Superseded documents and the original assessment prompt
-├── tests/                    # pytest suite (77 tests)
+├── tests/                    # pytest suite (88 tests)
 ├── scripts/generate_sample_data.py
 ├── scripts/check_data.py     # Read-only artefact verifier behind `make check-data`
 ├── scripts/show_data.py      # Read-only viewer behind `make show-data`
@@ -89,6 +89,8 @@ committed so a fresh clone runs out of the box. Everything the pipeline writes g
 Two read-only commands inspect a run. `make check-data` judges it against the table contracts, and
 `make show-data` prints the rows themselves. Both take the same selectors: `LAYER`, `TABLE` and `DATE`,
 and either case works, so `DATE=2026-09-01` and `date=2026-09-01` are the same selector.
+A selector counts only when it is given on the command line, so an exported `COLUMNS` or `ENV`
+cannot turn into one.
 
 ### Verify a run
 
@@ -126,6 +128,9 @@ make show-data DATE=2026-09-01                            # one partition only
 make show-data LAYER=gold TABLE=fact_daily_events date=2026-09-01   # the same, lowercase
 make show-data LAYER=gold TABLE=wide_daily_user_events date=2026-09-01
 ```
+
+`SCHEMA` is a switch rather than a value: `1`, `yes`, `true` and `on` turn it on, `0`, `no`,
+`false` and `off` turn it off, and any other value stops the build instead of being ignored.
 
 Exit codes: `0` something was shown,
 `2` the request does not match the data, `3` nothing to look at. With `FORMAT=json` or `csv` the rows

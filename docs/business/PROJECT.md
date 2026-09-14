@@ -19,7 +19,7 @@ pipeline: Bronze (raw archive) to Silver (cleaned detail) to Gold (curated star 
 | Data engine | Pandas (single machine) | Data volume assumption < 10 GB per batch; lightweight and fast |
 | Table format | Parquet (partitioned directories) | Columnar, high compression, analytics-friendly |
 | Config | YAML (environment-specific) | Sensitive values injected via environment variables |
-| Testing | pytest | 77 tests, all passing |
+| Testing | pytest | 88 tests, all passing |
 | CI | GitLab CI (`.gitlab-ci.yml`) | Required by the assignment |
 | Orchestration | Makefile + CLI; Airflow blueprint only | No runnable DAG in this repo |
 
@@ -48,7 +48,7 @@ demo-gx/
 │   ├── changes/              # Per-module change logs
 │   ├── rules/                # Engineering rules (structure / coding / flow / acceptance)
 │   └── archive/              # Superseded documents (architecture / data-design / module-design / requirements / change-logs / known-issues) + raw/ (original prompt)
-├── tests/                    # pytest suite (77 tests)
+├── tests/                    # pytest suite (88 tests)
 ├── scripts/generate_sample_data.py
 ├── scripts/check_data.py     # Read-only artefact verifier behind `make check-data`
 ├── scripts/show_data.py      # Read-only viewer behind `make show-data`

@@ -6,17 +6,37 @@ PYTHON := .venv/bin/python
 # `make show-data date=...` behave the same. The uppercase form is the documented
 # one, and the lowercase form is what people type on the way there. Mixed case
 # (`Date=`) is still a typo, because make compares variable names exactly.
+# A selector counts only when it comes from the command line, because make
+# imports the whole environment: a shell sets `COLUMNS` for terminal width, and
+# that name must not silently become the `--columns` argument.
 #   check-data and show-data: ENV=dev|test|prod, LAYER=all|bronze|silver|gold|errors,
 #                             TABLE=<name>, DATE=YYYY-MM-DD
-#   show-data only: LIMIT=<rows or lines>, COLUMNS=a,b, FORMAT=table|json|csv, SCHEMA=1
-ENV     ?= $(or $(env),dev)
-LAYER   ?= $(or $(layer),all)
-TABLE   ?= $(table)
-DATE    ?= $(date)
-LIMIT   ?= $(or $(limit),10)
-COLUMNS ?= $(columns)
-FORMAT  ?= $(or $(format),table)
-SCHEMA  ?= $(schema)
+#   show-data only: LIMIT=<rows or lines>, COLUMNS=a,b, FORMAT=table|json|csv,
+#                   SCHEMA=1|yes|true|on (off: 0|no|false|off, or leave it out)
+# $(call cmdline,NAME,default) — NAME as typed on the command line, else the default.
+# The test reads $(origin) and not the value, so a typed `TABLE=` stays empty.
+cmdline = $(if $(filter command,$(origin $(1))),$($(1)),$(2))
+
+ENV     := $(call cmdline,ENV,$(call cmdline,env,dev))
+LAYER   := $(call cmdline,LAYER,$(call cmdline,layer,all))
+TABLE   := $(call cmdline,TABLE,$(call cmdline,table,))
+DATE    := $(call cmdline,DATE,$(call cmdline,date,))
+LIMIT   := $(call cmdline,LIMIT,$(call cmdline,limit,10))
+COLUMNS := $(call cmdline,COLUMNS,$(call cmdline,columns,))
+FORMAT  := $(call cmdline,FORMAT,$(call cmdline,format,table))
+SCHEMA  := $(call cmdline,SCHEMA,$(call cmdline,schema,))
+
+# SCHEMA is a switch, not a value: the on-words turn it on and the off-words turn
+# it off, so `SCHEMA=0` reads as off instead of "non-empty, therefore on".
+# Anything else stops the build, because a mistyped switch is not an answer.
+SCHEMA_ON  := 1 yes true on
+SCHEMA_OFF := 0 no false off
+ifneq ($(SCHEMA),)
+ifneq ($(filter $(SCHEMA_ON) $(SCHEMA_OFF),$(SCHEMA)),$(SCHEMA))
+$(error SCHEMA must be one of $(SCHEMA_ON) (on) or $(SCHEMA_OFF) (off), not "$(SCHEMA)")
+endif
+endif
+SCHEMA_FLAG := $(if $(filter $(SCHEMA_ON),$(SCHEMA)),--schema,)
 
 .PHONY: setup data run test lint check-data show-data clean
 
@@ -66,7 +86,7 @@ check-data:
 show-data:
 	@$(PYTHON) scripts/show_data.py --env $(ENV) --layer $(LAYER) --table "$(TABLE)" --limit $(LIMIT) \
 		--format $(FORMAT) $(if $(DATE),--event-date $(DATE),) \
-		$(if $(COLUMNS),--columns "$(COLUMNS)",) $(if $(SCHEMA),--schema,)
+		$(if $(COLUMNS),--columns "$(COLUMNS)",) $(SCHEMA_FLAG)
 
 ## Remove run artefacts. Committed sample inputs and the layer skeleton stay.
 ## NOTE: do not reduce this to `rm -rf data/*/output/*`. That expands to the
