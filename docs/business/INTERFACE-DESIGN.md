@@ -65,15 +65,15 @@ Strict mode rejects unknown fields not in this list.
 | test | `./data/test` | `config/test.yaml` |
 | prod | `./data/prod` | `config/prod.yaml` |
 
-Each environment root splits by direction:
+Each environment root splits by direction. The example is dev; test and prod mirror it under `data/test/` and `data/prod/`:
 
 ```text
-{storage.base_path}/
-├── input/          # inbound drop location; where --input defaults to
+data/dev/
+├── input/          # inbound drop location; where --input defaults to (sample_data.json)
 └── output/         # everything the pipeline writes
 ```
 
-Every path shape below is relative to `output/`, written `{output_root}`.
+Every path shape below is relative to `output/`, written `{output_root}`. In dev that resolves to `data/dev/output/`.
 
 ### 3.2 Bronze
 

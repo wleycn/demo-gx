@@ -9,7 +9,7 @@ The deviation table in `AGENTS.md` §10 points to the anchors in this document. 
 **Symptom**: the project does not run a coverage tool. There is no `--cov` flag in the pytest configuration or CI pipeline.
 **Root cause**: the upstream rule requires coverage of at least 80 percent for projects with CI. This project's CI skeleton defines test and data-quality stages but does not wire a coverage tool.
 **Impact**: there is no automated check that new code is covered by tests. The baseline is "at least one assertion per requirement" plus manual review.
-**Disposition**: accepted. The project has 27 tests covering contract edge cases. Adding a coverage gate is a future improvement, not a blocking issue for a reference implementation.
+**Disposition**: accepted. The project has 35 tests covering contract edge cases. Adding a coverage gate is a future improvement, not a blocking issue for a reference implementation.
 **Related**: AGENTS.md (deviation: coverage gate), tests/.
 ---
 

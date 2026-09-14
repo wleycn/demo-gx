@@ -50,7 +50,7 @@ demo-gx/
 │   ├── transformation/cleaner.py        # DataCleaner
 │   ├── transformation/deduplicator.py   # Deduplicator
 │   ├── curation/builder.py              # GoldBuilder (fact / dims / wide)
-│   └── common/               # config.py, logger.py, metrics.py, time_utils.py
+│   └── common/               # config.py, logger.py, mask.py, metrics.py, time_utils.py
 ├── config/                   # dev.yaml / test.yaml / prod.yaml + schema.yaml (data contract)
 ├── data/                     # Per-env storage: {env}/input committed, {env}/output ignored
 ├── docs/
@@ -59,14 +59,16 @@ demo-gx/
 │   ├── changes/              # Per-module change logs
 │   ├── rules/                # Engineering rules (structure / coding / flow / acceptance)
 │   └── archive/              # Superseded documents and the original assessment prompt
-├── tests/                    # pytest suite (27 tests)
+├── tests/                    # pytest suite (35 tests)
 ├── scripts/generate_sample_data.py
 ├── scripts/hooks/pre-commit  # Pre-commit gate hook (copy into .git/hooks)
 ├── scripts/hooks/commit-msg  # Commit-message provenance hook (same install step)
-├── Makefile                  # setup / data / run / test / clean
+├── Makefile                  # setup / data / run / test / lint / clean
 ├── pyproject.toml            # Single entry for dependencies, packaging and pytest config
-├── .gitlab-ci.yml            # CI skeleton (test -> data-quality -> promote)
+├── .gitlab-ci.yml            # CI skeleton: test + lint -> data-quality -> manual promote
 ├── .gitattributes            # Line-ending policy (md=CRLF, code=LF)
+├── .gitignore                # Ignores the virtualenv, run artefacts and caches
+├── AGENTS.md                 # AI coding constraints (red lines and conduct)
 └── README.md
 ```
 

@@ -67,12 +67,12 @@ The pipeline reads a JSON file and distributes each record through three layers.
 
 ### 2.1 Storage Layout
 
-Environment-isolated directory structure. Each environment has its own root, taken from the `storage.base_path` config setting. The root is split into `input/` (inbound) and `output/` (what the pipeline writes). INTERFACE-DESIGN.md section 3.1 lists the root for each environment.
+Environment-isolated directory structure. Each environment has its own root, set by the `storage.base_path` config item: `data/dev`, `data/test` and `data/prod`. The root splits into `input/` (inbound) and `output/` (what the pipeline writes). The tree below shows dev; test and prod have the same shape under their own root. Subdirectory names are the defaults of the `storage.*_subpath` config items.
 
 ```text
-{storage.base_path}/output/
+data/dev/output/
 ├── bronze/                        # Raw JSON archive (immutable)
-│   └── {source_system}/
+│   └── {source_system}/             # the sample data uses api / web / mobile / unknown
 │       └── dt={YYYY-MM-DD}/
 │           └── events.json
 ├── silver/                        # Cleaned detail layer (Parquet)
@@ -97,6 +97,8 @@ Environment-isolated directory structure. Each environment has its own root, tak
 └── logs/
     └── pipeline.log
 ```
+
+A dev run therefore writes real paths such as `data/dev/output/bronze/web/dt=2026-09-14/events.json`, `data/dev/output/silver/event_date=2026-09-14/data.parquet` and `data/dev/output/gold/dim_customer/data.parquet`.
 
 ### 2.2 Bronze Layer (Raw JSON Lines)
 
@@ -149,7 +151,7 @@ Errors are written to `errors/bad_schema/` as JSON Lines, one error object per l
 
 The Bronze/Silver/Gold layouts above are directory and file layouts that the single-machine demo writes today. In the target big-data environment the same layers would be managed as Iceberg tables. Data files remain Parquet, but a catalog plus metadata layer adds ACID transactions, partition evolution, snapshot isolation, and time travel.
 Prepared Iceberg DDL assets (Spark SQL dialect) are available in the archived `docs/archive/data-design.md` section 6. These document the target shape and are ready to run once a big-data environment is available. They are not executable in this repository's current environment.
-The mapping between demo and production equivalents. Paths start at `{storage.base_path}/output/`:
+The mapping between demo and production equivalents. Paths start at the environment's `output/` root, which is `data/dev/output/` in dev:
 
 | Demo (this repo, Pandas) | Production equivalent (Iceberg/Spark) |
 |---|---|
