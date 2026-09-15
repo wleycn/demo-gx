@@ -5,6 +5,7 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-15
 
+- `fc87eff` docs: show the configuration split in the layout trees [AI]
 - `6f9cca6` docs(interface): publish the inspection CLI contract and close two rule drifts [AI]
 - `11e1a1f` fix(config): carry the config layout through the code, the tests and the documents [AI]
 - `a748aae` [AI] fix send_email path references across SSQ and fin-risk scripts
