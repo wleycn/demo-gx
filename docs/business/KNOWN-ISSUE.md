@@ -18,7 +18,7 @@ The deviation table in the "Skeleton Deviations" section points to the anchors d
 **Symptom**: the project has no `catalog.py` and no concept of a unified compute session. Bronze, Silver, and Gold are plain directory paths on the local file system.
 **Root cause**: the skeleton provides a `catalog.py` entry point only for projects that have a catalog (Iceberg / Hive); this project has none. It runs on Pandas with local Parquet files. There is no Spark session, no Iceberg catalog, and no table registry.
 **Impact**: table metadata (schema, partitions) is implicit in the directory structure, not registered in a catalog. Time travel and snapshot isolation are not available.
-**Disposition**: accepted for the local demo. The production shape would use an Iceberg catalog. See DATA-DESIGN section 2.7 for the Iceberg DDL reference.
+**Disposition**: accepted for the local demo. The production shape would use an Iceberg catalog. See `sql/reference/iceberg_target_shape.sql` for the Iceberg DDL reference.
 **Related**: DATA-DESIGN.md (section 2.7, production table format reference), KNOWN-ISSUE.md "Skeleton Deviations" (conditional skeleton item, not a deviation).
 ---
 
@@ -36,8 +36,8 @@ The deviation table in the "Skeleton Deviations" section points to the anchors d
 **Symptom**: the `amount` column in Silver and Gold is stored as pandas `float64`, not as a `DECIMAL` type.
 **Root cause**: the upstream rule prohibits `float` for monetary values. Pandas does not have a native `DECIMAL` type; `float64` is the default numeric type. Converting to `decimal.Decimal` would break vectorized operations and significantly slow down the pipeline.
 **Impact**: floating-point arithmetic can introduce rounding errors in `total_amount` and `avg_amount` aggregations. For a demo with small data this is not visible, but it would be a correctness issue in production.
-**Disposition**: migration item. The production shape uses `DECIMAL(18,2)` in the Iceberg DDL (see DATA-DESIGN section 2.7, Silver and Gold table definitions).
-**Related**: DATA-DESIGN.md (section 2.7, Iceberg DDL), AGENTS.md section 3 (red line: amount float), AGENTS.md (deviation: amount precision).
+**Disposition**: migration item. The production shape uses `DECIMAL(18,2)` in the Iceberg DDL (see `sql/reference/iceberg_target_shape.sql`, the Silver and Gold table definitions).
+**Related**: `sql/reference/iceberg_target_shape.sql` (Iceberg DDL), AGENTS.md section 3 (red line: amount float), AGENTS.md (deviation: amount precision).
 ---
 
 ### #table-contract-approval — No approval chain for table contracts
@@ -133,7 +133,7 @@ Items that the skeleton presents as **conditional** are not deviations. Upstream
 - **Entry point inside the package, not in `scripts/`**: the two directories would share assumptions rather than separate them, because the entry hardcodes its `--env` values and `tests/` imports four pipeline components as libraries. The merge is accepted because there is no second caller. Its cost is command-line side effects in library code.
 - **Transformation by stage not domain**: single business domain (events) means domain-split would produce singleton directories. Stage boundaries are the real reusable boundaries. `common/` fills the cross-stage shared layer role.
 - **No `src/demo_gx/models/`**: `config/contract/schema.yaml` and `docs/tables/` are the single sources of truth. A Python model layer would create a second definition.
-- **No `sql/`**: no SQL engine; schema changes tracked through `schema.yaml` and table contracts. Iceberg DDL assets are in DATA-DESIGN.md section 2.7 as a production-shape reference only.
+- **No `sql/migrations/` or `sql/transforms/`**: no SQL engine, so schema changes are tracked through `schema.yaml` and the table contracts. The target-shape DDL sits in `sql/reference/` as a reference asset that nothing executes.
 - **Flat tests**: one file per module; mirroring would add a directory level per test file. `test_validation.py` covers `validation/schema_validator.py`.
 - **Bronze/Silver/Gold naming**: maps to upstream `ods/dwd/dws/ads` via `DOMAIN-LANGUAGE.md` term `data layer mapping`.
 

@@ -9,6 +9,7 @@
 *.ini       text eol=lf
 *.txt       text eol=lf
 *.json      text eol=lf
+*.sql       text eol=lf
 *.parquet   binary
 .gitignore  text eol=lf
 .gitattributes text eol=lf

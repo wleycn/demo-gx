@@ -102,6 +102,7 @@ For a functional or contract change, **append** one entry to `docs/changes/{modu
 | Interface contract | `docs/business/INTERFACE-DESIGN.md` | CLI arguments, artefact paths, error envelope: the single source of truth |
 | Data contract | `docs/business/DATA-DESIGN.md` | Layered data flow, table structures, partitioning and rerun semantics |
 | Table contracts | `docs/tables/{table}.md` | One file per table: grain / primary key / dedup method / lifecycle |
+| Production-shape DDL | `sql/reference/iceberg_target_shape.sql` | Target Iceberg DDL (Spark SQL) for Bronze / Silver / Gold; a reference asset that nothing executes |
 | Field contract source | `config/contract/schema.yaml` | Field types / required / enums / regular expressions |
 | Environment config | `config/env/dev.yaml`, `config/env/test.yaml`, `config/env/prod.yaml` | Storage paths / logging / metrics / alerting |
 | Product code | `src/demo_gx/` | Installable package; entry `cli.py`, modules `common` / `ingestion` / `validation` / `transformation` / `curation` |

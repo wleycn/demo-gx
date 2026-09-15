@@ -85,7 +85,7 @@
 ### 1. Structure Skeleton (additions on top of `python/PROJECT-STRUCTURE.md`, adopt as needed)
 
 > A data-processing project has exactly **three built-in parts**: the table contract (`docs/tables/`, see §3), the layering dependency direction (see §2) and the configuration directory layout (see below). Everything listed below appears **only with a given technology choice**; a line marked "only when ..." is created only when that condition holds.
-> A local Pandas pipeline, for example, has no scheduler (so no `dags/`), no catalog (so no `catalog.py`) and no SQL (so no `sql/`). Not creating these directories is not a deviation.
+> A local Pandas pipeline, for example, has no scheduler (so no `dags/`), no catalog (so no `catalog.py`) and executes no SQL (so no `sql/migrations/` or `sql/transforms/`). Target-shape DDL kept as a reference only goes in `sql/reference/`.
 > The project's actual structure is in the project map of the root `AGENTS.md` and in `docs/business/PROJECT.md`.
 
 ```text
@@ -99,6 +99,7 @@
 ├── src/{pkg}/catalog.py         # 🔴 single entry point: session, catalog, table loading, maintenance ops (only when there is a catalog, e.g. Iceberg / Hive)
 ├── sql/migrations/              # V{N}__{desc}.sql incremental DDL (only when the table structure is managed by SQL migrations)
 ├── sql/transforms/              # SQL transform scripts, by business domain (only when transforms are written in SQL)
+├── sql/reference/               # reference assets: target-shape DDL / examples, not executable (only when such assets exist)
 ├── docs/tables/{table}.md       # table contract: one md per table
 └── tests/{fixtures,pipelines}/  # only when tests need sample data on disk / per-pipeline subdirectories
 ```
@@ -112,6 +113,7 @@
 | `models/` | schema and type definitions | Business logic |
 | `{shared}/` | Single entry point for cross-module shared capabilities | Referencing concrete business modules |
 | `sql/migrations/` | schema evolution incremental scripts | Modifying an already-committed number, manual execution in production |
+| `sql/reference/` | reference assets: **non-executable** scripts such as target-shape DDL | Being referenced by a scheduler or a migration tool; read as an executable migration |
 | `notebooks/` | Exploratory analysis | Referenced by production scheduling, committing outputs and credentials |
 
 ### 2. Layering and Dependency Direction 🔴

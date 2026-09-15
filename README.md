@@ -68,6 +68,7 @@ demo-gx/
 │   ├── tables/               # Per-table contracts (one file per table)
 │   ├── changes/              # Per-module change logs
 │   └── rules/                # Engineering rules (structure / coding / flow / acceptance)
+├── sql/reference/            # Target-shape Iceberg DDL (reference asset: nothing executes it)
 ├── tests/                    # pytest suite (88 tests)
 ├── scripts/generate_sample_data.py
 ├── scripts/check_data.py     # Read-only artefact verifier behind `make check-data`
