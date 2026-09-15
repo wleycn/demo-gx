@@ -5,6 +5,7 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-15
 
+- `2f5f2eb` refactor(sql): move the target-shape DDL into sql/reference/ [AI]
 - `b542cd6` docs: drop the archive and fold the Iceberg DDL into DATA-DESIGN [AI]
 - `cf13763` refactor(config): rename the data contract half of config/ to contract/ [AI]
 - `fc87eff` docs: show the configuration split in the layout trees [AI]
