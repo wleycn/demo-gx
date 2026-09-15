@@ -104,6 +104,7 @@ docs/changes/
 
 ### 5.1 The 40% threshold
 - A single AI-generated **code change must not exceed 40% of the file's total volume**; above that it must be split into multiple operations
+- The threshold applies **only to files that reach 200 lines after the change**; below that the file is not limited (a small file is cheap to review even when rewritten whole). The line count is measured on the file **after** the change
 - After each operation, verify the compile/run status (per stack: `mvn compile` / `vue-tsc --noEmit` / `python -m compileall` + static checks)
 
 ### 5.2 Context loading constraints
