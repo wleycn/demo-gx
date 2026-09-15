@@ -5,6 +5,8 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-15
 
+- `b542cd6` docs: drop the archive and fold the Iceberg DDL into DATA-DESIGN [AI]
+- `cf13763` refactor(config): rename the data contract half of config/ to contract/ [AI]
 - `fc87eff` docs: show the configuration split in the layout trees [AI]
 - `6f9cca6` docs(interface): publish the inspection CLI contract and close two rule drifts [AI]
 - `11e1a1f` fix(config): carry the config layout through the code, the tests and the documents [AI]
