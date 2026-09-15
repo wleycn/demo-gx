@@ -5,8 +5,13 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-15
 
+- `6f9cca6` docs(interface): publish the inspection CLI contract and close two rule drifts [AI]
+- `11e1a1f` fix(config): carry the config layout through the code, the tests and the documents [AI]
+- `a748aae` [AI] fix send_email path references across SSQ and fin-risk scripts
+- `0de1385` docs: record the selector hardening and the rename in the changelog [AI]
 - `ca9605d` refactor(show-data): finish the show rename inside the viewer [AI]
 - `80ec9f2` fix(make): read selectors only from the command line and treat SCHEMA as a switch [AI]
+- `5a97c8d` docs: record the selector case fix in the changelog [AI]
 - `490a662` fix(make): accept the inspection selectors in either case [AI]
 
 ## 2026-09-14
