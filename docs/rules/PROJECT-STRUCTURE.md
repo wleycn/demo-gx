@@ -90,8 +90,9 @@
 
 ```text
 {project}/
-├── config/env/{env}.yaml        # one file per environment: storage paths / logging / metrics / alerting 🔴 configuration is read from here only
-├── config/data/schema.yaml      # data contract source: field types / required / enums / patterns / ranges
+├── config/                      # configuration, split by purpose
+│   ├── env/{env}.yaml           # one file per environment: storage paths / logging / metrics / alerting 🔴 configuration is read from here only
+│   └── data/schema.yaml         # data contract source: field types / required / enums / patterns / ranges
 ├── dags/                        # orchestration: dependency assembly only, no transform logic 🔴 (only when a scheduler exists, e.g. Airflow / Dagster)
 ├── src/{pkg}/pipelines/{domain}/ # read/write transform logic (only when a domain needs a further pipeline split; the domain directory itself comes from the stack layer)
 ├── src/{pkg}/models/            # schema / contract models, aligned with the table contract 🔴 (only when the contract becomes code models)
