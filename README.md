@@ -16,6 +16,8 @@ Python 3.10 or later, and `make` (Linux/macOS). Every step has a `make` target; 
 | 4 | `make test` | Run the pytest suite |
 | 5 | `make lint` | Check lint, formatting and type annotations (ruff + mypy) |
 | 6 | `make clean` | Remove all run artifacts for a clean re-run |
+| 7 | `make check-data` | reads what a run produced and compares it with the table contracts in `docs/tables/` |
+| 8 | `make show-data` | prints the rows themselves, LAYER=gold TABLE=fact_daily_events DATE=2026-09-01 |
 
 Manual equivalents (no `make`):
 
@@ -84,59 +86,6 @@ Each environment writes under `data/{env}/`. What you feed in goes to `input/`, 
 committed so a fresh clone runs out of the box. Everything the pipeline writes goes to
 `output/`, which is git-ignored and rebuildable: `make clean` then `make run`.
 
-## Inspecting the Output
-
-Two read-only commands inspect a run. `make check-data` judges it against the table contracts, and
-`make show-data` prints the rows themselves. Both take the same selectors: `LAYER`, `TABLE` and `DATE`,
-and either case works, so `DATE=2026-09-01` and `date=2026-09-01` are the same selector.
-A selector counts only when it is given on the command line, so an exported `COLUMNS` or `ENV`
-cannot turn into one.
-
-### Verify a run
-
-`make check-data` reads what a run produced and compares it with the table contracts in `docs/tables/`.
-It exits non-zero when a check fails, so it serves as a verification step too.
-
-```bash
-make check-data                               # every layer, every table
-make check-data LAYER=gold                    # one layer
-make check-data LAYER=gold TABLE=fact_daily_events
-make check-data DATE=2026-09-01               # one partition only
-make check-data LAYER=gold TABLE=fact_daily_events date=2026-09-01   # the same, lowercase
-```
-
-The layer is a parameter, because the layers are structural. The table is discovered from disk, so a
-table added to the pipeline is checked without editing the tool. Exit codes: `0` every check passed,
-`1` a check failed, `2` no such table, `3` nothing was scanned.
-
-It reports file and partition counts, row counts, column and type parity against the contract, the
-declared partition key, business primary key uniqueness, and whether every field under
-`pii.masked_fields` is masked. The layer layout is in `docs/business/DATA-DESIGN.md`.
-
-### Show the rows
-
-`make show-data` prints the rows themselves, so it answers "what does the data look like". It never
-fails on a data defect: a table that breaks its contract is exactly the table you want to look at.
-
-```bash
-make show-data                                            # every layer, 10 rows each
-make show-data LAYER=gold TABLE=fact_daily_events LIMIT=5
-make show-data LAYER=gold TABLE=dim_customer SCHEMA=1     # names and types only
-make show-data LAYER=gold TABLE=fact_daily_events COLUMNS=event_date,total_amount
-make show-data LAYER=gold TABLE=fact_daily_events FORMAT=json   # rows on stdout
-make show-data DATE=2026-09-01                            # one partition only
-make show-data LAYER=gold TABLE=fact_daily_events date=2026-09-01   # the same, lowercase
-make show-data LAYER=gold TABLE=wide_daily_user_events date=2026-09-01
-```
-
-`SCHEMA` is a switch rather than a value: `1`, `yes`, `true` and `on` turn it on, `0`, `no`,
-`false` and `off` turn it off, and any other value stops the build instead of being ignored.
-
-Exit codes: `0` something was shown,
-`2` the request does not match the data, `3` nothing to look at. With `FORMAT=json` or `csv` the rows
-go to stdout and the report moves to stderr, so a pipe carries data only. Without `DATE` the read
-starts at the first partition in name order, and the report names every partition the shown rows came
-from.
 
 ## Pre-commit Gate
 

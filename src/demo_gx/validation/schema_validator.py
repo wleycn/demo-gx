@@ -72,12 +72,15 @@ class SchemaValidator:
         df = df.copy()
         # Initialize error-reason column (always present to avoid downstream
         # read/write errors on a non-existent column)
+
         df["_error_reason"] = ""
         invalid_mask = pd.Series(False, index=df.index)
+        
         # 1. Check for extra (unknown) fields
         actual_fields = set(df.columns)
         # Exclude internal columns (_raw_json audit column, _error_reason
         # error column) so they are not mistaken for extra schema fields
+
         extra_fields = actual_fields - self.expected_fields - {"_raw_json", "_error_reason"}
         if extra_fields:
             # Strict mode: reject rows whose ORIGINAL record carries any

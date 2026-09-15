@@ -36,6 +36,7 @@ class MetricsCollector:
             "errors": [],
         }
 
+
     def increment(self, key: str, value: int = 1) -> None:
         """Increment a metric counter by the given value.
 
@@ -50,6 +51,7 @@ class MetricsCollector:
         else:
             self.metrics[key] = value
 
+
     def set(self, key: str, value: Any) -> None:
         """Set a metric to an explicit value, overwriting any prior value.
 
@@ -59,6 +61,7 @@ class MetricsCollector:
         """
         self.metrics[key] = value
 
+
     def add_error(self, error_msg: str) -> None:
         """Append an error message to the error list.
 
@@ -66,6 +69,7 @@ class MetricsCollector:
             error_msg (str): A human-readable error description.
         """
         self.metrics["errors"].append(error_msg)
+
 
     def save(self, output_path: str) -> None:
         """Persist the collected metrics to a JSON file.

@@ -98,26 +98,6 @@ under each environment's `output/` directory (`data/{env}/output/`) and are git-
 - **Single-machine fit**: Pandas keeps the demo runnable inside the stated volume assumption
   of under 10 GB per batch.
 
-## Verification Commands
-
-```bash
-# Run the pipeline
-make run
-# Run tests
-make test
-# Lint, format check and type check
-make lint
-# Inspect what a run wrote, against the table contracts
-make check-data
-# Show the rows a run wrote
-make show-data LAYER=gold TABLE=fact_daily_events
-# Or manually
-.venv/bin/python -m demo_gx.cli --env dev
-.venv/bin/python -m pytest tests/ -q
-.venv/bin/python -m ruff check src scripts tests
-.venv/bin/python -m ruff format --check src scripts tests
-.venv/bin/python -m mypy
-```
 
 ## Document Navigation
 

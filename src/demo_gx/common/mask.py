@@ -1,4 +1,4 @@
-# [AI-GENERATED] model=deepseek-flash date=2026-09-14 reviewed_by=pending
+# [AI-GENERATED] model=deepseek-flash date=2026-09-14 reviewed_by=Rocky
 """PII masking for the ingestion boundary.
 
 Direct identifiers are replaced by a keyed digest as records enter the

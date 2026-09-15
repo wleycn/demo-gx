@@ -36,24 +36,19 @@
 | `docs/` | Standards and business documents | Drifting from the code (changing code must be synced) |
 | `docs/changes/` | Change trail (one per module, append-only) | Writing non-change content (explanations, attachments, temporary files) |
 
-> **Why `src/` and `scripts/` are not merged**: the two are invoked in different ways. `src/` is library code that is `import`ed: possibly installed, packaged and reused in many places. `scripts/` are entries invoked **as commands** by shell / cron / a scheduler, containing `if __name__ == "__main__"` and argument parsing. The benefits of separating them: ① library code does not carry command-line side effects because of an entry; ② changing scheduling shell arguments does not affect the library; ③ permission and path assumptions differ (a shell may depend on env / argv, a library must not).
-> **Boundary where merging is allowed** (keep only `src/` only when all three hold): ① there are only 1-2 entries; ② the entries contain no scheduler-specific assumptions (hardcoded absolute paths, fixed env names); ③ there is no library code that would be reused outside the shell. If any one fails -> keep them separate. After merging, use `python -m {pkg}.cli` as the entry and still write no script files.
 
 ## 3. Single Entry Point Files (Single Entry Point Principle)
-
-> **The path follows the project structure layer**: `{shared}/` is the cross-module capability directory, for example `utils/` or `common/`. The module name follows the structure layer as well. The constraint is **one implementation per capability**, not one particular file name. A capability the project genuinely does not need does not require a module. Once it is needed, it goes through the entry point in this table.
 
 | Single entry point | File | Responsibility |
 |---|---|---|
 | Configuration and credentials | `{shared}/config.py` | env / secret loading, typed output (Pydantic Settings), with validation |
-| Paths | In a project: the project root anchor in the next row; system scripts: `path_anchor.py` / `path_resolve.py` (see skill `path-ssot-governance`) | **No** `Path.home()` / `expanduser` / direct `import dotenv` |
-| Paths (project root) | `Path(__file__).resolve().parents[k]` | Projects always derive from `__file__` and **do not depend on an external shared library** (a shared `path_anchor` applies only to system scripts hosted under a unified infrastructure directory) |
+| Paths | `Path(__file__).resolve().parents[k]` | Projects always derive from `__file__` and **do not depend on an external shared library** |
 | Logging | `{shared}/logger.py` | `get_logger(__name__)`, with run_id / target / row count / elapsed time |
 | Retry | `{shared}/retry.py` | Unified retry and conflict handling; **unified gate**: all four categories -- non-zero exit / empty output / timeout / exception -- trigger |
 | Data access | `{shared}/db.py` | Unified connection and query entry (for PG operations see skill `pg-query`) |
 | Redaction | `{shared}/mask.py` | Phone numbers / ID documents / addresses / bank cards |
 
-> 🔴 **The same capability must not be reimplemented outside the single entry point** (including retry, redaction regexes, connection parameter tuning, logging handlers). Changes to system scripts must pass `path_governance_audit.py` with zero violations (see skill `path-ssot-governance`).
+> 🔴 **The same capability must not be reimplemented outside the single entry point** 
 
 ## 4. Naming Conventions
 

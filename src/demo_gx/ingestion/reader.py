@@ -1,4 +1,4 @@
-# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=pending
+# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=Rocky
 """Input ingestion module.
 
 Provides a unified reader that auto-detects file format by extension,

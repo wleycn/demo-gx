@@ -4,7 +4,7 @@
 > Every AI coding tool and agent runtime working in this repository is bound by this file.
 > That includes Hermes Agent itself, along with the coder profiles, delegated subagents and cron jobs it dispatches.
 > Claude Code, Codex, Cursor and other CLI / IDE assistants are equally subject to it.
-> There is exactly one test: **having this repository as cwd means being bound**. A tool not named above is not exempt just because of that. The effective path on the Hermes side is in §8.
+
 
 ## 0. Rule Precedence
 
@@ -86,12 +86,10 @@ For a functional or contract change, **append** one entry to `docs/changes/{modu
 - **Guarantee on the Hermes side**: Hermes and its delegation chain always **start with the project root as cwd**. The delegation chain includes coder profiles, `delegate_task` subagents and cron jobs. A delegation brief must state `cwd=/home/hermes/workspace/demo-gx`. **Do not assume the executor has read this file**; when in doubt, **inline** the §3 red lines into the brief.
 - Red lines must be **made executable**: if something can be written as a lint, a check script or a CI check, do not count on "the model will read it".
 
-## 9. Maps (where to find what · which skill to use)
 
-Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which skill to use at this stage".
+## 9 Project Map (file index)
 
-### 9.1 Project Map (file index)
-
+> answers "where is the thing"
 > Generation rule: fill the table below with files that **actually exist in the project**, and delete inapplicable rows. Paths in the table must be really reachable. The machine gate checks the referenced files under `docs/`, `src/`, `scripts/`, `tests/` and `data/` plus the root files it names. A directory path or a `config/*.yaml` entry has to be verified by the reviewer.
 
 | Category | Location | Purpose |
@@ -114,8 +112,9 @@ Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which sk
 | Change trail | `docs/changes/{module}.md` | One per module, append-only change entries |
 | Gate | `scripts/hooks/pre-commit` and `scripts/hooks/commit-msg`, installed as `.git/hooks/pre-commit` / `.git/hooks/commit-msg` | Calls `ng/tools/pre_commit_gate.py` |
 
-### 9.2 Skill Map (stage → skill)
+## 10 Skill Map (stage → skill)
 
+> answers "which skill to use at this stage".
 > For stage definitions see `docs/rules/DEVELOP-FLOW.md` §1 (ten stages) and §1.1 (stage 4 substeps). The table below links only skills that **actually exist in the skill library**; the names must be resolvable, `pre_commit_gate.py` checks them.
 > Usage: before entering a stage, load that stage's skill (`skill_view`) and execute by its Phase or Step. Replacing a skill flow with "the usual approach" is forbidden.
 
@@ -135,16 +134,3 @@ Neither map is optional. 9.1 answers "where is the thing", 9.2 answers "which sk
 | Cross-cutting (any stage) | `doc-code-drift` (contract and code drift), `post-change-cleanup` (post-change cleanup), `module-retirement` (retiring an old module), `docs-writing-discipline` (before writing documents and reports); daily discipline `ops-basics-discipline` / `path-ssot-governance` / `secret-sprawl-audit` | Stage completion / before delivery / when drift is found |
 | Any stage (specific to this type) | `data-layer-design` (schema and query plan); `verify-data-layer` (independent verification of a data-layer handover); `pg-query`; `performance-benchmarking` | When tables / partitions / a data pipeline are involved |
 
-
-## 10. Rule Provenance and Deviations
-
-- **Provenance**: this project's rules = this file + the `docs/rules/` four-piece set. The four-piece set is assembled verbatim by the assembly tool in three layers: **baseline → tech stack → project type** (`rules_assembly.py`). Assembly only lowers heading levels; it does not change the text of an upper layer, nor delete an upper-layer entry. **Not hand-edited per project**.
-- **Where deviations live**: a place where this project disagrees with the upstream rules is registered item by item in `docs/business/KNOWN-ISSUE.md`, in that file's deviation section. This section holds the discipline and points there; it holds no table of its own.
-- **Deviation discipline**: the standard practice is the **default** and a deviation is the exception. A deviation is allowed only when all four conditions hold:
-  - ① It is registered item by item.
-  - ② Its disposition column points to an anchor that actually exists; writing only "already explained" is forbidden.
-  - ③ It states **why the standard practice is not adopted**; empty reasons such as "this project is special" are forbidden.
-  - ④ It records the cost and the rollback cost.
-- **Silently lowering the standard without registering it is forbidden**. "This is just a one-off case" is not a reason for exemption from registration.
-- A deviation not yet resolved counts as a **known issue**: it is registered in `docs/business/KNOWN-ISSUE.md`.
-- **The structure of this file is fixed**: the ten core sections §0–§9, plus this single pointer section §10. **No new section may be added.** Project-level additions go into the corresponding section: red lines into §3, conduct into §4, output requirements into §5, maps into §9.1 / §9.2, and any disagreement with upstream into `docs/business/KNOWN-ISSUE.md`. The machine gate warns about a self-added section. In particular, do not add another "anti-pattern" comparison table that duplicates §3.
