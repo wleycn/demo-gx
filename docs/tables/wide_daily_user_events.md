@@ -27,7 +27,7 @@ deduplication happens in Silver.
 `event_date` (date). Partition directory format: `event_date={YYYY-MM-DD}/data.parquet`.
 
 - **Rationale**: the partition mirrors the fact table, so the two stay aligned per day.
-- **Estimated volume**: 1 to 7 rows per partition in the demo sample, matching the fact table.
+- **Estimated volume**: same partition count and grain as the fact table. Exact counts are read from `make check-data`.
 
 ## Field List
 

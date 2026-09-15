@@ -6,12 +6,14 @@ the failure path (a record missing a required field is correctly
 quarantined with a descriptive error reason).
 """
 
+import json
 from pathlib import Path
 
 import pandas as pd
 import pytest
 import yaml
 
+from demo_gx.ingestion.reader import read_input
 from demo_gx.validation.schema_validator import SchemaValidator
 
 
@@ -134,6 +136,39 @@ def _valid_row(**overrides):
     return row
 
 
+def test_an_undeclared_key_quarantines_only_its_own_record(schema_config, tmp_path):
+    """Strict mode judges the record, not the batch: one stray key does not sink the file.
+
+    Before the audit copy kept each record's own key set, pandas turned the stray
+    key into a column and every row's ``_raw_json`` then carried it, so a single
+    bad record quarantined the whole batch.
+    """
+    rows = [
+        _valid_row(surprise="boom"),
+        _valid_row(event_id="223e4567-e89b-42d3-a456-426614174000", customer_id="cust_002"),
+    ]
+    source = tmp_path / "input.json"
+    source.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+    df = read_input(str(source), masked_fields=[])
+    valid, invalid = SchemaValidator(schema_config, RUN_TS).validate(df)
+    assert len(invalid) == 1, invalid["error_reason"].tolist()
+    assert len(valid) == 1
+    assert "Extra fields" in invalid.iloc[0]["error_reason"]
+    assert "surprise" not in valid.columns
+
+
+def test_an_input_that_carries_its_own_raw_json_column_still_flows(schema_config, tmp_path):
+    """A source column named ``_raw_json`` is preserved and dropped, not a contract breach."""
+    source = tmp_path / "input.json"
+    source.write_text(json.dumps(_valid_row(_raw_json='{"k": 1}')) + "\n", encoding="utf-8")
+    df = read_input(str(source), masked_fields=[])
+    assert df["_raw_json_user"].iloc[0] == '{"k": 1}'
+    valid, invalid = SchemaValidator(schema_config, RUN_TS).validate(df)
+    assert len(invalid) == 0, invalid["error_reason"].tolist()
+    assert len(valid) == 1
+    assert "_raw_json_user" not in valid.columns
+
+
 def test_validation_fails_non_numeric_amount(schema_config):
     """A non-numeric amount must quarantine that row, not crash the batch."""
     df = pd.DataFrame(
@@ -192,6 +227,19 @@ def test_validation_fails_amount_too_precise(schema_config):
     assert len(valid) == 0
     assert len(invalid) == 1
     assert "decimal places" in invalid.iloc[0]["error_reason"]
+
+
+def test_validation_passes_a_large_amount_with_two_decimals(schema_config):
+    """A two-decimal amount must not be quarantined for its magnitude.
+
+    Scaling a large value multiplies its float error with it, so an absolute
+    epsilon ends up flagging valid money: the tolerance has to be relative.
+    """
+    df = pd.DataFrame([_valid_row(amount=10000000000000.12)])
+    validator = SchemaValidator(schema_config, RUN_TS)
+    valid, invalid = validator.validate(df)
+    assert len(invalid) == 0, invalid.iloc[0]["error_reason"]
+    assert len(valid) == 1
 
 
 def test_validation_fails_infinite_amount(schema_config):

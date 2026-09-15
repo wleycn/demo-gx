@@ -28,7 +28,7 @@ The pipeline reads a JSON file and distributes each record through three layers.
   +----------+----------+
   | Pass     | Fail
   v          v
-[valid_df]  [errors/bad_schema/]   <-- JSON Lines with error envelope
+[valid_df]  [errors/quarantine/]  <-- Parquet partition table with error envelope
   |          (pipeline continues processing valid data)
   v
 [DataCleaner]                      <-- timestamp UTC standardization
@@ -37,7 +37,7 @@ The pipeline reads a JSON file and distributes each record through three layers.
   v
 [Deduplicator.deduplicate()]       <-- deduplicate by event_id
   |                                    keep latest ingestion_timestamp
-  |                                    superseded rows -> duplicates.log
+  |                                    superseded rows -> errors/duplicates/
   v
 [Write Silver (Parquet)]           <-- partition by event_date
   |                                    overwrite per partition (idempotent)
@@ -58,7 +58,7 @@ The pipeline reads a JSON file and distributes each record through three layers.
 
 ### Key Flow Branches
 
-**Bad data path**: Records that fail validation (missing required fields, type mismatch, extra fields, future timestamp) are quarantined to `errors/bad_schema/` with an error envelope. The pipeline continues processing valid data without interruption.
+**Bad data path**: Records that fail validation (missing required fields, type mismatch, extra fields, future timestamp) are quarantined to `errors/quarantine/` with an error envelope, partitioned by the record's event date. The pipeline continues processing valid data without interruption.
 **Type change path**: Type and format violations (non-numeric amount, timestamp parse failures) are quarantined at the validation stage together with schema violations. They do not reach Silver. The validator uses `error_type=type_coercion_failed` to distinguish them. A separate "flag and pass to Silver" path is not enabled. The decision and its rationale are recorded in KNOWN-ISSUE.md under "Fail-safe isolation over flag-and-pass".
 **Deduplication path**: Silver deduplicates by `event_id`. The rule and its tie-break live in the table contract: [../tables/silver_events.md](../tables/silver_events.md).
 **Backfill path**: When `--event-date YYYY-MM-DD` is given, only rows whose `event_timestamp` falls on that date are processed. Rows whose timestamp does not parse are kept in scope so the validator can quarantine them. Bronze always archives the full arriving batch. Gold is rebuilt from the full on-disk Silver snapshot. Section 2.4 explains why that makes a partial run safe.
@@ -90,9 +90,12 @@ data/dev/output/
 │       └── event_date={YYYY-MM-DD}/
 │           └── data.parquet
 ├── errors/
-│   ├── bad_schema/
-│   │   └── {timestamp}_errors.json
-│   └── duplicates.log             # Plain text, appended
+│   ├── quarantine/
+│   │   └── event_date={YYYY-MM-DD|unknown}/
+│   │       └── data.parquet
+│   └── duplicates/
+│       └── event_date={YYYY-MM-DD}/
+│           └── data.parquet
 ├── metrics.json
 └── logs/
     └── pipeline.log
@@ -139,7 +142,7 @@ Gold is always rebuilt from the full on-disk Silver snapshot, never from the in-
 
 ### 2.5 Error Records
 
-Errors are written to `errors/bad_schema/` as JSON Lines, one error object per line. The envelope fields are an output contract; the field table lives in INTERFACE-DESIGN.md section 4.
+Errors are written to `errors/quarantine/` as a partitioned Parquet table, partitioned by `event_date` (the record's own event date, or `unknown` for unparseable timestamps). The envelope fields are an output contract; the field table lives in INTERFACE-DESIGN.md section 4. Superseded duplicates are written to `errors/duplicates/`, also partitioned by `event_date`. Both tables are partition-overwritten, so a rerun of the same batch leaves the content unchanged (AGENTS.md red line 1).
 
 ### 2.6 Reprocessing Semantics
 

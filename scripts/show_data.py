@@ -1,4 +1,4 @@
-# [AI-GENERATED] model=deepseek-flash date=2026-09-14 reviewed_by=pending
+# [AI-GENERATED] model=qianfan-code-latest date=2026-09-15 reviewed_by=pending
 """Read-only viewer for the artefacts a pipeline run produced.
 
 What it answers
@@ -72,12 +72,10 @@ BATCH_ROWS = 256
 LABEL_WIDTH = 11
 INDENT = "    "
 
-# The two layers that are JSON Lines rather than Parquet. These are the same
-# layouts ``check_data.py`` reads; a third consumer would justify moving them
-# next to the Parquet layout resolver.
-JSON_LAYERS = ("bronze", "errors")
+# Bronze is the only JSON Lines layer. The error tables are Parquet, the same
+# layout Silver and Gold use.
+JSON_LAYERS = ("bronze",)
 BRONZE_GLOB = "*/dt=*/events.json"
-QUARANTINE_GLOB = "bad_schema/*.json"
 
 
 def _cell(value: Any) -> str:
@@ -131,15 +129,9 @@ def _read_lines(files: list[Path], limit: int) -> tuple[list[str], int, bool]:
 
 def _json_files(layer: str, root: Path, event_date: str) -> list[Path]:
     """The text files a JSON Lines layer holds."""
-    if layer == "bronze":
-        files = sorted(root.glob(BRONZE_GLOB))
-        if event_date:
-            files = [path for path in files if path.parent.name == f"dt={event_date}"]
-        return files
-    files = sorted(root.glob(QUARANTINE_GLOB))
-    duplicate_log = root / "duplicates.log"
-    if duplicate_log.is_file():
-        files.append(duplicate_log)
+    files = sorted(root.glob(BRONZE_GLOB))
+    if event_date:
+        files = [path for path in files if path.parent.name == f"dt={event_date}"]
     return files
 
 
@@ -334,7 +326,10 @@ def main(argv: list[str] | None = None) -> int:
         if layer in JSON_LAYERS:
             show_json(layer, name, root, event_date, args.limit, args.schema, report)
             continue
-        code = show_parquet(layer, name, root, event_date, columns_arg, args.limit, args.schema, machine, report)
+        # The errors layer root is errors/, but each table lives one level
+        # deeper: errors/quarantine/ and errors/duplicates/.
+        table_root = root / name if layer == "errors" else root
+        code = show_parquet(layer, name, table_root, event_date, columns_arg, args.limit, args.schema, machine, report)
         if code is not None:
             return code
     return 0

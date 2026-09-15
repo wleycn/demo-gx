@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# [AI-GENERATED] model=deepseek-flash date=2026-09-09 reviewed_by=Rocky
+# [AI-GENERATED] model=qianfan-code-latest date=2026-09-15 reviewed_by=pending
 """Command-line entry point for the data pipeline.
 
 The CLI orchestrates the full ETL flow:
@@ -36,7 +36,9 @@ def main() -> None:
     write Silver, build and write Gold).  Metrics are always persisted, even
     on failure.
 
-    Exits with code 0 on success or 1 on any unhandled exception.
+    Exit codes, as published in INTERFACE-DESIGN.md section 1: ``0`` a completed
+    run, ``1`` an unhandled exception, ``2`` nothing matched the date scope,
+    ``3`` nothing valid survived validation.
     """
     # Anchor relative paths (storage/logs/metrics/input) to the project root
     # so the pipeline behaves identically regardless of the caller's CWD
@@ -112,7 +114,9 @@ def main() -> None:
             if raw_df.empty:
                 logger.warning("No rows with event_date=%s, stopping.", args.event_date)
                 metrics.save(config["metrics"]["output_file"])
-                return
+                # 2 = nothing in scope. A scheduler has to tell this apart from
+                # a plain success; see INTERFACE-DESIGN.md section 1.
+                sys.exit(2)
 
         # 2. Validate schema
         logger.info("Validating schema...")
@@ -124,7 +128,7 @@ def main() -> None:
         logger.info("Valid: %s, Invalid: %s", len(valid_df), len(invalid_df))
         # Write invalid records to the error quarantine area
         if not invalid_df.empty:
-            errors_path = Path(config["storage"]["output_root"]) / config["storage"]["errors_subpath"] / "bad_schema"
+            errors_path = Path(config["storage"]["output_root"]) / config["storage"]["errors_subpath"] / "quarantine"
             # Envelope fields and reason classification belong to the validation
             # layer (INTERFACE-DESIGN.md section 4); the orchestrator only
             # supplies the destination and the run timestamp.
@@ -134,7 +138,9 @@ def main() -> None:
         if valid_df.empty:
             logger.warning("No valid records, stopping.")
             metrics.save(config["metrics"]["output_file"])
-            return
+            # 3 = nothing valid survived validation. No Silver and no Gold were
+            # written, so this is not a plain success either.
+            sys.exit(3)
 
         # 3. Clean data
         logger.info("Cleaning data...")
@@ -151,11 +157,17 @@ def main() -> None:
         deduped_df, duplicates_df = deduper.deduplicate(cleaned_df)
         metrics.increment("duplicates_removed", len(duplicates_df))
         if not duplicates_df.empty:
-            dup_log = Path(config["storage"]["output_root"]) / config["storage"]["errors_subpath"] / "duplicates.log"
-            dup_log.parent.mkdir(parents=True, exist_ok=True)
-            with open(dup_log, "a") as f:
-                duplicates_df.to_csv(f, index=False, header=False)
-            logger.info("Duplicates logged to %s", dup_log)
+            dup_dir = Path(config["storage"]["output_root"]) / config["storage"]["errors_subpath"] / "duplicates"
+            # Partition-scoped overwrite by event_date, same as quarantine and
+            # Silver (AGENTS.md red line 1: bare append is forbidden).
+            for date_val, group in duplicates_df.groupby("event_date"):
+                date_str = str(date_val)
+                part_path = dup_dir / f"event_date={date_str}"
+                part_path.mkdir(parents=True, exist_ok=True)
+                tmp_file = part_path / "data.parquet.tmp"
+                group.to_parquet(tmp_file, index=False)
+                tmp_file.replace(part_path / "data.parquet")
+            logger.info("Duplicates written to %s", dup_dir)
         metrics.increment("silver_rows", len(deduped_df))
         # DATA-DESIGN.md section 2.3: _processed_timestamp is added automatically at
         # write time (pipeline processing timestamp, UTC), injected by the

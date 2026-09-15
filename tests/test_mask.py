@@ -11,8 +11,10 @@ import pathlib
 
 import pandas as pd
 
+from demo_gx.common.config import load_schema
 from demo_gx.common.mask import MASK_HEX_LEN, MASK_PREFIX, mask_columns, mask_value
 from demo_gx.ingestion.reader import read_input
+from demo_gx.validation.schema_validator import SchemaValidator
 
 
 def test_mask_is_deterministic() -> None:
@@ -54,6 +56,70 @@ def test_mask_columns_skips_a_column_the_frame_does_not_carry() -> None:
     df = pd.DataFrame({"event_id": ["abc"]})
     masked = mask_columns(df, ["customer_id"])
     assert list(masked.columns) == ["event_id"]
+
+
+def test_mask_columns_leaves_a_missing_identifier_missing() -> None:
+    """A null identifier stays null, so the required-field gate can still see it.
+
+    Hashing ``"nan"`` would turn every null into one well-formed digest: the row
+    would pass validation and every such row would collapse into a single
+    phantom customer.
+    """
+    df = pd.DataFrame({"customer_id": ["cust_001", None], "amount": [1.0, 2.0]})
+    masked = mask_columns(df, ["customer_id"])
+    assert masked["customer_id"].iloc[0] == mask_value("cust_001")
+    assert pd.isna(masked["customer_id"].iloc[1])
+
+
+def test_read_input_keeps_a_null_identifier_null(tmp_path: pathlib.Path) -> None:
+    """The audit copy must show the missing identifier, not a digest of ``"nan"``."""
+    source = tmp_path / "input.json"
+    source.write_text(
+        json.dumps(
+            {
+                "event_id": "bdd640fb-0667-4ad1-9c80-317fa3b1799d",
+                "source_system": "web",
+                "customer_id": None,
+                "event_type": "view",
+                "amount": 1.5,
+                "currency": "USD",
+            }
+        )
+        + "\n"
+    )
+    df = read_input(str(source), masked_fields=["customer_id"])
+    assert pd.isna(df["customer_id"].iloc[0])
+    assert json.loads(df["_raw_json"].iloc[0])["customer_id"] is None
+
+
+def test_a_null_identifier_is_quarantined_and_not_hashed(tmp_path: pathlib.Path) -> None:
+    """End to end: the row lands in the quarantine and the reason names the field.
+
+    Before the null rule, this row passed validation and reached Silver with a
+    digest of the string ``"nan"`` as its customer id.
+    """
+    source = tmp_path / "input.json"
+    source.write_text(
+        json.dumps(
+            {
+                "event_id": "bdd640fb-0667-4ad1-9c80-317fa3b1799d",
+                "source_system": "web",
+                "customer_id": None,
+                "event_type": "view",
+                "event_timestamp": "2026-09-10T10:00:00Z",
+                "amount": 1.5,
+                "currency": "USD",
+                "ingestion_timestamp": "2026-09-10T10:01:00Z",
+            }
+        )
+        + "\n"
+    )
+    df = read_input(str(source), masked_fields=["customer_id"])
+    validator = SchemaValidator(load_schema(), pd.Timestamp("2026-09-15T00:00:00Z"))
+    valid, invalid = validator.validate(df)
+    assert len(valid) == 0
+    assert len(invalid) == 1
+    assert "customer_id is null" in invalid.iloc[0]["error_reason"]
 
 
 def test_read_input_masks_before_the_audit_copy(tmp_path: pathlib.Path) -> None:

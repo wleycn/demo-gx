@@ -78,17 +78,20 @@ class SchemaValidator:
 
         # 1. Check for extra (unknown) fields
         actual_fields = set(df.columns)
-        # Exclude internal columns (_raw_json audit column, _error_reason
-        # error column) so they are not mistaken for extra schema fields
-
-        extra_fields = actual_fields - self.expected_fields - {"_raw_json", "_error_reason"}
+        # Exclude internal columns so they are not mistaken for schema fields:
+        # the _raw_json audit column, the _error_reason error column, and
+        # _raw_json_user which preserves a source column that already used the
+        # audit name. The last one is dropped below: Bronze carries it, the
+        # table contracts do not.
+        internal_columns = {"_raw_json", "_raw_json_user", "_error_reason"}
+        extra_fields = actual_fields - self.expected_fields - internal_columns
         if extra_fields:
-            # Strict mode: reject rows whose ORIGINAL record carries any
-            # undeclared key. Row-level key presence is judged from the
-            # preserved raw JSON when available — a null extra value and a
-            # missing key are indistinguishable after pandas read_json, so
-            # column-level notna() is only a fallback (dev-review: batch-
-            # dependent judging). Fallback used by unit tests without _raw_json.
+            # Strict mode: reject the records whose OWN record carries an
+            # undeclared key. Judging is per record because the audit copy keeps
+            # each record's own key set (reader._audit_copies); a record that
+            # never had the key must still pass. Column-level notna() is the
+            # fallback for frames built without the audit copy, since a tabular
+            # source cannot distinguish "key absent" from "key null".
             if "_raw_json" in df.columns:
 
                 def _has_extra_key(raw: str) -> bool:
@@ -101,17 +104,20 @@ class SchemaValidator:
 
                 extra_mask = df["_raw_json"].map(_has_extra_key).astype(bool)
             else:
-                extra_mask = df[list(extra_fields)].notna().any(axis=1)
-            if not extra_mask.any():
-                invalid_mask = invalid_mask | True
-                df["_error_reason"] = df["_error_reason"] + f" Extra fields (present in input): {extra_fields};"
-            else:
-                invalid_mask = invalid_mask | extra_mask
-                df.loc[extra_mask, "_error_reason"] = (
-                    df.loc[extra_mask, "_error_reason"].fillna("") + f" Extra fields: {extra_fields};"
-                )
+                # No audit copy: the column is the only evidence. A row that
+                # carries a value carries the key; when no row has one the column
+                # still proves the source declared it, so every row carries it.
+                present = df[list(extra_fields)].notna().any(axis=1)
+                extra_mask = present if present.any() else pd.Series(True, index=df.index)
+            invalid_mask = invalid_mask | extra_mask
+            df.loc[extra_mask, "_error_reason"] = (
+                df.loc[extra_mask, "_error_reason"].fillna("") + f" Extra fields: {extra_fields};"
+            )
             # Drop extra field columns (keep only standard fields + _raw_json)
             df = df.drop(columns=list(extra_fields))
+        # Drop the preserved user column before the frame leaves the validator:
+        # it is internal plumbing, not a contract field.
+        df = df.drop(columns=[c for c in ("_raw_json_user",) if c in df.columns])
 
         # 2. Per-field validation
         for field, rules in self.field_rules.items():
@@ -197,7 +203,15 @@ class SchemaValidator:
                 # Precision: at most N decimal places when schema declares it
                 if "max_decimals" in rules:
                     scaled = df[field] * 10 ** rules["max_decimals"]
-                    too_precise = df[field].notna() & ((scaled - scaled.round()).abs() > 1e-6)
+                    # Relative tolerance: multiplying by 10**n scales the float
+                    # error with the value, so a fixed epsilon flags valid money
+                    # once the amount is large enough (measured: 1e13 with two
+                    # decimals). 1e-13 sits just above the double spacing
+                    # (~1.1e-16 of the value), which keeps real precision errors
+                    # caught while absorbing representation noise. The floor
+                    # covers amounts small enough that the scale is near zero.
+                    tolerance = (scaled.abs() * 1e-13).clip(lower=1e-6)
+                    too_precise = df[field].notna() & ((scaled - scaled.round()).abs() > tolerance)
                     if too_precise.any():
                         invalid_mask = invalid_mask | too_precise
                         df.loc[too_precise, "_error_reason"] = (

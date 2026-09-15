@@ -361,3 +361,50 @@
 - **Rollback**: revert the commit and move the four blocks back into section 2.7. Nothing reads the file.
 - **Related**: `docs/business/CHANGELOG.md`, branch `fix/config-layout-propagation`.
 
+## 20260915 · field-validation-fixes — Judge the record, keep the null, and scale the tolerance
+
+- **Motivation**: three defects in the ingestion and validation path, found while auditing the code after the document work landed.
+  First, strict mode judged the batch instead of the record. pandas turned a stray key into a column, and the audit copy
+  then carried that key on every row, so one bad record quarantined the whole file. Measured: 107 sample rows plus one
+  record with an undeclared key gave 0 valid rows out of 108.
+  Second, masking hashed a null identifier into a well-formed digest. A null `customer_id` passed the required-field rule,
+  reached Silver, and collapsed every missing identifier into one phantom customer.
+  Third, the `max_decimals` tolerance was absolute while the value it judged was scaled, so a valid two-decimal amount
+  at 1e13 was quarantined as too precise.
+- **Scope**: `ingestion/reader.py` (JSON input is parsed record by record, and the audit copy is built from each record's own keys), `validation/schema_validator.py` (per-record extra-key judgement, internal-column set, relative precision tolerance), `common/mask.py` (nulls are left as nulls), `tests/test_mask.py` and `tests/test_validation.py`, and the masking section of `docs/tables/silver_events.md`.
+- **Behaviour and contract changes**: an undeclared key now quarantines only the records that carry it, which is what the table contract already claimed. A null identifier stays null, so the required-field rule quarantines it as the contract's rule 1 requires. `_raw_json_user`, the column that preserves a source column named `_raw_json`, is an internal name now: Bronze keeps it, and it is dropped before Silver. The `max_decimals` tolerance follows the magnitude of the value it judges.
+- **Verification**: each defect has a test that was seen to fail first. `mask_columns` leaves a missing identifier missing,
+  and the reader keeps a null identifier null. A null identifier is quarantined end to end, an undeclared key
+  quarantines only its own record, and an input carrying its own `_raw_json` column still flows. A two-decimal
+  amount at 1e13 passes, while `10.999`, `0.001` and `123.456` are still rejected. The sample plus one stray-key record
+  now yields 103 valid rows of 108 instead of 0. The whole suite passes, and ruff and mypy are clean.
+- **Rollback**: revert the commit. The defects return, and no artefact shape changes.
+- **Related**: `docs/business/CHANGELOG.md`, branch `fix/config-layout-propagation`.
+
+## 20260915 · pipeline-exit-codes — Publish what the entry point returns
+
+- **Motivation**: the two inspection commands have a published exit-code table, and the pipeline entry point had none. A run whose `--event-date` scope matched nothing, and a run where every row was quarantined, both ended with exit code 0. A scheduler could not tell "ran and processed nothing" apart from "ran fine".
+- **Scope**: `src/demo_gx/cli.py` (the two early stops), `docs/business/INTERFACE-DESIGN.md` section 1 for the published table, and a new `tests/test_cli_exit_codes.py`.
+- **Behaviour and contract changes**: `0` completed, `1` unhandled exception, `2` nothing matched the date scope, `3` nothing valid survived validation. Codes `2` and `3` still write `metrics.json`, and Bronze still archives the arriving batch before the scope filter runs. `make run` on an empty scope now stops with make's own code `2` instead of reporting success.
+- **Verification**: three cases run the real entry point in a subprocess with `STORAGE_BASE_PATH` pointed at a temporary directory, so the test owns its artefacts. The two new cases were seen to fail first, both returning 0 before the change. `.venv/bin/python -m pytest tests/test_cli_exit_codes.py -q` reports 3 passed, and the whole suite stays green.
+- **Rollback**: revert the commit. No artefact changes; a scheduler would go back to seeing 0 for both stops.
+- **Related**: `docs/business/CHANGELOG.md`, branch `fix/config-layout-propagation`.
+
+## 20260915 · measured-numbers-and-ci-verifier — Stop restating counts, and run the verifier in CI
+
+- **Motivation**: three of the five table contracts carried measured sample counts that had gone stale. `silver_events.md` claimed 101 rows over 30 partitions, and the artefacts hold 102 over 31. `dim_customer.md` claimed 44 rows, and the table holds 45. An earlier change entry records the same two numbers being corrected by hand, which is the signature of a claim nobody checks.
+- **Scope**: the `Estimated volume` line of the five contracts under `docs/tables/`, and the data-quality stage of `.gitlab-ci.yml`.
+- **Behaviour and contract changes**: the contracts state the shape of the volume instead of an exact count, and point at `make check-data`, which prints the measured values. The CI data-quality stage now runs `scripts/check_data.py --env test` after the pipeline, so the artefact verifier gates the stage. The two inline assertions stay, because they judge the run envelope, which the verifier reports but does not judge.
+- **Verification**: every count in the five contracts was measured against `data/dev/output/` before the rewrite. `.venv/bin/python -m pytest -q` stays green, `make check-data` reports 0 FAIL and 0 WARN, and the pre-commit gate exits 0.
+- **Rollback**: revert the commit. The contracts go back to counts that drift, and CI loses one gate.
+- **Related**: `docs/business/CHANGELOG.md`, branch `fix/config-layout-propagation`.
+
+## 20260915 · error-artefact-partitions — Make the error artefacts idempotent tables
+
+- **Motivation**: the quarantine was one JSON file per run and the duplicate log was appended, so both artefacts changed on every rerun. The verifier summed across runs, so the same repository state reported different numbers depending on how often the pipeline had run. One input produced 4 quarantine rows and 1 duplicate line on the first run, and the verifier reported 31 and 7 after seven runs. AGENTS.md red line 1 forbids bare append, and these two artefacts were the only ones still doing it.
+- **Scope**: `validation/error_envelope.py` and the duplicate write in `cli.py`, which now write partitioned Parquet under `errors/`; `scripts/check_data.py` and `scripts/show_data.py`, which read the new tables; the new contracts `docs/tables/quarantine.md` and `docs/tables/duplicates.md`; and the error-layer sections of `DATA-DESIGN.md`, `INTERFACE-DESIGN.md`, `MODULE-DESIGN.md`, `DOMAIN-LANGUAGE.md` and `silver_events.md`.
+- **Behaviour and contract changes**: `errors/quarantine/event_date=<date|unknown>/data.parquet` and `errors/duplicates/event_date=<date>/data.parquet` replace `errors/bad_schema/{stamp}_errors.json` and `errors/duplicates.log`. The partition key is the record's own event date, so a scoped backfill replaces one day and leaves the other days alone. In the quarantine, `event_date` is a string, because that table has to be able to say `unknown`; the other tables keep a real date. The envelope keeps its four declared fields and gains the partition column.
+- **Verification**: a two-run probe on one input reports a stable quarantine of 1 record and 1 duplicate row, and asserts that neither old path is written. Three spec tests in `tests/test_error_artefacts.py` were seen to fail first: rerun stability, partition isolation under `--event-date`, and the `unknown` partition. `make check-data` reports 0 FAIL and 0 WARN, with the error counts belonging to a single run, and each table reported once. The whole suite passes, ruff and mypy are clean, and a byte scan finds no line-ending violation.
+- **Rollback**: revert the commit and rerun. The tables regenerate, and nothing reads the old layout either way.
+- **Related**: `docs/business/CHANGELOG.md`, branch `fix/config-layout-propagation`.
+

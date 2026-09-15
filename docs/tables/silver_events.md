@@ -20,7 +20,7 @@ One row per unique event (after deduplication by `event_id`).
 
 By `event_id`, keeping the record with the latest `ingestion_timestamp`. On an exact
 tie (identical `ingestion_timestamp`), the last-occurring row in the input file wins
-(keep-last; stable sort). Superseded duplicates are written to `errors/duplicates.log`
+(keep-last; stable sort). Superseded duplicates are written to the partitioned `errors/duplicates/` table
 for post-hoc review.
 
 ## Partition
@@ -29,7 +29,7 @@ for post-hoc review.
 `event_date={YYYY-MM-DD}/data.parquet`.
 
 - **Rationale**: every downstream read filters or groups by date. A date partition lets one run rewrite a single day without touching the others.
-- **Estimated volume**: 1 to 7 rows per partition in the demo sample. The sample holds 101 rows across 30 partitions, about 11 KB per partition.
+- **Estimated volume**: single-digit rows per partition in the demo sample, tens of KB per partition. Exact counts move with the sample and with the validation rules, so they are read from `make check-data` rather than restated here.
 
 ## Field List
 
@@ -63,6 +63,7 @@ for post-hoc review.
 
 - **Direct identifiers**: `customer_id` is the only one. `event_id` is a surrogate key and carries no personal data.
 - **Masking today**: `customer_id` is replaced by a keyed digest at the ingestion boundary. The masked form is `h_` plus 16 hex characters.
+- **A missing identifier stays missing**: the mask skips null values instead of hashing them. Hashing would turn every null into one well-formed digest, which passes the required-field rule and collapses distinct missing rows into a single phantom customer. A null `customer_id` therefore quarantines the row (quality rule 1).
 - **Raw copy**: `_raw_json` holds the masked value, because the mask runs before that column is built. Bronze, Silver, Gold and the quarantine envelopes all carry the masked form.
 - **Why a digest and not a redaction**: Gold groups events by `customer_id` and `dim_customer` holds one row per distinct value. A redaction such as `cust_***` would collapse every customer into a single bucket and change the Gold row counts.
 - **Production note**: the demo config leaves `pii.pepper` empty, so the digest is reproducible from the input alone. A real deployment injects the key from the secret store.
@@ -99,4 +100,4 @@ for post-hoc review.
 7. `currency` must match three upper-case letters.
 8. Both timestamps must parse and must not be later than the run instant.
 9. `event_id` is unique after deduplication.
-10. A quarantined row never reaches this table. Validation failure sends it to `errors/bad_schema/`.
+10. A quarantined row never reaches this table. Validation failure sends it to `errors/quarantine/`.

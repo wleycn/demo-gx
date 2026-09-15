@@ -25,7 +25,7 @@ Built via `drop_duplicates()` on `event_type` from the Silver snapshot.
 None. Full snapshot, non-partitioned. Written as a single `data.parquet` file.
 
 - **Rationale**: the table is a small reference list, so partitions would add directories without narrowing any read.
-- **Estimated volume**: 5 rows in the demo sample. The count tracks the number of distinct event types.
+- **Estimated volume**: one row per distinct event type. Exact counts are read from `make check-data`.
 
 ## Field List
 

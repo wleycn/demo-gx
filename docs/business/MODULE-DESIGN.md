@@ -40,7 +40,7 @@ All paths in this section are relative to `src/demo_gx/`.
 
 **Input**: raw DataFrame.
 **Output**: tuple of two DataFrames `(valid_df, invalid_df)`. `invalid_df` includes an `error_reason` column describing each violation.
-**Failure policy**: invalid records are written to `errors/bad_schema/` and do not block the processing of valid data.
+**Failure policy**: invalid records are written to `errors/quarantine/` and do not block the processing of valid data.
 **Run reference**: the `<= current time` rule is evaluated against the run instant passed to the constructor, not the wall clock, so a given run validates reproducibly (AGENTS.md section 3 red line 10).
 
 ### 2.3 transformation/cleaner.py
@@ -58,7 +58,7 @@ All paths in this section are relative to `src/demo_gx/`.
 
 **Description**: deduplicates by `event_id`, keeping the record with the latest `ingestion_timestamp`. The tie-break rule is a data invariant; see DATA-DESIGN.md section 1.
 **Input**: cleaned DataFrame.
-**Output**: pair `(deduplicated_df, duplicates_df)`. The module performs no I/O. The CLI writes superseded duplicates to `errors/duplicates.log`.
+**Output**: pair `(deduplicated_df, duplicates_df)`. The module performs no I/O. The CLI writes superseded duplicates to the partitioned `errors/duplicates/` table.
 
 ### 2.5 curation/builder.py
 
@@ -96,8 +96,8 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 2. Call `ingestion.read_input` to read the batch.
 3. Call `ingestion.write_bronze` to archive the full arriving batch.
 4. If `--event-date` is given, scope processing to rows whose `event_timestamp` falls on that date.
-5. Call `SchemaValidator.validate` to split valid and invalid data. Invalid records are handed to `validation.error_envelope.write_error_envelope`, which builds the envelope and writes it to `errors/bad_schema/`.
-6. Call `DataCleaner` and `Deduplicator` to process valid data. Superseded duplicates are written to `errors/duplicates.log`.
+5. Call `SchemaValidator.validate` to split valid and invalid data. Invalid records are handed to `validation.error_envelope.write_error_envelope`, which builds the envelope and writes it to the partitioned `errors/quarantine/` table.
+6. Call `DataCleaner` and `Deduplicator` to process valid data. Superseded duplicates are written to the partitioned `errors/duplicates/` table.
 7. Write to Silver layer (partitioned by `event_date`, Parquet format). Add `_processed_timestamp` from the injected run timestamp at write time.
 8. Call `GoldBuilder` to generate Gold-layer data from the full on-disk Silver snapshot (see DATA-DESIGN.md section 2.4).
 9. Save `metrics.json`.
@@ -106,7 +106,7 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 
 ### 2.10 validation/error_envelope.py
 
-**Description**: owns the quarantine error envelope end to end. `classify_error` maps a validator `error_reason` to the coarse `error_type`. `build_error_envelope` assembles the four-field frame. `write_error_envelope` writes it as JSON Lines to `errors/bad_schema/{timestamp}_errors.json` and returns the written path. The filename stamp is made filesystem-safe because an ISO string contains characters illegal on Windows.
+**Description**: owns the quarantine error envelope end to end. `classify_error` maps a validator `error_reason` to the coarse `error_type`. `build_error_envelope` assembles the four-field frame. `write_error_envelope` writes it as a partitioned Parquet table under `errors/quarantine/event_date=<date|unknown>/data.parquet` and returns the written partition paths. Each partition is overwritten, so a rerun replaces one day and leaves the others alone.
 **Input**: the rejected DataFrame (carrying `error_reason`), the quarantine directory, and the run timestamp.
 **Output**: the written file path. The envelope field list and the classification rule are defined once in INTERFACE-DESIGN.md section 4.
 **Timestamp**: passed in as a parameter, never read from the system clock here (AGENTS.md section 3 red line 10).

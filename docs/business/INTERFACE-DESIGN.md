@@ -24,6 +24,18 @@ python -m demo_gx.cli --env dev --input /tmp/other.json
 
 The CLI anchors all relative paths (storage, logs, metrics, input) to the project root, so it behaves identically regardless of the caller's working directory.
 
+Exit codes. These are the codes the entry point returns:
+
+| Code | Meaning |
+|---|---|
+| `0` | Completed: Silver and Gold were written |
+| `1` | Unhandled exception; the message is in the log and in metrics `errors` |
+| `2` | Nothing matched `--event-date`; Bronze still archived the arriving batch |
+| `3` | Nothing valid survived validation; Silver and Gold were not touched |
+
+Codes `2` and `3` exist so a scheduler can tell "ran and processed nothing" apart from "ran fine".
+A run that stops at either code still writes `metrics.json`.
+
 The run timestamp is read exactly once at the entry boundary and then threaded down as a parameter. Modules never read the system clock for data stamping. That single read makes the injected value authoritative.
 
 ### 1.1 Inspection Commands
@@ -172,11 +184,15 @@ Fact and wide tables are partitioned by `event_date`. Dimension tables are full 
 
 ```text
 {output_root}/errors/
-├── bad_schema/{timestamp}_errors.json    # JSON Lines
-└── duplicates.log                        # Plain text, appended
+├── quarantine/event_date={YYYY-MM-DD|unknown}/data.parquet    # Parquet, partition-overwritten
+└── duplicates/event_date={YYYY-MM-DD}/data.parquet             # Parquet, partition-overwritten
 ```
 
-There is no separate type-conversion quarantine directory. Every rejected row goes into the single `bad_schema/` envelope, including rows whose type conversion failed: they are filed with `error_type=type_coercion_failed`.
+Both tables are partitioned by the record's own event date and overwritten per
+partition, the same as Silver. A record whose `event_timestamp` does not parse
+goes to `event_date=unknown` in the quarantine table.
+
+There is no separate type-conversion quarantine directory. Every rejected row goes into the single `quarantine/` table, including rows whose type conversion failed: they are filed with `error_type=type_coercion_failed`.
 
 ### 3.6 Metrics and Logs
 
@@ -187,7 +203,7 @@ There is no separate type-conversion quarantine directory. Every rejected row go
 
 ## 4. Error Envelope Fields
 
-Invalid records are written to `errors/bad_schema/{timestamp}_errors.json` in JSON Lines format. Each line is one error object.
+Invalid records are written to `errors/quarantine/event_date={YYYY-MM-DD|unknown}/data.parquet` as a partitioned Parquet table. The partition key is the record's own event date.
 
 | Field | Type | Description |
 |---|---|---|
@@ -195,6 +211,7 @@ Invalid records are written to `errors/bad_schema/{timestamp}_errors.json` in JS
 | `error_type` | string | `schema_mismatch` or `type_coercion_failed`. Derived from the validator's per-rule error reason. |
 | `error_details` | string | Specific reason text from the validator (e.g. "field 'event_id' missing", "amount not numeric"). |
 | `ingestion_timestamp` | string (ISO-8601) | The UTC time the pipeline processed this record. |
+| `event_date` | string | Partition key: `YYYY-MM-DD` derived from `event_timestamp`, or `unknown` when it does not parse. |
 
 ### Error Type Classification
 

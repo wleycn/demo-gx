@@ -6,6 +6,7 @@ masks direct identifiers at the ingestion boundary and appends an audit column
 (``_raw_json``) for full replayability in the Bronze layer.
 """
 
+import json
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -47,17 +48,21 @@ def read_input(file_path: str, masked_fields: Iterable[str] | None = None, peppe
     if not path.exists():
         raise FileNotFoundError(f"Input file {file_path} not found")
     suffix = path.suffix.lower()
+    # Records are kept for JSON input: the audit copy is built per record, and
+    # a key that only some records carry has to stay missing on the others (see
+    # _audit_copies). A tabular source has no per-record shape, so it yields None.
+    records: list[dict] | None = None
     if suffix == ".json":
-        df = pd.read_json(path, lines=True)
+        records = _read_json_lines(path)
+        df = pd.DataFrame(records)
     elif suffix == ".csv":
         df = pd.read_csv(path)
     elif suffix == ".parquet":
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Unsupported file type: {suffix}")
-    # Add the raw JSON column for audit purposes. If the input already
-    # carries an internal column name (_raw_json), preserve the user column
-    # under a distinct name instead of silently overwriting it
+    # If the input already carries an internal column name (_raw_json), preserve
+    # the user column under a distinct name instead of silently overwriting it
     # (dev-review: input-column collision).
     if "_raw_json" in df.columns:
         df = df.rename(columns={"_raw_json": "_raw_json_user"})
@@ -66,10 +71,65 @@ def read_input(file_path: str, masked_fields: Iterable[str] | None = None, peppe
     # reaches Bronze, Silver, Gold, the quarantine or the logs.
     if masked_fields:
         df = mask_columns(df, masked_fields, pepper)
-    # date_format="iso": without it, datetime columns serialize to epoch
-    # milliseconds and replay silently lands in 1970 (dev-review critical)
-    df["_raw_json"] = df.apply(lambda row: row.to_json(date_format="iso"), axis=1)
+    df["_raw_json"] = _audit_copies(df, records, masked_fields)
     return df
+
+
+def _read_json_lines(path: Path) -> list[dict]:
+    """Parse a JSON-Lines file into one record per line, in file order.
+
+    ``records[i]`` corresponds to row ``i`` of the frame built from it, so the
+    audit copy can be rebuilt from the record's own keys rather than from the
+    frame's column union.
+
+    Args:
+        path (pathlib.Path): The JSON-Lines file.
+
+    Returns:
+        list[dict]: One dictionary per non-empty line.
+    """
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _audit_copies(df: pd.DataFrame, records: list[dict] | None, masked_fields: Iterable[str] | None) -> list[str]:
+    """Build the ``_raw_json`` audit copy for every row.
+
+    With the source records in hand, each copy carries exactly the keys that
+    record had, with the masked value substituted for each masked column. A
+    frame rebuilt copy would instead give every row the union of all keys, with
+    nulls where the key was never there, and strict mode could no longer tell
+    "key absent" from "key present and null" — one stray key would then
+    quarantine the whole batch.
+
+    For tabular sources (CSV, Parquet) there is no per-record shape, so the copy
+    is the frame row serialized. ``date_format="iso"`` keeps datetime columns as
+    ISO strings; without it they serialize to epoch milliseconds and a replay
+    silently lands in 1970 (dev-review critical).
+
+    Args:
+        df (pandas.DataFrame): The (already masked) frame.
+        records (list[dict] | None): Source records, or ``None`` for tabular input.
+        masked_fields (Iterable[str] | None): Columns whose frame value is the
+            masked form.
+
+    Returns:
+        list[str]: One JSON string per row, aligned with the frame index.
+    """
+    if records is None:
+        return list(df.apply(lambda row: row.to_json(date_format="iso"), axis=1))
+    assert len(records) == len(df), "record count and frame row count diverged"
+    masked = set(masked_fields or ())
+    copies = []
+    for position, record in enumerate(records):
+        row = {}
+        for key, value in record.items():
+            if key in masked and key in df.columns:
+                value = df[key].iloc[position]  # the masked form
+                if pd.isna(value):
+                    value = None  # a missing identifier stays missing, not "NaN"
+            row[key] = value
+        copies.append(json.dumps(row, ensure_ascii=False, default=str))
+    return copies
 
 
 def write_bronze(raw_df: pd.DataFrame, bronze_base: Path, run_ts: pd.Timestamp) -> int:

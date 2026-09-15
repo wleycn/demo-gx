@@ -1,13 +1,18 @@
-# [AI-GENERATED] model=deepseek-flash date=2026-09-14 reviewed_by=pending
-"""Error envelope construction and quarantine write for schema validation failures.
+# [AI-GENERATED] model=qianfan-code-latest date=2026-09-15 reviewed_by=pending
+"""Error envelope construction and partitioned quarantine write.
 
 Owns two things the orchestrator must not: the mapping from a validator
 ``error_reason`` to the coarse ``error_type``, and the on-disk shape of
-``errors/bad_schema/{timestamp}_errors.json``.
+``errors/quarantine/event_date=<YYYY-MM-DD|unknown>/data.parquet``.
 
 The caller supplies the target directory and the run timestamp; neither is
 read from the system clock here (see AGENTS.md section 3 red line: partition
 parameters are injected by the scheduler).
+
+The partition key is the record's own event date, derived from
+``event_timestamp``. A record whose ``event_timestamp`` does not parse
+goes to ``event_date=unknown``. Each partition is overwritten, so a rerun
+of the same batch leaves the artefact unchanged (AGENTS.md red line 1).
 
 Contract: INTERFACE-DESIGN.md section 4.
 """
@@ -17,6 +22,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+
+from demo_gx.common.time_utils import parse_utc_mixed
 
 # Reason fragments that mark a type-coercion failure rather than a contract
 # mismatch. INTERFACE-DESIGN.md section 4 is the single source for this list.
@@ -36,11 +43,28 @@ def classify_error(reason: str) -> str:
     return "type_coercion_failed" if any(h in reason for h in TYPE_COERCION_HINTS) else "schema_mismatch"
 
 
+def _derive_event_date(invalid_df: pd.DataFrame) -> pd.Series:
+    """Derive the partition key from each row's ``event_timestamp``.
+
+    Returns a string Series: ``YYYY-MM-DD`` for parseable timestamps,
+    ``"unknown"`` for unparseable ones.
+    """
+    if "event_timestamp" not in invalid_df.columns:
+        return pd.Series(["unknown"] * len(invalid_df), index=invalid_df.index)
+    # One parsing policy for the whole pipeline: parse_utc_mixed tolerates mixed
+    # formats, where a plain pd.to_datetime would apply the first row's format
+    # to every row and silently NaT the rest.
+    parsed = parse_utc_mixed(invalid_df["event_timestamp"])
+    dates = parsed.dt.strftime("%Y-%m-%d")
+    dates = dates.where(parsed.notna(), "unknown")
+    return dates
+
+
 def build_error_envelope(
     invalid_df: pd.DataFrame,
     ingestion_timestamp: pd.Timestamp,
 ) -> pd.DataFrame:
-    """Build the four-field error envelope for quarantined rows.
+    """Build the five-field error envelope for quarantined rows.
 
     Args:
         invalid_df (pandas.DataFrame): Rejected rows carrying ``error_reason``.
@@ -49,7 +73,7 @@ def build_error_envelope(
 
     Returns:
         pandas.DataFrame: Columns ``original_json``, ``error_type``,
-        ``error_details``, ``ingestion_timestamp``.
+        ``error_details``, ``ingestion_timestamp``, ``event_date``.
     """
     if "_raw_json" in invalid_df.columns:
         original = invalid_df["_raw_json"].astype(str)
@@ -61,6 +85,7 @@ def build_error_envelope(
             "error_type": invalid_df["error_reason"].map(classify_error),
             "error_details": invalid_df["error_reason"].str.strip(),
             "ingestion_timestamp": ingestion_timestamp.isoformat(),
+            "event_date": _derive_event_date(invalid_df),
         }
     )
 
@@ -69,25 +94,32 @@ def write_error_envelope(
     invalid_df: pd.DataFrame,
     errors_dir: Path,
     ingestion_timestamp: pd.Timestamp,
-) -> Path:
-    """Write the error envelope to ``errors_dir`` as JSON Lines.
+) -> list[Path]:
+    """Write the error envelope as a partitioned Parquet table.
 
-    The filename stamp is made filesystem-safe because ``isoformat`` contains
-    ``:`` and ``+``, which are illegal in Windows paths. The envelope body
-    still carries the full ISO stamp.
+    Partitions are keyed by ``event_date`` (``YYYY-MM-DD`` or ``unknown``).
+    Each partition directory ``event_date=<value>/data.parquet`` is overwritten,
+    so a rerun replaces one day and leaves the others alone.
 
     Args:
         invalid_df (pandas.DataFrame): Rejected rows carrying ``error_reason``.
-        errors_dir (pathlib.Path): Quarantine directory; created if absent.
+        errors_dir (pathlib.Path): Quarantine table root
+            (``errors/quarantine``); created if absent.
         ingestion_timestamp (pandas.Timestamp): Run timestamp.
 
     Returns:
-        pathlib.Path: The written file.
+        list[pathlib.Path]: The written partition files, one per event date.
     """
-    errors_dir.mkdir(parents=True, exist_ok=True)
-    stamp = ingestion_timestamp.strftime("%Y%m%dT%H%M%S%fZ")
-    path = errors_dir / f"{stamp}_errors.json"
-    build_error_envelope(invalid_df, ingestion_timestamp).to_json(
-        path, orient="records", lines=True, force_ascii=False, date_format="iso"
-    )
-    return path
+    envelope = build_error_envelope(invalid_df, ingestion_timestamp)
+    written: list[Path] = []
+    for date_val, group in envelope.groupby("event_date"):
+        part_path = errors_dir / f"event_date={date_val}"
+        part_path.mkdir(parents=True, exist_ok=True)
+        # Partition-scoped overwrite: write to a temp file then replace, so a
+        # crash mid-write cannot leave a half-written data.parquet.
+        tmp_file = part_path / "data.parquet.tmp"
+        group.to_parquet(tmp_file, index=False)
+        final = part_path / "data.parquet"
+        tmp_file.replace(final)
+        written.append(final)
+    return written

@@ -48,6 +48,11 @@ def mask_columns(df: pd.DataFrame, columns: Iterable[str], pepper: str = "") -> 
     input still flows to the validator and gets quarantined there rather than
     failing at the read boundary.
 
+    A missing value stays missing. Masking it would hash the string ``"nan"``,
+    which turns every null identifier into the same well-formed digest: the row
+    then passes the required-field gate and every such row collapses into one
+    phantom customer in ``dim_customer`` and in the Gold groups.
+
     Args:
         df (pandas.DataFrame): The frame to mask.
         columns (Iterable[str]): Column names to replace with their masked form.
@@ -59,5 +64,5 @@ def mask_columns(df: pd.DataFrame, columns: Iterable[str], pepper: str = "") -> 
     masked = df.copy()
     for column in columns:
         if column in masked.columns:
-            masked[column] = masked[column].map(lambda value: mask_value(value, pepper))
+            masked[column] = masked[column].map(lambda value: mask_value(value, pepper) if pd.notna(value) else value)
     return masked

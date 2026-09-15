@@ -26,7 +26,7 @@ deduplication happens in Silver by `event_id`.
 `event_date` (date). Partition directory format: `event_date={YYYY-MM-DD}/data.parquet`.
 
 - **Rationale**: the partition mirrors Silver, so a single-day backfill rewrites one Gold partition.
-- **Estimated volume**: 1 to 7 rows per partition in the demo sample, 30 partitions in total.
+- **Estimated volume**: single-digit rows per partition in the demo sample, one row per (event date, customer, event type) group. Exact counts are read from `make check-data`.
 
 ## Field List
 

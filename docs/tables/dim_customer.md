@@ -25,7 +25,7 @@ Built via `drop_duplicates()` on `customer_id` from the Silver snapshot.
 None. Full snapshot, non-partitioned. Written as a single `data.parquet` file.
 
 - **Rationale**: the table is a full snapshot with a small row count, so partitions would add directories without narrowing any read.
-- **Estimated volume**: 44 rows in the demo sample. The table stays small because it holds one row per customer.
+- **Estimated volume**: one row per distinct customer, so the table stays small. Exact counts are read from `make check-data`.
 
 ## Field List
 
