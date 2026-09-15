@@ -48,8 +48,7 @@ demo-gx/
 │   ├── business/             # Seven business documents (this directory)
 │   ├── tables/               # Per-table contracts (one file per table)
 │   ├── changes/              # Per-module change logs
-│   ├── rules/                # Engineering rules (structure / coding / flow / acceptance)
-│   └── archive/              # Superseded documents (architecture / data-design / module-design / requirements / change-logs / known-issues) + raw/ (original prompt)
+│   └── rules/                # Engineering rules (structure / coding / flow / acceptance)
 ├── tests/                    # pytest suite (88 tests)
 ├── scripts/generate_sample_data.py
 ├── scripts/check_data.py     # Read-only artefact verifier behind `make check-data`
@@ -132,8 +131,8 @@ Resolved migration items are listed under "Resolved Migration Items" in [KNOWN-I
 
 - Migrate from Pandas to PySpark for larger data volumes.
 - Introduce Great Expectations or dbt for data contract validation.
-- Adopt Apache Iceberg for schema evolution and time travel. Iceberg DDL assets are prepared
-  in `docs/archive/data-design.md` section 6.
+- Adopt Apache Iceberg for schema evolution and time travel. Iceberg DDL assets are in
+  DATA-DESIGN.md section 2.7.
 - Add stream processing (Kafka plus Spark Structured Streaming or Flink).
 - Integrate OpenLineage for lineage tracking.
 - Use Airflow for orchestration and scheduling.

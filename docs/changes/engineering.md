@@ -343,3 +343,12 @@
 - **Rollback**: revert the commit and move the directory back. Nothing outside the single entry point reads the path, and no artefact carries it.
 - **Related**: `docs/business/CHANGELOG.md`, branch `fix/config-layout-propagation`.
 
+## 20260915 · archive-drop — Delete the archive and keep the one asset it held
+
+- **Motivation**: `docs/archive/` held documents that the business-document set had already replaced, two empty placeholder files, and the original assessment prompt. Nothing read them. One exception: `data-design.md` section 6 was the only home of the prepared Iceberg DDL, and four live statements pointed at it (`DATA-DESIGN.md` section 2.7, `PROJECT.md` future extensions, and two `KNOWN-ISSUE.md` dispositions that route through 2.7).
+- **Scope**: the Iceberg DDL (Bronze, Silver, Gold and the analytics reads) moves into `docs/business/DATA-DESIGN.md` section 2.7, the section that already described it; `docs/archive/` is deleted in full, `raw/` and the two empty files included; the referencing sentences in `DATA-DESIGN.md`, `PROJECT.md` and `KNOWN-ISSUE.md` now name the live section; the archive rows leave the two layout trees.
+- **Behaviour and contract changes**: none to code, configuration or artefacts. The SQL moves verbatim, so the asset itself is unchanged and only its address is. The production-shape reference now sits inside the live document set, which removes a pointer that used to resolve outside it.
+- **Verification**: the four SQL blocks were compared with the archived source before the deletion and are identical block for block. A repository-wide search for `docs/archive` returns two hits, both inside older entries of `docs/changes/engineering.md`, which record what was true at the time. `.venv/bin/python -m pytest tests/ -q` reports 88 passed, ruff and mypy are clean, `make check-data` reports 0 FAIL and 0 WARN across 7 tables, and the pre-commit gate exits 0 with no warnings. A byte scan of every tracked markdown and code file finds no line-ending violation.
+- **Rollback**: revert the commit. The deleted documents return from git history and the DDL then lives in two places until section 2.7 drops it again.
+- **Related**: `docs/business/CHANGELOG.md`, branch `fix/config-layout-propagation`.
+

@@ -67,8 +67,7 @@ demo-gx/
 │   ├── business/             # Project, data, module, interface, glossary, changelog, known issues
 │   ├── tables/               # Per-table contracts (one file per table)
 │   ├── changes/              # Per-module change logs
-│   ├── rules/                # Engineering rules (structure / coding / flow / acceptance)
-│   └── archive/              # Superseded documents and the original assessment prompt
+│   └── rules/                # Engineering rules (structure / coding / flow / acceptance)
 ├── tests/                    # pytest suite (88 tests)
 ├── scripts/generate_sample_data.py
 ├── scripts/check_data.py     # Read-only artefact verifier behind `make check-data`
