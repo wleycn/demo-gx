@@ -15,7 +15,7 @@
 ## 2. Configuration and Credentials
 
 - 🔴 Credentials / endpoints / paths are loaded via `config.py` from env or a secret manager; **plaintext must never appear in code, notebooks or scheduling parameters**
-- 🔴 Paths must not use `Path.home()` / `expanduser` / a direct `import dotenv` -- a project derives its anchor from `__file__`; system scripts go through `path_anchor.py` / `load_shared_env()` (see skill `path-ssot-governance`)
+- 🔴 Paths must not use `Path.home()` / `expanduser` / a direct `import dotenv` -- a project derives its anchor from `__file__`
 - 🟡 All configuration items have typed defaults and validation (Pydantic Settings), so configuration errors surface at startup
 
 ## 3. Error Handling and Retry

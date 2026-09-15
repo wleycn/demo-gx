@@ -26,6 +26,71 @@ The CLI anchors all relative paths (storage, logs, metrics, input) to the projec
 
 The run timestamp is read exactly once at the entry boundary and then threaded down as a parameter. Modules never read the system clock for data stamping. That single read makes the injected value authoritative.
 
+### 1.1 Inspection Commands
+
+Two read-only commands inspect a run in place. `make check-data` judges the artefacts against
+`docs/tables/*.md`; `make show-data` prints the rows. Neither writes under `data/`.
+The tools behind them are `scripts/check_data.py` and `scripts/show_data.py`, which take the same
+selectors as long options.
+
+Both accept four selectors:
+
+| Selector | Default | Choices | Meaning |
+|---|---|---|---|
+| `ENV` | `dev` | `dev`, `test`, `prod` | Environment root to inspect |
+| `LAYER` | `all` | `all`, `bronze`, `silver`, `gold`, `errors` | Layer to inspect |
+| `TABLE` | none | any table on disk | One table. Gold tables take the directory name. |
+| `DATE` | none | `YYYY-MM-DD` | One partition |
+
+**Case**: the uppercase spelling is the documented one. Its lowercase twin sets the same value, so
+`DATE=2026-09-01` and `date=2026-09-01` are the same selector. Mixed case stays a typo, because make
+compares variable names exactly.
+
+**Origin**: a selector counts only when it is given on the command line. An exported `COLUMNS` or
+`ENV` cannot turn into one, and a typed `TABLE=` stays empty.
+
+`show-data` adds four:
+
+| Selector | Default | Choices | Meaning |
+|---|---|---|---|
+| `LIMIT` | `10` | integer | Rows for Parquet layers, lines for JSON layers |
+| `COLUMNS` | all | comma-separated names | Columns to read and show |
+| `FORMAT` | `table` | `table`, `json`, `csv` | Output shape |
+| `SCHEMA` | off | see below | Names and types only, no rows read |
+
+`SCHEMA` is a switch, not a value. `1`, `yes`, `true` and `on` turn it on; `0`, `no`, `false` and
+`off` turn it off. Any other value stops the build, because a mistyped switch is not an answer.
+
+Exit codes. These are the codes the tools return:
+
+| Command | `0` | `1` | `2` | `3` |
+|---|---|---|---|---|
+| `check-data` | every check passed | a check failed | no table with that name on disk | nothing was scanned |
+| `show-data` | something was shown | not used | the request does not match the data | nothing to look at |
+
+`check-data` counts a missing artefact as a failed check, so a `DATE` whose partition is absent
+returns `1`, not `3`. `show-data` returns `2` when a named table is absent, and also when
+`FORMAT=json` or `csv` covers more than one table, because a machine format needs a single table in
+scope. It reports a partition that holds no file and still returns `0`, because it never fails on a
+data defect.
+
+**Through make**: a non-zero recipe exit becomes make's own `2`. Read the printed summary line for
+the tool's code, or call the script directly.
+
+**Streams**: with `FORMAT=json` or `csv` the rows go to stdout and the report moves to stderr, so a
+pipe carries data only.
+
+**What `check-data` checks**: file and partition counts, row counts, column and type parity against
+the contract, the declared partition key, business primary key uniqueness, and whether every field
+under `pii.masked_fields` is masked. The layer is a parameter because the layers are structural.
+The table is discovered from disk, so a table added to the pipeline is checked without editing the
+tool.
+
+**What `show-data` never does**: fail on a data defect. A table that breaks its contract is exactly
+the table you want to look at.
+
+The layer layout itself is in `DATA-DESIGN.md`.
+
 ## 2. Input Format
 
 The reader auto-detects format by file extension:
