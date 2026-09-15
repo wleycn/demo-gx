@@ -2,7 +2,7 @@
 """Schema validation module.
 
 Implements strict-mode validation against the data contract defined in
-``config/data/schema.yaml``.  Validates field existence, types, enum membership,
+``config/contract/schema.yaml``.  Validates field existence, types, enum membership,
 regex patterns, and minimum values, then splits the DataFrame into valid
 and invalid partitions with per-row error reasons.
 """

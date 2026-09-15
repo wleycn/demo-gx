@@ -66,16 +66,16 @@ def _anchor_to_output(config: dict, section: str, key: str) -> None:
 
 
 def load_schema() -> dict:
-    """Load the data contract from ``config/data/schema.yaml``.
+    """Load the data contract from ``config/contract/schema.yaml``.
 
     Returns:
         dict: Parsed schema dictionary defining fields, types, required
         flags, enum values, and regex patterns.
 
     Raises:
-        FileNotFoundError: If ``config/data/schema.yaml`` does not exist.
+        FileNotFoundError: If ``config/contract/schema.yaml`` does not exist.
     """
-    schema_path = PROJECT_ROOT / "config" / "data" / "schema.yaml"
+    schema_path = PROJECT_ROOT / "config" / "contract" / "schema.yaml"
     if not schema_path.exists():
         raise FileNotFoundError(f"Schema file {schema_path} not found")
     with open(schema_path) as f:

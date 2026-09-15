@@ -92,7 +92,7 @@
 {project}/
 ├── config/                      # configuration, split by purpose
 │   ├── env/{env}.yaml           # one file per environment: storage paths / logging / metrics / alerting 🔴 configuration is read from here only
-│   └── data/schema.yaml         # data contract source: field types / required / enums / patterns / ranges
+│   └── contract/schema.yaml     # data contract source: field types / required / enums / patterns / ranges
 ├── dags/                        # orchestration: dependency assembly only, no transform logic 🔴 (only when a scheduler exists, e.g. Airflow / Dagster)
 ├── src/{pkg}/pipelines/{domain}/ # read/write transform logic (only when a domain needs a further pipeline split; the domain directory itself comes from the stack layer)
 ├── src/{pkg}/models/            # schema / contract models, aligned with the table contract 🔴 (only when the contract becomes code models)
@@ -103,7 +103,7 @@
 └── tests/{fixtures,pipelines}/  # only when tests need sample data on disk / per-pipeline subdirectories
 ```
 
-> The configuration directory splits by **purpose**: `env/` holds the runtime parameters that vary per environment (one file per environment), `data/` holds the data contract, which does not vary by environment. Both are **built-in**: they do not appear or disappear with a technology choice. `config/data/schema.yaml` is the **single source** of the field contract; the table contract refers to it instead of restating it.
+> The configuration directory splits by **purpose**: `env/` holds the runtime parameters that vary per environment (one file per environment), `contract/` holds the data contract, which does not vary by environment. Both are **built-in**: they do not appear or disappear with a technology choice. `config/contract/schema.yaml` is the **single source** of the field contract; the table contract refers to it instead of restating it.
 
 | Directory | Responsibility | Forbidden |
 |---|---|---|

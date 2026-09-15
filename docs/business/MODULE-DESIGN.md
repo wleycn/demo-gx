@@ -33,7 +33,7 @@ All paths in this section are relative to `src/demo_gx/`.
 
 ### 2.2 validation/schema_validator.py
 
-**Description**: validates against the 8 required fields defined in `config/data/schema.yaml`. Uses strict mode:
+**Description**: validates against the 8 required fields defined in `config/contract/schema.yaml`. Uses strict mode:
 
 - Rejects all extra fields not defined in the contract. Row-level key presence is judged from the preserved `_raw_json` when available, because a null extra value and a missing key are indistinguishable after `pandas.read_json`.
 - Validates whether fields are missing, types are compatible, and formats are correct (UUID, ISO timestamp, enum, regex, minimum, max length, max decimals).
@@ -129,7 +129,7 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 
 ### 3.2 Data Contract
 
-- `config/data/schema.yaml` explicitly defines fields, types, required flags, enum value whitelists, regex patterns, minimum values, max length, and max decimals.
+- `config/contract/schema.yaml` explicitly defines fields, types, required flags, enum value whitelists, regex patterns, minimum values, max length, and max decimals.
 - Modifying this YAML takes effect without changing core Python logic.
 
 ## 4. Cross-Module Communication

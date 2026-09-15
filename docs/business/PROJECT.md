@@ -42,7 +42,7 @@ demo-gx/
 │   └── common/               # config.py, logger.py, mask.py, metrics.py, time_utils.py
 ├── config/                   # Configuration, split by purpose
 │   ├── env/                  # dev.yaml / test.yaml / prod.yaml (runtime parameters per environment)
-│   └── data/                 # schema.yaml (the data contract: types, required, enums, patterns)
+│   └── contract/             # schema.yaml (the data contract: types, required, enums, patterns)
 ├── data/                     # Per-env storage: {env}/input committed, {env}/output ignored
 ├── docs/
 │   ├── business/             # Seven business documents (this directory)
@@ -71,7 +71,7 @@ under each environment's `output/` directory (`data/{env}/output/`) and are git-
 
 ## Contract Summary
 
-- **Data contract**: `config/data/schema.yaml` defines 8 required fields with types, enum values,
+- **Data contract**: `config/contract/schema.yaml` defines 8 required fields with types, enum values,
   regex patterns, and minimum values. Strict mode rejects unknown fields.
 - **Environment config**: `config/env/{dev,test,prod}.yaml` controls storage paths, logging,
   metrics, and alert endpoints. Each environment writes under its own root, split into

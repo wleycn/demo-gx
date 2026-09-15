@@ -132,7 +132,7 @@ Items that the skeleton presents as **conditional** are not deviations. Upstream
 - **No `dags/`**: no scheduler; `python -m demo_gx.cli` is the only entry point.
 - **Entry point inside the package, not in `scripts/`**: the two directories would share assumptions rather than separate them, because the entry hardcodes its `--env` values and `tests/` imports four pipeline components as libraries. The merge is accepted because there is no second caller. Its cost is command-line side effects in library code.
 - **Transformation by stage not domain**: single business domain (events) means domain-split would produce singleton directories. Stage boundaries are the real reusable boundaries. `common/` fills the cross-stage shared layer role.
-- **No `src/demo_gx/models/`**: `config/data/schema.yaml` and `docs/tables/` are the single sources of truth. A Python model layer would create a second definition.
+- **No `src/demo_gx/models/`**: `config/contract/schema.yaml` and `docs/tables/` are the single sources of truth. A Python model layer would create a second definition.
 - **No `sql/`**: no SQL engine; schema changes tracked through `schema.yaml` and table contracts. Iceberg DDL exists in `docs/archive/` as production-shape reference only.
 - **Flat tests**: one file per module; mirroring would add a directory level per test file. `test_validation.py` covers `validation/schema_validator.py`.
 - **Bronze/Silver/Gold naming**: maps to upstream `ods/dwd/dws/ads` via `DOMAIN-LANGUAGE.md` term `data layer mapping`.

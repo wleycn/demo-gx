@@ -105,7 +105,7 @@ After reading, a `_raw_json` column is appended to every row containing the row'
 
 ### Expected Input Fields
 
-Defined in `config/data/schema.yaml`. All 8 fields are required.
+Defined in `config/contract/schema.yaml`. All 8 fields are required.
 
 | Field | Type | Validation |
 |---|---|---|

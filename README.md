@@ -61,7 +61,7 @@ demo-gx/
 │   └── common/               # config.py, logger.py, mask.py, metrics.py, time_utils.py
 ├── config/                   # Configuration, split by purpose
 │   ├── env/                  # dev.yaml / test.yaml / prod.yaml (runtime parameters per environment)
-│   └── data/                 # schema.yaml (the data contract: types, required, enums, patterns)
+│   └── contract/             # schema.yaml (the data contract: types, required, enums, patterns)
 ├── data/                     # Per-env storage: {env}/input committed, {env}/output ignored
 ├── docs/
 │   ├── business/             # Project, data, module, interface, glossary, changelog, known issues

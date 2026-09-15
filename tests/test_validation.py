@@ -20,9 +20,9 @@ def schema_config():
     """Load the schema.yaml contract for use in tests.
 
     Returns:
-        dict: Parsed schema configuration from ``config/data/schema.yaml``.
+        dict: Parsed schema configuration from ``config/contract/schema.yaml``.
     """
-    with open(Path(__file__).parent.parent / "config" / "data" / "schema.yaml") as f:
+    with open(Path(__file__).parent.parent / "config" / "contract" / "schema.yaml") as f:
         return yaml.safe_load(f)
 
 
