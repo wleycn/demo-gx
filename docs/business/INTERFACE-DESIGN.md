@@ -40,7 +40,7 @@ After reading, a `_raw_json` column is appended to every row containing the row'
 
 ### Expected Input Fields
 
-Defined in `config/schema.yaml`. All 8 fields are required.
+Defined in `config/data/schema.yaml`. All 8 fields are required.
 
 | Field | Type | Validation |
 |---|---|---|
@@ -61,9 +61,9 @@ Strict mode rejects unknown fields not in this list.
 
 | Environment | `storage.base_path` | Config file |
 |---|---|---|
-| dev | `./data/dev` | `config/dev.yaml` |
-| test | `./data/test` | `config/test.yaml` |
-| prod | `./data/prod` | `config/prod.yaml` |
+| dev | `./data/dev` | `config/env/dev.yaml` |
+| test | `./data/test` | `config/env/test.yaml` |
+| prod | `./data/prod` | `config/env/prod.yaml` |
 
 Each environment root splits by direction. The example is dev; test and prod mirror it under `data/test/` and `data/prod/`:
 

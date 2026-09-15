@@ -33,7 +33,7 @@ All paths in this section are relative to `src/demo_gx/`.
 
 ### 2.2 validation/schema_validator.py
 
-**Description**: validates against the 8 required fields defined in `config/schema.yaml`. Uses strict mode:
+**Description**: validates against the 8 required fields defined in `config/data/schema.yaml`. Uses strict mode:
 
 - Rejects all extra fields not defined in the contract. Row-level key presence is judged from the preserved `_raw_json` when available, because a null extra value and a missing key are indistinguishable after `pandas.read_json`.
 - Validates whether fields are missing, types are compatible, and formats are correct (UUID, ISO timestamp, enum, regex, minimum, max length, max decimals).
@@ -73,7 +73,7 @@ All paths in this section are relative to `src/demo_gx/`.
 
 ### 2.6 common/config.py
 
-**Description**: reads `config/{env}.yaml` and parses the YAML content into a Python dict. Supports overriding the storage base path via the `STORAGE_BASE_PATH` environment variable. Anchors relative paths for metrics and log files under the environment's storage base path.
+**Description**: reads `config/env/{env}.yaml` and parses the YAML content into a Python dict. Supports overriding the storage base path via the `STORAGE_BASE_PATH` environment variable. Anchors relative paths for metrics and log files under the environment's storage base path.
 **Input**: environment identifier (`dev`, `test`, `prod`).
 **Output**: configuration dict containing storage paths, logging settings, metrics output location, and alert endpoints.
 
@@ -116,7 +116,7 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 
 ### 3.1 Configuration Files
 
-- `config/dev.yaml`, `config/test.yaml`, `config/prod.yaml`.
+- `config/env/dev.yaml`, `config/env/test.yaml`, `config/env/prod.yaml`.
 - Core config items:
   - `storage.base_path`: environment root. INTERFACE-DESIGN.md section 3.1 lists the root for each environment.
   - `storage.input_subpath` / `input_file`: the inbound drop directory and the default input file name, used when `--input` is omitted.
@@ -129,7 +129,7 @@ This policy lives in one place so the validator, cleaner, CLI, and Bronze writer
 
 ### 3.2 Data Contract
 
-- `config/schema.yaml` explicitly defines fields, types, required flags, enum value whitelists, regex patterns, minimum values, max length, and max decimals.
+- `config/data/schema.yaml` explicitly defines fields, types, required flags, enum value whitelists, regex patterns, minimum values, max length, and max decimals.
 - Modifying this YAML takes effect without changing core Python logic.
 
 ## 4. Cross-Module Communication

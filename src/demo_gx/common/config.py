@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 def load_config(env: str = "dev") -> dict:
     """Load the YAML configuration for the given environment.
 
-    Reads ``config/{env}.yaml`` relative to the project root and optionally
+    Reads ``config/env/{env}.yaml`` relative to the project root and optionally
     overrides the storage base path via the ``STORAGE_BASE_PATH`` environment
     variable.
 
@@ -31,7 +31,7 @@ def load_config(env: str = "dev") -> dict:
     Raises:
         FileNotFoundError: If the configuration file does not exist.
     """
-    config_path = PROJECT_ROOT / "config" / f"{env}.yaml"
+    config_path = PROJECT_ROOT / "config" / "env" / f"{env}.yaml"
     if not config_path.exists():
         raise FileNotFoundError(f"Config file {config_path} not found")
     with open(config_path) as f:
@@ -66,16 +66,16 @@ def _anchor_to_output(config: dict, section: str, key: str) -> None:
 
 
 def load_schema() -> dict:
-    """Load the data contract schema.yaml from the project config directory.
+    """Load the data contract from ``config/data/schema.yaml``.
 
     Returns:
         dict: Parsed schema dictionary defining fields, types, required
         flags, enum values, and regex patterns.
 
     Raises:
-        FileNotFoundError: If ``config/schema.yaml`` does not exist.
+        FileNotFoundError: If ``config/data/schema.yaml`` does not exist.
     """
-    schema_path = PROJECT_ROOT / "config" / "schema.yaml"
+    schema_path = PROJECT_ROOT / "config" / "data" / "schema.yaml"
     if not schema_path.exists():
         raise FileNotFoundError(f"Schema file {schema_path} not found")
     with open(schema_path) as f:

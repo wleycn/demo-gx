@@ -114,7 +114,6 @@ def main() -> None:
                 metrics.save(config["metrics"]["output_file"])
                 return
 
-
         # 2. Validate schema
         logger.info("Validating schema...")
         schema_cfg = load_schema()
@@ -137,7 +136,6 @@ def main() -> None:
             metrics.save(config["metrics"]["output_file"])
             return
 
-
         # 3. Clean data
         logger.info("Cleaning data...")
         cleaner = DataCleaner()
@@ -146,7 +144,6 @@ def main() -> None:
         cleaned_df = cleaner.check_amount(cleaned_df)
         # Add event_date partition column
         cleaned_df["event_date"] = pd.to_datetime(cleaned_df["event_timestamp"]).dt.date
-
 
         # 4. Deduplicate
         logger.info("Deduplicating...")
@@ -165,7 +162,6 @@ def main() -> None:
         # entry boundary rather than read here (AGENTS.md section 3 red line 10)
         deduped_df["_processed_timestamp"] = run_ts
 
-
         # 5. Write Silver layer
         silver_path = Path(config["storage"]["output_root"]) / config["storage"]["silver_subpath"]
         # Partition by event_date
@@ -175,7 +171,6 @@ def main() -> None:
             part_path.mkdir(parents=True, exist_ok=True)
             group.to_parquet(part_path / "data.parquet", index=False)
             logger.info("Silver data written to %s", part_path)
-
 
         # 6. Build Gold layer — ALWAYS from the on-disk Silver snapshot, never
         #    from the in-memory batch: dims and wide are full snapshots, so a

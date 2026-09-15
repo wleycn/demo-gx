@@ -40,7 +40,7 @@ demo-gx/
 │   ├── transformation/deduplicator.py   # Deduplicator
 │   ├── curation/builder.py              # GoldBuilder (fact / dims / wide)
 │   └── common/               # config.py, logger.py, mask.py, metrics.py, time_utils.py
-├── config/                   # dev.yaml / test.yaml / prod.yaml + schema.yaml (data contract)
+├── config/                   # env/ (dev, test, prod).yaml + data/schema.yaml (the data contract)
 ├── data/                     # Per-env storage: {env}/input committed, {env}/output ignored
 ├── docs/
 │   ├── business/             # Seven business documents (this directory)
@@ -69,9 +69,9 @@ under each environment's `output/` directory (`data/{env}/output/`) and are git-
 
 ## Contract Summary
 
-- **Data contract**: `config/schema.yaml` defines 8 required fields with types, enum values,
+- **Data contract**: `config/data/schema.yaml` defines 8 required fields with types, enum values,
   regex patterns, and minimum values. Strict mode rejects unknown fields.
-- **Environment config**: `config/{dev,test,prod}.yaml` controls storage paths, logging,
+- **Environment config**: `config/env/{dev,test,prod}.yaml` controls storage paths, logging,
   metrics, and alert endpoints. Each environment writes under its own root, split into
   `input/` and `output/`: dev under `data/dev/`, test under `data/test/`, prod under
   `data/prod/`.

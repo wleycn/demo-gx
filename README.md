@@ -59,7 +59,7 @@ demo-gx/
 │   ├── transformation/deduplicator.py   # Deduplicator
 │   ├── curation/builder.py              # GoldBuilder (fact / dims / wide)
 │   └── common/               # config.py, logger.py, mask.py, metrics.py, time_utils.py
-├── config/                   # dev.yaml / test.yaml / prod.yaml + schema.yaml (data contract)
+├── config/                   # env/ (dev, test, prod).yaml + data/schema.yaml (the data contract)
 ├── data/                     # Per-env storage: {env}/input committed, {env}/output ignored
 ├── docs/
 │   ├── business/             # Project, data, module, interface, glossary, changelog, known issues

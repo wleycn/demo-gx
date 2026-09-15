@@ -4,7 +4,7 @@
 > Every AI coding tool and agent runtime working in this repository is bound by this file.
 > That includes Hermes Agent itself, along with the coder profiles, delegated subagents and cron jobs it dispatches.
 > Claude Code, Codex, Cursor and other CLI / IDE assistants are equally subject to it.
-
+> There is exactly one test: **having this repository as cwd means being bound**. A tool not named above is not exempt just because of that. The effective path on the Hermes side is in §8.
 
 ## 0. Rule Precedence
 
@@ -67,7 +67,7 @@ Read through in this order before starting:
 
 ## 6. Change Trail
 
-For a functional or contract change, **append** one entry to `docs/changes/{module}.md`. The entry slug has the same name as the branch; for the entry template see `docs/rules/DEVELOP-FLOW.md` §4. `{module}` takes the top-level module directory name under `src/demo_gx/`, namely `ingestion`, `validation`, `transformation`, `curation`, `common`; a non-functional change lands in `engineering.md`. That directory holds **entry files only** — no README, notes or attachments. For the module list see §9.1 project map.
+For a functional or contract change, **append** one entry to `docs/changes/{module}.md`. The entry slug has the same name as the branch; for the entry template see `docs/rules/DEVELOP-FLOW.md` §4. `{module}` takes the top-level module directory name under `src/demo_gx/`, namely `ingestion`, `validation`, `transformation`, `curation`, `common`; a non-functional change lands in `engineering.md`. That directory holds **entry files only** — no README, notes or attachments. For the module list see the §9 project map.
 
 - Append a deployment record after release.
 
@@ -87,7 +87,7 @@ For a functional or contract change, **append** one entry to `docs/changes/{modu
 - Red lines must be **made executable**: if something can be written as a lint, a check script or a CI check, do not count on "the model will read it".
 
 
-## 9 Project Map (file index)
+## 9. Project Map (file index)
 
 > answers "where is the thing"
 > Generation rule: fill the table below with files that **actually exist in the project**, and delete inapplicable rows. Paths in the table must be really reachable. The machine gate checks the referenced files under `docs/`, `src/`, `scripts/`, `tests/` and `data/` plus the root files it names. A directory path or a `config/*.yaml` entry has to be verified by the reviewer.
@@ -98,11 +98,12 @@ For a functional or contract change, **append** one entry to `docs/changes/{modu
 | AI constraints | `AGENTS.md` (this file) | Red lines and conduct, highest precedence |
 | Rules | `docs/rules/` | Four-piece set: structure / coding / flow / acceptance |
 | Business documents | `docs/business/` | Project description / modules / data / interfaces / glossary / changes / known issues |
+| Deviation register | `docs/business/KNOWN-ISSUE.md` | Known pitfalls / design decisions / every disagreement with the upstream rules, registered item by item (lowering the standard without registering it is forbidden) |
 | Interface contract | `docs/business/INTERFACE-DESIGN.md` | CLI arguments, artefact paths, error envelope: the single source of truth |
 | Data contract | `docs/business/DATA-DESIGN.md` | Layered data flow, table structures, partitioning and rerun semantics |
 | Table contracts | `docs/tables/{table}.md` | One file per table: grain / primary key / dedup method / lifecycle |
-| Field contract source | `config/schema.yaml` | Field types / required / enums / regular expressions |
-| Environment config | `config/dev.yaml`, `config/test.yaml`, `config/prod.yaml` | Storage paths / logging / metrics / alerting |
+| Field contract source | `config/data/schema.yaml` | Field types / required / enums / regular expressions |
+| Environment config | `config/env/dev.yaml`, `config/env/test.yaml`, `config/env/prod.yaml` | Storage paths / logging / metrics / alerting |
 | Product code | `src/demo_gx/` | Installable package; entry `cli.py`, modules `common` / `ingestion` / `validation` / `transformation` / `curation` |
 | Dependencies and toolchain | `pyproject.toml` | The single entry point for dependency declarations, packaging and pytest config |
 | Sample data generation | `scripts/generate_sample_data.py` | Generates `data/{env}/input/sample_data.json` from a fixed seed, carries no business logic |
@@ -112,7 +113,7 @@ For a functional or contract change, **append** one entry to `docs/changes/{modu
 | Change trail | `docs/changes/{module}.md` | One per module, append-only change entries |
 | Gate | `scripts/hooks/pre-commit` and `scripts/hooks/commit-msg`, installed as `.git/hooks/pre-commit` / `.git/hooks/commit-msg` | Calls `ng/tools/pre_commit_gate.py` |
 
-## 10 Skill Map (stage → skill)
+## 10. Skill Map (stage → skill)
 
 > answers "which skill to use at this stage".
 > For stage definitions see `docs/rules/DEVELOP-FLOW.md` §1 (ten stages) and §1.1 (stage 4 substeps). The table below links only skills that **actually exist in the skill library**; the names must be resolvable, `pre_commit_gate.py` checks them.

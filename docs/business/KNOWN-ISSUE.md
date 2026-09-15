@@ -1,7 +1,7 @@
 # Known Issues and Design Decisions
 
 This document records known pitfalls, design decisions, and rejected alternatives. Each entry has five parts: symptom, root cause, impact, disposition, and related document. The disposition is either "accepted" (the project lives with it) or "migration item" (to be addressed when the production shape is available).
-The deviation table in `AGENTS.md` §10 points to the anchors in this document. Items that have been migrated out of this list are listed under "Resolved Migration Items" at the end.
+The deviation table in the "Skeleton Deviations" section points to the anchors defined in this document. Items that have been migrated out of this list are listed under "Resolved Migration Items" at the end.
 ---
 
 ### #coverage-gate-off — No coverage gate enabled
@@ -104,7 +104,7 @@ Two clock reads survive by design and are not defects:
 
 ## Skeleton Deviations (upstream vs this project)
 
-This section is the single home of the deviation record: the table, the applicability boundaries and the cost-and-rollback notes. `AGENTS.md` §10 keeps only the pointer here.
+This section is the single home of the deviation record: the discipline, the table, the applicability boundaries and the cost-and-rollback notes.
 
 The standard practice is the default and a deviation is the exception, so a deviation must satisfy all four conditions at once:
 
@@ -113,7 +113,7 @@ The standard practice is the default and a deviation is the exception, so a devi
 3. It states why the standard practice is not adopted; empty reasons such as "this project is special" are forbidden.
 4. Its cost and rollback cost are recorded in the cost-and-rollback summary at the end of this section.
 
-Silently lowering the standard without registering it is forbidden, and "this is just a one-off case" is not a reason for exemption. Inside a table cell a vertical bar such as `a|b` is written `a\|b`, otherwise Markdown breaks that cell. Change entries under `docs/changes/` that cite `AGENTS.md` section 10 refer to this section; those entries are append-only and are not rewritten.
+Silently lowering the standard without registering it is forbidden, and "this is just a one-off case" is not a reason for exemption. Inside a table cell a vertical bar such as `a|b` is written `a\|b`, otherwise Markdown breaks that cell. Earlier change entries under `docs/changes/` that cite `AGENTS.md` section 10 mean this section; those entries are append-only and are not rewritten.
 
 | Issue | Upstream | This project | Disposition |
 |---|---|---|---|
@@ -132,7 +132,7 @@ Items that the skeleton presents as **conditional** are not deviations. Upstream
 - **No `dags/`**: no scheduler; `python -m demo_gx.cli` is the only entry point.
 - **Entry point inside the package, not in `scripts/`**: the skeleton's merge boundary requires three conditions at once and this project satisfies only the first (single entry). Conditions two and three fail because the entry hardcodes `--env` values and `tests/` imports four pipeline components as libraries. Merge accepted because there is no second caller; cost is command-line side effects in library code.
 - **Transformation by stage not domain**: single business domain (events) means domain-split would produce singleton directories. Stage boundaries are the real reusable boundaries. `common/` fills the cross-stage shared layer role.
-- **No `src/demo_gx/models/`**: `config/schema.yaml` and `docs/tables/` are the single sources of truth. A Python model layer would create a second definition.
+- **No `src/demo_gx/models/`**: `config/data/schema.yaml` and `docs/tables/` are the single sources of truth. A Python model layer would create a second definition.
 - **No `sql/`**: no SQL engine; schema changes tracked through `schema.yaml` and table contracts. Iceberg DDL exists in `docs/archive/` as production-shape reference only.
 - **Flat tests**: one file per module; mirroring would add a directory level per test file. `test_validation.py` covers `validation/schema_validator.py`.
 - **Bronze/Silver/Gold naming**: maps to upstream `ods/dwd/dws/ads` via `DOMAIN-LANGUAGE.md` term `data layer mapping`.

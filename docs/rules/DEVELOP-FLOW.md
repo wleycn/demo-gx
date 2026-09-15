@@ -72,7 +72,7 @@ docs/changes/
 └── engineering.md       # fallback for non-functional changes (build / dependencies / rules / documents / CI)
 ```
 
-- 🔴 This directory holds **entry files only** (`{module}.md`): no README / notes / lists / attachments — **the directory itself is the list** (module name = source top-level module directory name). The mapping of "which change goes in which file" and the fallback rules are written into the project's `AGENTS.md` §9.1 and `docs/business/PROJECT.md`
+- 🔴 This directory holds **entry files only** (`{module}.md`): no README / notes / lists / attachments — **the directory itself is the list** (module name = source top-level module directory name). The mapping of "which change goes in which file" and the fallback rules are written into the project's `AGENTS.md` §9 and `docs/business/PROJECT.md`
 - Division of labor with `CHANGELOG.md`: this directory = **per-module change details** (one entry per change, including scope / verification / rollback); `CHANGELOG.md` = **timeline summary view** (one line per entry)
 
 - 🔴 Append an entry to the end of the corresponding module file **when the change is complete**; for cross-module changes write the full text in the primary module and a one-line pointer back in the other modules

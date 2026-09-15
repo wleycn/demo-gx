@@ -2,7 +2,7 @@
 """Schema validation module.
 
 Implements strict-mode validation against the data contract defined in
-``config/schema.yaml``.  Validates field existence, types, enum membership,
+``config/data/schema.yaml``.  Validates field existence, types, enum membership,
 regex patterns, and minimum values, then splits the DataFrame into valid
 and invalid partitions with per-row error reasons.
 """
@@ -75,7 +75,7 @@ class SchemaValidator:
 
         df["_error_reason"] = ""
         invalid_mask = pd.Series(False, index=df.index)
-        
+
         # 1. Check for extra (unknown) fields
         actual_fields = set(df.columns)
         # Exclude internal columns (_raw_json audit column, _error_reason

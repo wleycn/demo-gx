@@ -25,5 +25,3 @@ def parse_utc_mixed(series: pd.Series) -> pd.Series:
         values.
     """
     return pd.to_datetime(series, utc=True, errors="coerce", format="mixed")
-
-

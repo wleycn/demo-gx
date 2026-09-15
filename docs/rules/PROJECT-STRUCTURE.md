@@ -36,7 +36,6 @@
 | `docs/` | Standards and business documents | Drifting from the code (changing code must be synced) |
 | `docs/changes/` | Change trail (one per module, append-only) | Writing non-change content (explanations, attachments, temporary files) |
 
-
 ## 3. Single Entry Point Files (Single Entry Point Principle)
 
 | Single entry point | File | Responsibility |
@@ -48,7 +47,7 @@
 | Data access | `{shared}/db.py` | Unified connection and query entry (for PG operations see skill `pg-query`) |
 | Redaction | `{shared}/mask.py` | Phone numbers / ID documents / addresses / bank cards |
 
-> 🔴 **The same capability must not be reimplemented outside the single entry point** 
+> 🔴 **The same capability must not be reimplemented outside the single entry point**
 
 ## 4. Naming Conventions
 
@@ -85,12 +84,14 @@
 
 ### 1. Structure Skeleton (additions on top of `python/PROJECT-STRUCTURE.md`, adopt as needed)
 
-> A data-processing project has exactly **two built-in parts**: the table contract (`docs/tables/`, see §3) and the layering dependency direction (see §2). Everything listed below appears **only with a given technology choice**; a line marked "only when ..." is created only when that condition holds.
+> A data-processing project has exactly **three built-in parts**: the table contract (`docs/tables/`, see §3), the layering dependency direction (see §2) and the configuration directory layout (see below). Everything listed below appears **only with a given technology choice**; a line marked "only when ..." is created only when that condition holds.
 > A local Pandas pipeline, for example, has no scheduler (so no `dags/`), no catalog (so no `catalog.py`) and no SQL (so no `sql/`). Not creating these directories is not a deviation.
 > The project's actual structure is in the project map of the root `AGENTS.md` and in `docs/business/PROJECT.md`.
 
 ```text
 {project}/
+├── config/env/{env}.yaml        # one file per environment: storage paths / logging / metrics / alerting 🔴 configuration is read from here only
+├── config/data/schema.yaml      # data contract source: field types / required / enums / patterns / ranges
 ├── dags/                        # orchestration: dependency assembly only, no transform logic 🔴 (only when a scheduler exists, e.g. Airflow / Dagster)
 ├── src/{pkg}/pipelines/{domain}/ # read/write transform logic (only when a domain needs a further pipeline split; the domain directory itself comes from the stack layer)
 ├── src/{pkg}/models/            # schema / contract models, aligned with the table contract 🔴 (only when the contract becomes code models)
@@ -100,6 +101,8 @@
 ├── docs/tables/{table}.md       # table contract: one md per table
 └── tests/{fixtures,pipelines}/  # only when tests need sample data on disk / per-pipeline subdirectories
 ```
+
+> The configuration directory splits by **purpose**: `env/` holds the runtime parameters that vary per environment (one file per environment), `data/` holds the data contract, which does not vary by environment. Both are **built-in**: they do not appear or disappear with a technology choice. `config/data/schema.yaml` is the **single source** of the field contract; the table contract refers to it instead of restating it.
 
 | Directory | Responsibility | Forbidden |
 |---|---|---|
