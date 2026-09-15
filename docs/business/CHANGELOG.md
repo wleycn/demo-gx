@@ -5,6 +5,8 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-15
 
+- `a10c4b4` docs(rules): give the change-size cap a lower bound of 200 lines [AI]
+- `3dc38d8` docs: record the code-audit fixes in the changelog [AI]
 - `e3758f8` fix(pipeline): close the code-audit findings across validation, masking and the error artefacts [AI]
 - `2f5f2eb` refactor(sql): move the target-shape DDL into sql/reference/ [AI]
 - `b542cd6` docs: drop the archive and fold the Iceberg DDL into DATA-DESIGN [AI]
