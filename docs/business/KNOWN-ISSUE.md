@@ -100,6 +100,25 @@ Two clock reads survive by design and are not defects:
 - **Entry boundary**: `cli.py` reads the wall clock once when `--run-timestamp` is absent. The entry plays the scheduler role in a single-machine project; without that read `make run` would have no run instant. Injecting the flag removes the read entirely, and every data artefact then becomes byte-reproducible.
 - **Telemetry**: `common/metrics.py` and `common/logger.py` stamp real wall-clock times. Metrics record how long a run actually took; injecting a synthetic value there would make the metric lie.
 
+### #gold-full-scan — Gold rebuilds from every Silver partition
+
+`cli.py` reads every `silver/event_date=*/data.parquet` file and concatenates them on the
+driver before building Gold. Red line 2 forbids a full scan and a full pull to the driver,
+so this is registered here rather than left unstated.
+
+The reason is the grain of the two Gold products. `dim_customer` and
+`wide_daily_user_events` are full snapshots: rebuilding them from the scoped batch would
+renumber `first_seen_date` and drop every customer whose earlier events sit outside the
+scope, so a scoped backfill would quietly rewrite history (round-2 writer QC #7). Gold
+therefore reads the snapshot on disk, and this single-machine implementation reads all of
+it.
+
+What the production shape does instead: Spark reads the Silver table rather than globbing
+files, and the Gold job takes the partitions it needs plus a maintained dimension
+side-table, or runs as a full refresh scheduled outside the backfill path. The target
+shape is in `sql/reference/iceberg_target_shape.sql`; DATA-DESIGN.md section 2.6 covers
+reprocessing.
+
 ---
 
 ## Skeleton Deviations (upstream vs this project)
@@ -124,6 +143,7 @@ Silently lowering the standard without registering it is forbidden, and "this is
 | Table contract approval | `status: approved` frontmatter; CI blocks unreviewed | Local reference implementation; no approval chain | `#table-contract-approval` |
 | Stage model | Ten stages including pre-release, deployment, observability | Stage 8 replaced by end-to-end smoke; stages 9–10 N/A | See skeleton boundaries below |
 | Clock reads | Code reading system time forbidden | `common/metrics.py` and `common/logger.py` read clock for telemetry only | `#clock-reads-outside-data-stamping` |
+| Gold read path | Queries carry partition pruning; a full scan and a full pull to the driver are forbidden | Gold rebuilds from every Silver partition on the driver, because the dimension and wide products are full snapshots | `#gold-full-scan` |
 
 Items that the skeleton presents as **conditional** are not deviations. Upstream `PROJECT-STRUCTURE.md` §1 marks `dags/`, `src/{pkg}/pipelines/{domain}/`, `src/{pkg}/models/`, `sql/`, `catalog.py`, `tests/{fixtures,pipelines}/` and the `ods`→`dwd`→`dws`→`ads` layer naming as "created only when that condition holds", and states that not creating them is not a deviation. This project adopts none of them, so they are absent from the table above. Only those rows are departures from an unconditional rule.
 
@@ -151,3 +171,4 @@ Items that the skeleton presents as **conditional** are not deviations. Upstream
 - **Table contract approval** (`#table-contract-approval`) — cost: nothing blocks an unreviewed contract change; rollback: low, add a CI check on the frontmatter.
 - **Stage model** — cost: release and observability discipline is not exercised; rollback: both stages must be reinstated once this becomes a deployed service.
 - **Clock reads** (`#clock-reads-outside-data-stamping`) — cost: telemetry timestamps are not reproducible across runs; rollback: low, inject the run instant into the telemetry path too.
+- **Gold read path** (`#gold-full-scan`) — cost: build time and driver memory grow with the whole Silver history, so a backfill is not scoped in practice; rollback: medium, scope the fact rebuild to the run's dates and maintain the dimensions incrementally.

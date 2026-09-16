@@ -203,7 +203,7 @@ There is no separate type-conversion quarantine directory. Every rejected row go
 
 ## 4. Error Envelope Fields
 
-Invalid records are written to `errors/quarantine/event_date={YYYY-MM-DD|unknown}/data.parquet` as a partitioned Parquet table. The partition key is the record's own event date.
+Invalid records are written to `errors/quarantine/event_date={YYYY-MM-DD|unknown}/data.parquet` as a partitioned Parquet table. The partition key is the record's own event date. A run clears the covered days that hold no rejects and removes the table when nothing is left, so an absent table means zero records; `make check-data` reports absence as zero, not as a failure.
 
 | Field | Type | Description |
 |---|---|---|

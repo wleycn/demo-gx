@@ -37,7 +37,9 @@ format: `event_date={YYYY-MM-DD|unknown}/data.parquet`.
   say `unknown`, and the value matches the partition directory name. The other
   tables carry a real date because every row in them has one.
 - **Write mode**: partition-scoped overwrite (idempotent). Each partition's
-  `data.parquet` is rewritten per run.
+  `data.parquet` is rewritten through a temporary file and then moved into place.
+- **Scope clearing**: a run also drops the covered days that hold nothing, and the table
+  directory itself once no partition is left. An absent table therefore means zero rows.
 - **Estimated volume**: 0 to 10 rows per partition in the demo sample.
 
 ## Field List
@@ -65,8 +67,8 @@ format: `event_date={YYYY-MM-DD|unknown}/data.parquet`.
 ## Lifecycle
 
 - **Write mode**: partition-scoped overwrite (idempotent).
-- **Retention**: no retention policy. All partitions persist until manually
-  cleaned.
+- **Retention**: no retention policy beyond scope clearing: a partition stays until a
+  run covers that day again or someone cleans it manually.
 - **Reprocessing**: `--event-date` reprocesses one date. Late data writes to
   the corresponding historical partition.
 

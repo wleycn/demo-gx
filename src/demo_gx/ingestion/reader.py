@@ -13,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 
 from demo_gx.common.mask import mask_columns
+from demo_gx.common.storage import temp_then_replace
 from demo_gx.common.time_utils import parse_utc_mixed
 
 
@@ -187,9 +188,10 @@ def write_bronze(raw_df: pd.DataFrame, bronze_base: Path, run_ts: pd.Timestamp) 
         df["_ingestion_dt"] = run_date
     written = 0
     for (source, dt), group in df.groupby(["source_system", "_ingestion_dt"], dropna=False):
-        part_dir = bronze_base / str(source) / f"dt={dt}"
-        part_dir.mkdir(parents=True, exist_ok=True)
         out = group.drop(columns=["_ingestion_dt"])
-        out.to_json(part_dir / "events.json", orient="records", lines=True, force_ascii=False, date_format="iso")
+        # Same temporary-then-replace as every other table write: a crash must
+        # not truncate the archive that is already on disk.
+        with temp_then_replace(bronze_base / str(source) / f"dt={dt}" / "events.json") as target:
+            out.to_json(target, orient="records", lines=True, force_ascii=False, date_format="iso")
         written += len(group)
     return written

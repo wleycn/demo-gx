@@ -118,3 +118,44 @@ def test_a_row_with_an_unparseable_timestamp_gets_its_own_partition(tmp_path: pa
     partitions = _partitions(tmp_path, "quarantine")
     assert set(partitions) == {"event_date=unknown"}, partitions
     assert len(partitions["event_date=unknown"]) == 1
+
+
+def test_a_fixed_rerun_clears_the_days_that_stopped_breaking(tmp_path: pathlib.Path) -> None:
+    """A rerun with nothing to report leaves no error table for the days it covered.
+
+    The tables kept whatever an earlier run had written, so after a fix the
+    verifier went on reporting rejects and duplicates for a day that no longer
+    produced any. The artefacts said one thing and the run had said another.
+    """
+    broken = _run(tmp_path, _batch())
+    assert broken.returncode == 0, broken.stdout + broken.stderr
+    assert _partitions(tmp_path, "quarantine") and _partitions(tmp_path, "duplicates")
+
+    fixed = _run(
+        tmp_path,
+        [
+            _row(event_id="723e4567-e89b-42d3-a456-426614174005", customer_id="cust_002"),
+            _row(
+                event_id="823e4567-e89b-42d3-a456-426614174006",
+                customer_id="cust_002",
+                event_timestamp="2026-09-11T10:00:00Z",
+                ingestion_timestamp="2026-09-11T10:01:00Z",
+            ),
+        ],
+    )
+    assert fixed.returncode == 0, fixed.stdout + fixed.stderr
+    assert _partitions(tmp_path, "quarantine") == {}
+    assert _partitions(tmp_path, "duplicates") == {}
+
+
+def test_a_cleared_rerun_leaves_the_days_it_did_not_cover_alone(tmp_path: pathlib.Path) -> None:
+    """The scope decides what is cleared: a day outside it keeps its rejects."""
+    _run(tmp_path, _batch())
+    assert "event_date=2026-09-11" in _partitions(tmp_path, "quarantine")
+
+    fixed = _run(tmp_path, [_row(event_id="923e4567-e89b-42d3-a456-426614174007", customer_id="cust_003")])
+
+    assert fixed.returncode == 0, fixed.stdout + fixed.stderr
+    partitions = _partitions(tmp_path, "quarantine")
+    assert "event_date=2026-09-10" not in partitions
+    assert "event_date=2026-09-11" in partitions

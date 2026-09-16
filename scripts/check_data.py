@@ -267,6 +267,22 @@ def _check_masked(files: list[Path], fields: list[str]) -> Finding:
     return Finding("pii", OK, f"{fields} all masked, {distinct} distinct values of the form h_ + 16 hex")
 
 
+def _check_currency_corrections(files: list[Path], rows: int) -> Finding:
+    """Report how many amounts had an invalid currency code replaced.
+
+    The cleaner substitutes ``USD`` for a code that fails the contract's
+    pattern and flags the row in ``_is_invalid_currency``; the contract
+    documents that flag (`docs/tables/silver_events.md`). Nothing reported it,
+    so the substitution was invisible. No threshold is invented here: the count
+    and its share are the fact the flag exists for.
+    """
+    corrected = 0
+    for table in _read_columns(files, ["_is_invalid_currency"]):
+        corrected += sum(1 for value in table.column("_is_invalid_currency").to_pylist() if value)
+    share = f", {corrected * 100 / rows:.1f}% of rows" if rows else ""
+    return Finding("currency", OK, f"{corrected} row(s) had an invalid code{share}; corrected to USD and flagged")
+
+
 def check_parquet_table(
     root: Path, contract: Contract | None, masked: list[str], event_date: str | None
 ) -> list[Finding]:
@@ -311,6 +327,9 @@ def check_parquet_table(
         findings.append(_check_primary_key(files, contract.primary_key, actual))
     else:
         findings.append(Finding("primary key", WARN, "contract declares no primary key"))
+
+    if "_is_invalid_currency" in actual:
+        findings.append(_check_currency_corrections(files, rows))
 
     present = [name for name in masked if name in actual]
     if present:
@@ -376,8 +395,16 @@ def check_quarantine(root: Path, event_date: str | None, table_name: str) -> lis
     dirs = partition_dirs(table_root, key, event_date)
     files = parquet_files(table_root, key, event_date)
     if not files:
+        # An absent error table means the run found nothing to put in it: the
+        # pipeline clears the days a run covers that produced no errors, so "no
+        # file" reads as "no records". Reporting it as a failure would make the
+        # cleanest possible run — nothing rejected, nothing duplicated — the one
+        # that fails, and a false red teaches the reader to ignore this tool.
         scope = f" for event_date={event_date}" if event_date else ""
-        return [Finding(table_name, FAIL, f"no Parquet file under {table_root}{scope}")]
+        findings = [Finding(table_name, OK, f"no records{scope}; no table under {table_root}")]
+        if table_name == "quarantine":
+            findings.append(Finding("error types", OK, "none"))
+        return findings
     rows = sum(pq.ParquetFile(path).metadata.num_rows for path in files)
     if dirs:
         spread = [pq.ParquetFile(path / "data.parquet").metadata.num_rows for path in dirs]

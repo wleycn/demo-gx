@@ -19,10 +19,12 @@ Contract: INTERFACE-DESIGN.md section 4.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
 
+from demo_gx.common.storage import write_table
 from demo_gx.common.time_utils import parse_utc_mixed
 
 # Reason fragments that mark a type-coercion failure rather than a contract
@@ -94,6 +96,7 @@ def write_error_envelope(
     invalid_df: pd.DataFrame,
     errors_dir: Path,
     ingestion_timestamp: pd.Timestamp,
+    scope: Iterable[str] | None = None,
 ) -> list[Path]:
     """Write the error envelope as a partitioned Parquet table.
 
@@ -101,25 +104,20 @@ def write_error_envelope(
     Each partition directory ``event_date=<value>/data.parquet`` is overwritten,
     so a rerun replaces one day and leaves the others alone.
 
+    ``scope`` carries the partition values the run covers. A covered day that
+    produced no invalid rows is cleared, so a rerun after a fix does not leave
+    the earlier run's rows behind for the verifier to report.
+
     Args:
         invalid_df (pandas.DataFrame): Rejected rows carrying ``error_reason``.
         errors_dir (pathlib.Path): Quarantine table root
             (``errors/quarantine``); created if absent.
         ingestion_timestamp (pandas.Timestamp): Run timestamp.
+        scope (collections.abc.Iterable[str] | None): Partition values this run
+            owns, already rendered. ``None`` clears nothing.
 
     Returns:
         list[pathlib.Path]: The written partition files, one per event date.
     """
     envelope = build_error_envelope(invalid_df, ingestion_timestamp)
-    written: list[Path] = []
-    for date_val, group in envelope.groupby("event_date"):
-        part_path = errors_dir / f"event_date={date_val}"
-        part_path.mkdir(parents=True, exist_ok=True)
-        # Partition-scoped overwrite: write to a temp file then replace, so a
-        # crash mid-write cannot leave a half-written data.parquet.
-        tmp_file = part_path / "data.parquet.tmp"
-        group.to_parquet(tmp_file, index=False)
-        final = part_path / "data.parquet"
-        tmp_file.replace(final)
-        written.append(final)
-    return written
+    return write_table(envelope, errors_dir, partition_col="event_date", scope=scope)

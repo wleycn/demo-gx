@@ -142,7 +142,11 @@ Gold is always rebuilt from the full on-disk Silver snapshot, never from the in-
 
 ### 2.5 Error Records
 
-Errors are written to `errors/quarantine/` as a partitioned Parquet table, partitioned by `event_date` (the record's own event date, or `unknown` for unparseable timestamps). The envelope fields are an output contract; the field table lives in INTERFACE-DESIGN.md section 4. Superseded duplicates are written to `errors/duplicates/`, also partitioned by `event_date`. Both tables are partition-overwritten, so a rerun of the same batch leaves the content unchanged (AGENTS.md red line 1).
+Errors are written to `errors/quarantine/` as a partitioned Parquet table, partitioned by `event_date` (the record's own event date, or `unknown` for unparseable timestamps). The envelope fields are an output contract; the field table lives in INTERFACE-DESIGN.md section 4. Superseded duplicates are written to `errors/duplicates/`, also partitioned by `event_date`. Both tables are partition-overwritten, so a rerun of the same batch leaves the content
+unchanged (AGENTS.md red line 1). Each run also clears the partitions it covers that
+produced no rows and removes the table directory when nothing is left, so a day that stops
+producing rejects stops having a quarantine partition. An absent error table therefore means
+zero records, and `make check-data` reports it as a pass rather than a failure.
 
 ### 2.6 Reprocessing Semantics
 

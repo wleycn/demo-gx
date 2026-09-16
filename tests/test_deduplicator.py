@@ -51,3 +51,22 @@ def test_deduplicate_early_return_on_missing_columns():
     deduped, duplicates = Deduplicator.deduplicate(df)
     assert len(deduped) == 1
     assert duplicates.empty
+
+
+def test_a_row_without_a_usable_timestamp_never_wins_the_duplicate():
+    """An unparseable ingestion_timestamp must lose to one that has a value.
+
+    The sort left NaT last, and keep-last then promoted the row nobody could
+    order over the row that carried a timestamp: the surviving record was the
+    one with the least usable data.
+    """
+    df = pd.DataFrame(
+        [
+            {"event_id": "e1", "ingestion_timestamp": pd.Timestamp("2026-01-02T00:00:00Z"), "amount": 10.0},
+            {"event_id": "e1", "ingestion_timestamp": pd.NaT, "amount": 99.0},
+        ]
+    )
+    deduped, duplicates = Deduplicator.deduplicate(df)
+    assert len(deduped) == 1
+    assert deduped.iloc[0]["amount"] == 10.0
+    assert duplicates.iloc[0]["amount"] == 99.0

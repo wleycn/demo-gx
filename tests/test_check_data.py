@@ -229,3 +229,55 @@ def test_unknown_table_is_reported(project: Path, capsys: pytest.CaptureFixture[
     code, out = _run(capsys, "--layer", "gold", "--table", "ghost")
     assert code == 2
     assert "no table named 'ghost'" in out
+
+
+def test_an_absent_error_table_reports_no_records(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """No error table means no errors, which is a pass.
+
+    The pipeline clears the days a run covers that produced no errors, so an
+    absent table is the normal state of a clean run. Failing it made the best
+    possible outcome — nothing rejected, nothing duplicated — the one that
+    broke CI (audit finding, 2026-09-15).
+    """
+    code, out = _run(capsys, "--layer", "errors")
+    assert code == 0, out
+    assert "no records" in out
+    assert "0 FAIL" in out
+
+
+def test_a_scoped_absent_error_table_is_also_a_pass(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """The same rule holds when the check names one partition."""
+    code, out = _run(capsys, "--layer", "errors", "--event-date", "2026-01-01")
+    assert code == 0, out
+    assert "no records for event_date=2026-01-01" in out
+
+
+def test_currency_corrections_are_reported(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """The cleaning step's own flag is reported, not just written.
+
+    ``normalize_currency`` replaces an invalid code with USD and sets
+    ``_is_invalid_currency``, and the contract documents that column. Nothing
+    reported it, so the substitution was invisible to whoever reads the report.
+    """
+    contract = CONTRACT.replace(
+        "| `n` | bigint | Count |",
+        "| `n` | bigint | Count |\n| `_is_invalid_currency` | boolean | Corrected code |",
+    )
+    _write_contract(project, contract)
+    target = project / "data" / "dev" / "output" / "gold" / "tiny_table" / "event_date=2026-01-01"
+    target.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "event_date": pa.array([date(2026, 1, 1)], type=pa.date32()),
+                "customer_id": pa.array([MASKED], type=pa.string()),
+                "n": pa.array([1], type=pa.int64()),
+                "_is_invalid_currency": pa.array([True], type=pa.bool_()),
+            }
+        ),
+        target / "data.parquet",
+    )
+    code, out = _run(capsys, "--layer", "gold")
+    assert code == 0, out
+    assert "1 row(s) had an invalid code" in out
+    assert "100.0% of rows" in out

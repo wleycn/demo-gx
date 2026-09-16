@@ -8,6 +8,8 @@ and analytics consumption.
 
 import pandas as pd
 
+from demo_gx.common.time_utils import parse_utc_mixed
+
 
 class GoldBuilder:
     """Constructs Gold-layer fact, dimension, and wide tables."""
@@ -30,7 +32,10 @@ class GoldBuilder:
             (event_date, customer_id, event_type) group.
         """
         if "event_date" not in df.columns:
-            df["event_date"] = pd.to_datetime(df["event_timestamp"]).dt.date
+            # One parsing policy for the pipeline (common.time_utils): a plain
+            # pd.to_datetime here would apply the first row's format to every
+            # row and silently NaT the rest.
+            df["event_date"] = parse_utc_mixed(df["event_timestamp"]).dt.date
         fact = df.groupby(["event_date", "customer_id", "event_type"], as_index=False).agg(
             event_count=("event_id", "count"), total_amount=("amount", "sum"), avg_amount=("amount", "mean")
         )
