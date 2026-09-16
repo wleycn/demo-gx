@@ -3,6 +3,10 @@
 Version-level changes, reverse chronological order. Source: `git log --date=short --pretty=format:'%ad %h %s'`.
 A commit that only updates this file cannot list itself, so the newest hash here always trails `git log` by one entry.
 
+## 2026-09-16
+
+- `a874ca8` chore(lint): put the readability and naming rules behind a machine gate [AI]
+
 ## 2026-09-15
 
 - `9ada1ee` fix(pipeline): write every table whole, and let absence mean no errors [AI]
