@@ -17,8 +17,6 @@ of the same batch leaves the artefact unchanged (AGENTS.md red line 1).
 Contract: INTERFACE-DESIGN.md section 4.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from pathlib import Path
 

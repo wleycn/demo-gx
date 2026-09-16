@@ -16,8 +16,6 @@ Both invariants are what make a partition-scoped overwrite idempotent
 that outlives the absence of its rows, breaks that.
 """
 
-from __future__ import annotations
-
 import shutil
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
