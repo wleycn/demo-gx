@@ -31,15 +31,16 @@ src = ["src", "scripts", "tests"]
 # E/W pycodestyle, F pyflakes, I import order, UP pyupgrade, B bugbear,
 # SIM simplify, C4 comprehensions, DTZ naive datetimes, G logging,
 # BLE blind except, N naming, D docstrings, RUF ruff-specific.
-# D401 is ignored because it demands the imperative mood, which the Google style
-# guide explicitly leaves free.
+# Two docstring codes are ignored on purpose: D401 demands the imperative mood,
+# which the Google style guide leaves free, and D202 would delete the blank line
+# after a docstring, which our own layout rule requires (see CODING-STANDARD §13.1).
 select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4", "DTZ", "G", "BLE", "N", "D", "RUF"]
-ignore = ["D401"]
+ignore = ["D401", "D202"]
 
 [tool.ruff.lint.pydocstyle]
-# Google convention. D401 (imperative mood) is dropped under `ignore` above on
-# purpose: the Google style guide accepts either mood for a summary line, so
-# enforcing it would reject docstrings the convention itself allows.
+# Google convention. `ignore` above drops D401 (imperative mood), which the Google
+# style guide leaves free, and D202 (blank line after a docstring), which our own
+# layout rule requires.
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]

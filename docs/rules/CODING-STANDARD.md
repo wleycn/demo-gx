@@ -7,7 +7,7 @@
 - 🔴 All functions carry **type hints**, `tests/` included; CI runs `mypy` (at least strict on new modules)
 - 🔴 **Bare generic containers are forbidden**: `-> tuple:` / `x: dict` must spell out their type arguments (`tuple[str, int]` / `dict[str, Any]`) -- a bare container switches type checking off; enforced by `mypy --disallow-any-generics`
 - 🔴 **Do not write `from __future__ import annotations`**: with a runtime floor of 3.10 the `X | None` form and builtin generic annotations already work at runtime, and one more deferred-evaluation layer only trips `get_type_hints` and framework reflection
-- 🟡 Unified `ruff` lint + format, configuration centralized in `pyproject.toml` (no scattered flake8/pylint configs); on top of the baseline set `E/W/F/I/UP/B/SIM/C4/DTZ/G/BLE/RUF` enable `N` (naming) and `D` (`convention="google"`, ignoring `D203`/`D213`/`D401` -- `D401` demands the imperative mood, which contradicts Google's "either style is fine")
+- 🟡 Unified `ruff` lint + format, configuration centralized in `pyproject.toml` (no scattered flake8/pylint configs); on top of the baseline set `E/W/F/I/UP/B/SIM/C4/DTZ/G/BLE/RUF` enable `N` (naming) and `D` (`convention="google"`); ignore `D203`, `D213`, `D401` and `D202`. The first two contradict the Google convention; `D401` demands the imperative mood while Google allows either; `D202` deletes the blank line after a docstring, which §13.1 of this file requires.
 - 🟡 `tests/` turns `D1xx` off via `per-file-ignores`: a test function name is its own description, so a docstring is not required there
 - 🟡 **Naming**: the whitelist is pandas' idiomatic short names (`df`), counters and iterators (`i`/`j`/`k`), the exception `e` and the file `f`; **invented abbreviations made by deleting letters are forbidden** (`evt_date` -> `event_date`, `dup_dir` -> `duplicates_dir`); a name colliding with a keyword takes a trailing underscore (`class_`). Basis: PEP 8 (which bans only `l`/`O`/`I`) and Google's "avoid abbreviation". **No lint rule can catch a letter-deleting abbreviation -- this one rests on review**
 - 🔴 Production code **must not use `print`**; uniformly use `{shared}/logger.get_logger`
@@ -129,13 +129,18 @@ Type-specific red lines (data processing: write idempotency / partition pruning 
 
 ### 13.1 Blank Lines and Layout (written for the human reader)
 
-> **Basis**: PEP 8 allows blank lines "sparingly" to mark logical sections inside a function; the Google style guide §3.5 puts it more plainly -- **use single blank lines as you judge appropriate while writing functions and methods**. Separating logical stages inside a function with a single blank line is **encouraged**, not noise.
+> **Basis**: PEP 8 allows blank lines to mark logical sections inside a function. The Google style guide §3.5 is more explicit: **use single blank lines as you judge appropriate within functions or methods**. A single blank line between logical stages is **encouraged**, not noise.
 
-- 🔴 **Structural blank lines**: two between top-level definitions, one between methods, one between a class docstring and its first member, and **none after a `def` line**
-- 🟡 **Stages inside a function**: separate logical stages (validate / transform / write) with a **single** blank line; do not insert blank lines inside one stage
-- 🔴 **Forbidden whitespace**: two or more consecutive blank lines; blank lines inside parentheses or literals; blank lines carrying trailing spaces (`W293`)
-- 🟡 **Counter-check**: a stretch of code that needs two or more blank lines to stay readable is usually a signal to **split the function**. A blank line separates stages; it is not a way to hide a long function
-- 🟡 **Tool coverage**: whatever `ruff format` enforces mechanically (collapsing extra blank lines, removing those after a block opener or inside parentheses, stripping trailing whitespace) is **not re-checked in review**; this rule covers the half a tool cannot see -- **where a stage boundary belongs**
+- 🔴 **Two lines between functions**: two blank lines between top-level functions and top-level classes. `ruff format` adds whatever is missing and collapses anything beyond two down to two.
+- 🔴 **One line between methods**: one blank line between methods inside a class. This is the formatter's **enforced** value, and writing two collapses back to one, so the rule follows the tool.
+- 🔴 **No blank line after a `def` line**; one blank line between a class docstring and its first member.
+- 🔴 **One line before a comment**: a comment on its own line gets one blank line above it, which separates it from the code above.
+- 🔴 **One line after a docstring**: a docstring is followed by one blank line, for a single-line docstring as well as a multi-line one. The rule does not apply when the docstring is the only statement in its block.
+- 🔴 **At most one blank line inside a function**: two or more consecutive blank lines collapse to one. No blank lines inside parentheses or literals, and no trailing spaces on a blank line (`W293`).
+- 🟡 **Stages inside a function**: separate logical stages (validate / transform / write) with a **single** blank line, and do not insert blank lines inside one stage.
+- 🟡 **Counter-check**: a stretch of code that needs two or more blank lines to stay readable is usually a signal to **split the function**. A blank line separates stages; it is not a way to hide a long function.
+- **Exemptions**, all of them hard constraints rather than leniency: a comment that is the **first line of a block** gets no blank line above it, because the formatter deletes one right under `if:` / `for:` / `def:`; the same holds for a comment inside parentheses; also the first line of a file, and tool directives such as `#!`, an encoding line, the `[AI-GENERATED]` header, `# type:` and `# noqa`, which stay glued to what they annotate.
+- **Who enforces what**: blank lines between functions and methods, consecutive blank lines, blank lines inside parentheses and trailing whitespace are handled mechanically by `ruff format` and `ruff check`, so review does not repeat them. The blank line **before a comment** and the one **after a docstring** are out of the formatter's reach. The pre-commit gate covers them, judging added lines only, so an old repository is never re-litigated.
 
 ## [Layer: data-processing]CODING-STANDARD — Coding Standard (Data-Processing Projects)
 
