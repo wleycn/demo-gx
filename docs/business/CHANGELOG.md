@@ -5,6 +5,7 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-16
 
+- `221a839` chore: drop the __future__ annotations import the standard forbids [AI]
 - `ce2b3b2` style: give every comment and docstring its blank line [AI]
 - `7deeaef` chore(lint): adopt the four layout rules and drop D202 for them [AI]
 - `a874ca8` chore(lint): put the readability and naming rules behind a machine gate [AI]
