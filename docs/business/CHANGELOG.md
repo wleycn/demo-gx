@@ -5,6 +5,9 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-15
 
+- `9ada1ee` fix(pipeline): write every table whole, and let absence mean no errors [AI]
+- `9a039cf` docs(rules): measure the change-size cap on the file before the change [AI]
+- `f5c3953` docs: record the change-size cap in the changelog [AI]
 - `a10c4b4` docs(rules): give the change-size cap a lower bound of 200 lines [AI]
 - `3dc38d8` docs: record the code-audit fixes in the changelog [AI]
 - `e3758f8` fix(pipeline): close the code-audit findings across validation, masking and the error artefacts [AI]
