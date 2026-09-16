@@ -9,6 +9,7 @@ masks direct identifiers at the ingestion boundary and appends an audit column
 import json
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -52,7 +53,7 @@ def read_input(file_path: str, masked_fields: Iterable[str] | None = None, peppe
     # Records are kept for JSON input: the audit copy is built per record, and
     # a key that only some records carry has to stay missing on the others (see
     # _audit_copies). A tabular source has no per-record shape, so it yields None.
-    records: list[dict] | None = None
+    records: list[dict[str, Any]] | None = None
     if suffix == ".json":
         records = _read_json_lines(path)
         df = pd.DataFrame(records)
@@ -76,7 +77,7 @@ def read_input(file_path: str, masked_fields: Iterable[str] | None = None, peppe
     return df
 
 
-def _read_json_lines(path: Path) -> list[dict]:
+def _read_json_lines(path: Path) -> list[dict[str, Any]]:
     """Parse a JSON-Lines file into one record per line, in file order.
 
     ``records[i]`` corresponds to row ``i`` of the frame built from it, so the
@@ -92,7 +93,9 @@ def _read_json_lines(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def _audit_copies(df: pd.DataFrame, records: list[dict] | None, masked_fields: Iterable[str] | None) -> list[str]:
+def _audit_copies(
+    df: pd.DataFrame, records: list[dict[str, Any]] | None, masked_fields: Iterable[str] | None
+) -> list[str]:
     """Build the ``_raw_json`` audit copy for every row.
 
     With the source records in hand, each copy carries exactly the keys that

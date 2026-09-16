@@ -6,7 +6,7 @@ import pandas as pd
 from demo_gx.transformation.cleaner import DataCleaner
 
 
-def _clean_df(**overrides):
+def _clean_df(**overrides: object) -> pd.DataFrame:
     row = {
         "event_id": "123e4567-e89b-42d3-a456-426614174000",
         "source_system": "web",
@@ -21,7 +21,7 @@ def _clean_df(**overrides):
     return pd.DataFrame([row])
 
 
-def test_standardize_timestamps_utc_conversion():
+def test_standardize_timestamps_utc_conversion() -> None:
     """Timestamps parse to UTC and the raw string is backed up unchanged."""
     df = _clean_df()
     out = DataCleaner.standardize_timestamps(df.copy())
@@ -30,7 +30,7 @@ def test_standardize_timestamps_utc_conversion():
     assert out["_raw_event_timestamp"].iloc[0] == "2026-01-01T00:00:00+08:00"
 
 
-def test_standardize_timestamps_keeps_existing_raw_backup():
+def test_standardize_timestamps_keeps_existing_raw_backup() -> None:
     """If the validator already backed up the raw string, do not overwrite it."""
     df = _clean_df(event_timestamp="2026-01-01T07:00:00Z")
     df["_raw_event_timestamp"] = "ORIGINAL-RAW"
@@ -38,7 +38,7 @@ def test_standardize_timestamps_keeps_existing_raw_backup():
     assert out["_raw_event_timestamp"].iloc[0] == "ORIGINAL-RAW"
 
 
-def test_normalize_currency_uppercases_and_flags_non_whitelist():
+def test_normalize_currency_uppercases_and_flags_non_whitelist() -> None:
     """Lowercase codes uppercase; codes outside the whitelist become USD+flag."""
     df = pd.DataFrame(
         [
@@ -56,7 +56,7 @@ def test_normalize_currency_uppercases_and_flags_non_whitelist():
     assert bool(out2["_is_invalid_currency"].iloc[0]) is True
 
 
-def test_check_amount_backs_up_and_coerces():
+def test_check_amount_backs_up_and_coerces() -> None:
     """_raw_amount preserves the pre-coercion value; amount becomes numeric."""
     df = pd.DataFrame([_clean_df(amount="12.5").iloc[0].to_dict()])
     out = DataCleaner.check_amount(df)

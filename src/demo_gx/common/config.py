@@ -7,13 +7,14 @@ contract (``schema.yaml``) so that no other module needs to hard-code paths.
 
 import os
 from pathlib import Path
+from typing import Any
 
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
-def load_config(env: str = "dev") -> dict:
+def load_config(env: str = "dev") -> dict[str, Any]:
     """Load the YAML configuration for the given environment.
 
     Reads ``config/env/{env}.yaml`` relative to the project root and optionally
@@ -54,9 +55,11 @@ def load_config(env: str = "dev") -> dict:
     return config
 
 
-def _anchor_to_output(config: dict, section: str, key: str) -> None:
-    """Rewrite a relative path in ``config[section][key]`` to live under
-    ``storage.output_root`` (absolute paths pass through unchanged)."""
+def _anchor_to_output(config: dict[str, Any], section: str, key: str) -> None:
+    """Rewrite the relative path at ``config[section][key]`` under the output root.
+
+    An absolute path passes through unchanged.
+    """
     value = config.get(section, {}).get(key)
     if not value:
         return
@@ -65,7 +68,7 @@ def _anchor_to_output(config: dict, section: str, key: str) -> None:
         config[section][key] = str(Path(config["storage"]["output_root"]) / path)
 
 
-def load_schema() -> dict:
+def load_schema() -> dict[str, Any]:
     """Load the data contract from ``config/contract/schema.yaml``.
 
     Returns:

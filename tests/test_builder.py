@@ -10,7 +10,7 @@ import pandas as pd
 from demo_gx.curation.builder import GoldBuilder
 
 
-def _silver_df():
+def _silver_df() -> pd.DataFrame:
     """Two customers across two event dates, one duplicate-key-free sample."""
     rows = [
         # 2026-01-01: cust_a 2 purchases, cust_b 1 purchase
@@ -51,7 +51,7 @@ def _silver_df():
     return pd.DataFrame(rows)
 
 
-def test_fact_table_aggregates_counts_and_amounts():
+def test_fact_table_aggregates_counts_and_amounts() -> None:
     fact = GoldBuilder.build_fact_table(_silver_df())
     key = (pd.Timestamp("2026-01-01").date(), "cust_a", "purchase")
     row = fact.set_index(["event_date", "customer_id", "event_type"]).loc[key]
@@ -62,7 +62,7 @@ def test_fact_table_aggregates_counts_and_amounts():
     assert len(fact) == 3
 
 
-def test_dimensions_first_seen_date():
+def test_dimensions_first_seen_date() -> None:
     dims = GoldBuilder.build_dimensions(_silver_df())
     dc = dims["dim_customer"].set_index("customer_id")
     assert dc.loc["cust_a", "first_seen_date"] == pd.Timestamp("2026-01-01").date()
@@ -71,7 +71,7 @@ def test_dimensions_first_seen_date():
     assert set(de["event_type"]) == {"purchase", "click"}
 
 
-def test_wide_table_joins_without_column_collision():
+def test_wide_table_joins_without_column_collision() -> None:
     silver = _silver_df()
     fact = GoldBuilder.build_fact_table(silver)
     dims = GoldBuilder.build_dimensions(silver)
@@ -82,7 +82,7 @@ def test_wide_table_joins_without_column_collision():
     assert len(wide) == len(fact)
 
 
-def test_builder_handles_empty_input():
+def test_builder_handles_empty_input() -> None:
     empty = pd.DataFrame(columns=["event_id", "event_date", "customer_id", "event_type", "event_timestamp", "amount"])
     fact = GoldBuilder.build_fact_table(empty)
     dims = GoldBuilder.build_dimensions(empty)

@@ -66,7 +66,7 @@ def value_of(argv: list[str], flag: str) -> str:
     return argv[argv.index(flag) + 1]
 
 
-def test_nothing_given_falls_back_to_the_documented_defaults():
+def test_nothing_given_falls_back_to_the_documented_defaults() -> None:
     argv = command_for("show-data")
     assert value_of(argv, "--env") == "dev"
     assert value_of(argv, "--layer") == "all"
@@ -77,7 +77,7 @@ def test_nothing_given_falls_back_to_the_documented_defaults():
     assert "--schema" not in argv
 
 
-def test_a_selector_left_empty_does_not_reach_the_command():
+def test_a_selector_left_empty_does_not_reach_the_command() -> None:
     argv = command_for("show-data", "TABLE=", "DATE=", "COLUMNS=", "SCHEMA=")
     assert value_of(argv, "--table") == ""
     assert "--event-date" not in argv
@@ -86,30 +86,30 @@ def test_a_selector_left_empty_does_not_reach_the_command():
 
 
 @pytest.mark.parametrize("upper,lower,value", SELECTORS)
-def test_one_selector_spelled_either_way_builds_the_same_command(upper, lower, value):
+def test_one_selector_spelled_either_way_builds_the_same_command(upper: str, lower: str, value: str) -> None:
     assert command_for("show-data", f"{upper}={value}") == command_for("show-data", f"{lower}={value}")
 
 
-def test_lowercase_selectors_carry_their_values():
+def test_lowercase_selectors_carry_their_values() -> None:
     argv = command_for("show-data", "layer=gold", "table=dim_customer", "date=2026-09-01")
     assert value_of(argv, "--layer") == "gold"
     assert value_of(argv, "--table") == "dim_customer"
     assert value_of(argv, "--event-date") == "2026-09-01"
 
 
-def test_uppercase_wins_when_both_spellings_are_given():
+def test_uppercase_wins_when_both_spellings_are_given() -> None:
     argv = command_for("show-data", "TABLE=dim_customer", "table=fact_daily_events")
     assert value_of(argv, "--table") == "dim_customer"
 
 
-def test_check_data_reads_the_same_selectors_in_either_case():
+def test_check_data_reads_the_same_selectors_in_either_case() -> None:
     upper = command_for("check-data", "ENV=test", "LAYER=gold", "TABLE=dim_customer")
     lower = command_for("check-data", "env=test", "layer=gold", "table=dim_customer")
     assert upper == lower
     assert value_of(upper, "--layer") == "gold"
 
 
-def test_an_exported_variable_sharing_a_selector_name_is_ignored():
+def test_an_exported_variable_sharing_a_selector_name_is_ignored() -> None:
     # make imports the whole environment, and shells set COLUMNS for terminal
     # width, so an exported name must never turn into a selector on its own.
     argv = command_for(
@@ -127,7 +127,7 @@ def test_an_exported_variable_sharing_a_selector_name_is_ignored():
     assert value_of(argv, "--limit") == "10"
 
 
-def test_an_exported_lowercase_alias_is_ignored():
+def test_an_exported_lowercase_alias_is_ignored() -> None:
     argv = command_for("show-data", columns="customer_id", layer="gold", schema="1")
     assert "--columns" not in argv
     assert "--schema" not in argv
@@ -135,16 +135,16 @@ def test_an_exported_lowercase_alias_is_ignored():
 
 
 @pytest.mark.parametrize("value", ["1", "yes", "true", "on"])
-def test_schema_turns_on(value):
+def test_schema_turns_on(value: str) -> None:
     assert "--schema" in command_for("show-data", f"SCHEMA={value}")
 
 
 @pytest.mark.parametrize("value", ["0", "no", "false", "off"])
-def test_schema_turns_off(value):
+def test_schema_turns_off(value: str) -> None:
     assert "--schema" not in command_for("show-data", f"SCHEMA={value}")
 
 
-def test_schema_stops_the_build_on_a_value_that_is_neither_on_nor_off():
+def test_schema_stops_the_build_on_a_value_that_is_neither_on_nor_off() -> None:
     result = subprocess.run(
         ["make", "-n", "show-data", "SCHEMA=maybe"],
         cwd=REPO_ROOT,

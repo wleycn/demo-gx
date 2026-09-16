@@ -6,11 +6,11 @@ import pandas as pd
 from demo_gx.transformation.deduplicator import Deduplicator
 
 
-def _dup_df(*rows):
+def _dup_df(*rows: pd.Series) -> pd.DataFrame:
     return pd.DataFrame(list(rows))
 
 
-def _row(event_id, ingestion_ts, amount=1.0):
+def _row(event_id: str, ingestion_ts: str, amount: float = 1.0) -> pd.Series:
     return {
         "event_id": event_id,
         "ingestion_timestamp": pd.Timestamp(ingestion_ts, tz="UTC"),
@@ -18,7 +18,7 @@ def _row(event_id, ingestion_ts, amount=1.0):
     }
 
 
-def test_deduplicate_keeps_newest():
+def test_deduplicate_keeps_newest() -> None:
     """For a duplicate event_id, only the newest ingestion_timestamp survives."""
     df = _dup_df(
         _row("e1", "2026-01-01T00:00:00Z", amount=10),
@@ -33,7 +33,7 @@ def test_deduplicate_keeps_newest():
     assert e1.iloc[0]["amount"] == 20
 
 
-def test_deduplicate_tie_keeps_last_input_row():
+def test_deduplicate_tie_keeps_last_input_row() -> None:
     """Exact ingestion_timestamp tie: the last-occurring row wins (stable sort)."""
     df = _dup_df(
         _row("e1", "2026-01-01T00:00:00Z", amount=10),
@@ -45,7 +45,7 @@ def test_deduplicate_tie_keeps_last_input_row():
     assert deduped.iloc[0]["amount"] == 99
 
 
-def test_deduplicate_early_return_on_missing_columns():
+def test_deduplicate_early_return_on_missing_columns() -> None:
     """Missing event_id/ingestion_timestamp: return unchanged + empty log."""
     df = pd.DataFrame([{"amount": 1.0}])
     deduped, duplicates = Deduplicator.deduplicate(df)
@@ -53,7 +53,7 @@ def test_deduplicate_early_return_on_missing_columns():
     assert duplicates.empty
 
 
-def test_a_row_without_a_usable_timestamp_never_wins_the_duplicate():
+def test_a_row_without_a_usable_timestamp_never_wins_the_duplicate() -> None:
     """An unparseable ingestion_timestamp must lose to one that has a value.
 
     The sort left NaT last, and keep-last then promoted the row nobody could

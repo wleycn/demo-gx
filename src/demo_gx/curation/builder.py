@@ -42,7 +42,7 @@ class GoldBuilder:
         return fact
 
     @staticmethod
-    def build_dimensions(df: pd.DataFrame) -> dict:
+    def build_dimensions(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         """Extract dimension tables from Silver-layer data.
 
         Builds ``dim_customer`` (unique customer IDs with first-seen date)
@@ -68,7 +68,7 @@ class GoldBuilder:
         return {"dim_customer": dim_customer, "dim_event_type": dim_event_type}
 
     @staticmethod
-    def build_wide_table(fact_df: pd.DataFrame, dims: dict) -> pd.DataFrame:
+    def build_wide_table(fact_df: pd.DataFrame, dims: dict[str, pd.DataFrame]) -> pd.DataFrame:
         """Build a denormalized wide table via left joins.
 
         Left-joins the fact table with ``dim_customer`` (on ``customer_id``)

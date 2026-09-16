@@ -4,8 +4,12 @@
 
 ## 1. Python Language Standards
 
-- 🔴 All functions carry **type hints**; CI runs `mypy` (at least strict on new modules)
-- 🟡 Unified `ruff` lint + format, configuration centralized in `pyproject.toml` (no scattered flake8/pylint configs)
+- 🔴 All functions carry **type hints**, `tests/` included; CI runs `mypy` (at least strict on new modules)
+- 🔴 **Bare generic containers are forbidden**: `-> tuple:` / `x: dict` must spell out their type arguments (`tuple[str, int]` / `dict[str, Any]`) -- a bare container switches type checking off; enforced by `mypy --disallow-any-generics`
+- 🔴 **Do not write `from __future__ import annotations`**: with a runtime floor of 3.10 the `X | None` form and builtin generic annotations already work at runtime, and one more deferred-evaluation layer only trips `get_type_hints` and framework reflection
+- 🟡 Unified `ruff` lint + format, configuration centralized in `pyproject.toml` (no scattered flake8/pylint configs); on top of the baseline set `E/W/F/I/UP/B/SIM/C4/DTZ/G/BLE/RUF` enable `N` (naming) and `D` (`convention="google"`, ignoring `D203`/`D213`/`D401` -- `D401` demands the imperative mood, which contradicts Google's "either style is fine")
+- 🟡 `tests/` turns `D1xx` off via `per-file-ignores`: a test function name is its own description, so a docstring is not required there
+- 🟡 **Naming**: the whitelist is pandas' idiomatic short names (`df`), counters and iterators (`i`/`j`/`k`), the exception `e` and the file `f`; **invented abbreviations made by deleting letters are forbidden** (`evt_date` -> `event_date`, `dup_dir` -> `duplicates_dir`); a name colliding with a keyword takes a trailing underscore (`class_`). Basis: PEP 8 (which bans only `l`/`O`/`I`) and Google's "avoid abbreviation". **No lint rule can catch a letter-deleting abbreviation -- this one rests on review**
 - 🔴 Production code **must not use `print`**; uniformly use `{shared}/logger.get_logger`
 - 🔴 **No bare `except:`** and no `except Exception: pass` (silent failure = troubleshooting blind spot)
 - 🔴 Dependencies must go into `pyproject.toml` with the lock file committed; ad-hoc `pip install` is forbidden
@@ -109,7 +113,7 @@ Type-specific red lines (data processing: write idempotency / partition pruning 
 - 🔴 Server-side queries must go through the single entry point and carry **filter / limit constraints**; **unbounded queries are forbidden** (full table scans, lists without a limit)
 - 🔴 Authentication and role checks reuse the unified middleware; hand-written checks inside endpoints are forbidden
 
-## 13. Comments and Docstrings (Python)
+## 13. Comments, Docstrings and Layout (Python)
 
 > **Criterion**: comments answer "**why**" -- intent, constraints, non-obvious trade-offs, pitfalls already hit; the code itself answers "what". Restating the implementation = noise.
 > **Timing**: write them **as you go** while coding, not as a "fill it in later" task; when reworking existing code, change the comments **in the same diff**.
@@ -122,6 +126,16 @@ Type-specific red lines (data processing: write idempotency / partition pruning 
 - 🟡 **Must write**: ① why it is written this way (workaround / platform differences / precision and rounding mode); ② non-obvious boundaries and the source of magic values; ③ agreements with external systems (protocol quirks, field units); ④ security assumptions (which inputs are sanitized and which are not).
 - 🟡 **Do not write**: restating the code (`# i plus 1`), decorative banners / separator lines, informational modification records (`# modified on xx`).
 - 🟡 **AI-generated code**: comments must not claim unverified facts ("tested", "thread-safe", "performance optimized") unless evidence is attached in the same change.
+
+### 13.1 Blank Lines and Layout (written for the human reader)
+
+> **Basis**: PEP 8 allows blank lines "sparingly" to mark logical sections inside a function; the Google style guide §3.5 puts it more plainly -- **use single blank lines as you judge appropriate while writing functions and methods**. Separating logical stages inside a function with a single blank line is **encouraged**, not noise.
+
+- 🔴 **Structural blank lines**: two between top-level definitions, one between methods, one between a class docstring and its first member, and **none after a `def` line**
+- 🟡 **Stages inside a function**: separate logical stages (validate / transform / write) with a **single** blank line; do not insert blank lines inside one stage
+- 🔴 **Forbidden whitespace**: two or more consecutive blank lines; blank lines inside parentheses or literals; blank lines carrying trailing spaces (`W293`)
+- 🟡 **Counter-check**: a stretch of code that needs two or more blank lines to stay readable is usually a signal to **split the function**. A blank line separates stages; it is not a way to hide a long function
+- 🟡 **Tool coverage**: whatever `ruff format` enforces mechanically (collapsing extra blank lines, removing those after a block opener or inside parentheses, stripping trailing whitespace) is **not re-checked in review**; this rule covers the half a tool cannot see -- **where a stage boundary belongs**
 
 ## [Layer: data-processing]CODING-STANDARD — Coding Standard (Data-Processing Projects)
 
@@ -192,6 +206,7 @@ quality_rules:
 - 🔴 Read/write schemas are centralized in `models/`, with names aligned with the table contract
 - 🔴 schema evolution **goes through migrations only**; implicitly changing the schema at write time (auto add column / merge schema) is forbidden
 - 🟡 Time fields uniformly use `timestamp` (UTC) or a date partition `ds` string, declared in the contract
+- 🟡 One value list (enum / status code / currency / unit) has **exactly one home**: the schema under `config/contract`, with code reading it from configuration. A second copy inside code drifts (observed in practice: the schema carried a regex while the code carried a set, and one was updated without the other)
 
 ### 7. Data Security 🔴
 

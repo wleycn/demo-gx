@@ -30,14 +30,33 @@ src = ["src", "scripts", "tests"]
 [tool.ruff.lint]
 # E/W pycodestyle, F pyflakes, I import order, UP pyupgrade, B bugbear,
 # SIM simplify, C4 comprehensions, DTZ naive datetimes, G logging,
-# BLE blind except, RUF ruff-specific.
-select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4", "DTZ", "G", "BLE", "RUF"]
+# BLE blind except, N naming, D docstrings, RUF ruff-specific.
+# D401 is ignored because it demands the imperative mood, which the Google style
+# guide explicitly leaves free.
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4", "DTZ", "G", "BLE", "N", "D", "RUF"]
+ignore = ["D401"]
+
+[tool.ruff.lint.pydocstyle]
+# Google convention. D401 (imperative mood) is dropped under `ignore` above on
+# purpose: the Google style guide accepts either mood for a summary line, so
+# enforcing it would reject docstrings the convention itself allows.
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# A test function name is its own description: requiring a docstring on every
+# test would add a line that repeats the name and nothing else.
+"tests/**/*.py" = ["D1"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["src", "scripts"]
+# tests/ is checked too: a type mismatch between a test and the code it calls is
+# exactly the kind of defect that should surface at build time, not at runtime.
+files = ["src", "scripts", "tests"]
 # Every function carries parameter and return annotations.
 disallow_untyped_defs = true
+# A bare container (`-> tuple:`, `x: dict`) silently switches type checking off
+# for everything inside it, which is the failure mode this option catches.
+disallow_any_generics = true
 warn_unused_ignores = true
 no_implicit_optional = true
 

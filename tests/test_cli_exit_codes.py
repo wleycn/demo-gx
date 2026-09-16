@@ -15,12 +15,13 @@ import os
 import pathlib
 import subprocess
 import sys
+from typing import Any
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 RUN_TS = "2026-09-15T12:00:00Z"
 
 
-def _row(**overrides) -> dict:
+def _row(**overrides: object) -> dict[str, Any]:
     """One well-formed record; override any field for edge cases."""
     row = {
         "event_id": "123e4567-e89b-42d3-a456-426614174000",
@@ -36,7 +37,7 @@ def _row(**overrides) -> dict:
     return row
 
 
-def _run(tmp_path: pathlib.Path, rows: list[dict], *args: str) -> subprocess.CompletedProcess:
+def _run(tmp_path: pathlib.Path, rows: list[dict[str, Any]], *args: str) -> subprocess.CompletedProcess[str]:
     """Run the pipeline over ``rows`` with every artefact kept in ``tmp_path``."""
     source = tmp_path / "input.json"
     source.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")

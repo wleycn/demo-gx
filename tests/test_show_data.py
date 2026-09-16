@@ -139,9 +139,11 @@ def test_row_limit_is_respected(project: Path, capsys: pytest.CaptureFixture[str
 
 
 def test_partitions_are_read_in_name_order_and_reported(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """With no date given the read starts at the first partition, and the line
-    that names the source of the rows must not claim a single partition when
-    more than one was read."""
+    """Read every partition when no date is given.
+
+    The read starts at the first partition, and the line that names the source of
+    the rows must not claim a single partition when more than one was read.
+    """
     _write_table(project, partitions={date(2026, 1, 1): [FIRST], date(2026, 1, 2): [SECOND]})
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table")
     assert code == 0

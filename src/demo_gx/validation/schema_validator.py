@@ -46,7 +46,7 @@ class SchemaValidator:
         self.field_rules = schema_config["fields"]
         self.run_ts = run_ts
 
-    def validate(self, df: pd.DataFrame) -> tuple:
+    def validate(self, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Validate the DataFrame against the schema contract.
 
         Performs the following checks in order:

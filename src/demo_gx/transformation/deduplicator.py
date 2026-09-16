@@ -15,7 +15,7 @@ class Deduplicator:
     """Removes duplicate records by event_id, retaining the newest row."""
 
     @staticmethod
-    def deduplicate(df: pd.DataFrame) -> tuple:
+    def deduplicate(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Deduplicate by event_id, keeping the latest ingestion_timestamp.
 
         If either ``event_id`` or ``ingestion_timestamp`` is missing from
