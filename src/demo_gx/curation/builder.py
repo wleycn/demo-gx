@@ -31,6 +31,7 @@ class GoldBuilder:
             pandas.DataFrame: Aggregated fact table with one row per
             (event_date, customer_id, event_type) group.
         """
+
         if "event_date" not in df.columns:
             # One parsing policy for the pipeline (common.time_utils): a plain
             # pd.to_datetime here would apply the first row's format to every
@@ -57,13 +58,17 @@ class GoldBuilder:
             dict: A mapping from dimension table name to DataFrame.  Keys
             are ``"dim_customer"`` and ``"dim_event_type"``.
         """
+
         dim_customer = df[["customer_id"]].drop_duplicates().reset_index(drop=True)
+
         # Add first_seen_date (currently the minimum event_date available)
         if "event_date" in df.columns:
             first_seen = df.groupby("customer_id")["event_date"].min().reset_index(name="first_seen_date")
             dim_customer = dim_customer.merge(first_seen, on="customer_id", how="left")
+
         # Dimension table: event_type
         dim_event_type = df[["event_type"]].drop_duplicates().reset_index(drop=True)
+
         # Could add category etc., but currently left empty
         return {"dim_customer": dim_customer, "dim_event_type": dim_event_type}
 
@@ -86,6 +91,7 @@ class GoldBuilder:
             pandas.DataFrame: A denormalized wide table containing all
             fact and dimension columns.
         """
+
         wide = fact_df.merge(dims["dim_customer"], on="customer_id", how="left", validate="many_to_one")
         wide = wide.merge(dims["dim_event_type"], on="event_type", how="left", validate="many_to_one")
         return wide

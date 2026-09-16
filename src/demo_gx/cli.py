@@ -43,6 +43,7 @@ def _covered_dates(frame: pd.DataFrame) -> list[str]:
     Returns:
         list[str]: Sorted partition values.
     """
+
     if "event_timestamp" not in frame.columns:
         return ["unknown"]
     dates = parse_utc_mixed(frame["event_timestamp"]).dt.date
@@ -64,6 +65,7 @@ def main() -> None:
     run, ``1`` an unhandled exception, ``2`` nothing matched the date scope,
     ``3`` nothing valid survived validation.
     """
+
     # Anchor relative paths (storage/logs/metrics/input) to the project root
     # so the pipeline behaves identically regardless of the caller's CWD
     # (e.g. cron without cd) — dev-review: CWD-relative drift.
@@ -94,6 +96,7 @@ def main() -> None:
 
     # Load environment configuration
     config = load_config(args.env)
+
     # The input path defaults to the environment's inbound drop location, so a
     # bare `python -m demo_gx.cli --env test` runs with no path argument. Both
     # the directory and the file name come from config, never from a literal
@@ -128,8 +131,10 @@ def main() -> None:
         #     the full arriving batch for replay.
         if args.event_date:
             target_date = pd.to_datetime(args.event_date).date()
+
             # Shared parsing policy so scoping matches validator behaviour
             evt_date = parse_utc_mixed(raw_df["event_timestamp"]).dt.date
+
             # Rows whose timestamp does not parse have no event date: keep
             # them so the validator quarantines them instead of dropping them
             # silently outside the scope (round-2 writer QC #10)
@@ -138,6 +143,7 @@ def main() -> None:
             if raw_df.empty:
                 logger.warning("No rows with event_date=%s, stopping.", args.event_date)
                 metrics.save(config["metrics"]["output_file"])
+
                 # 2 = nothing in scope. A scheduler has to tell this apart from
                 # a plain success; see INTERFACE-DESIGN.md section 1.
                 sys.exit(2)
@@ -156,11 +162,13 @@ def main() -> None:
         metrics.increment("valid_rows", len(valid_df))
         metrics.increment("invalid_rows", len(invalid_df))
         logger.info("Valid: %s, Invalid: %s", len(valid_df), len(invalid_df))
+
         # Write the error quarantine. This runs even when nothing was rejected,
         # because it also clears the covered days that no longer have rejects:
         # a rerun after a fix must not leave the earlier rows behind.
         errors_base = Path(config["storage"]["output_root"]) / config["storage"]["errors_subpath"]
         quarantine_path = errors_base / "quarantine"
+
         # Envelope fields and reason classification belong to the validation
         # layer (INTERFACE-DESIGN.md section 4); the orchestrator only
         # supplies the destination and the run timestamp.
@@ -173,6 +181,7 @@ def main() -> None:
         if valid_df.empty:
             logger.warning("No valid records, stopping.")
             metrics.save(config["metrics"]["output_file"])
+
             # 3 = nothing valid survived validation. No Silver and no Gold were
             # written, so this is not a plain success either.
             sys.exit(3)
@@ -183,6 +192,7 @@ def main() -> None:
         cleaned_df = cleaner.standardize_timestamps(valid_df)
         cleaned_df = cleaner.normalize_currency(cleaned_df)
         cleaned_df = cleaner.check_amount(cleaned_df)
+
         # Add event_date partition column. Parsed through the shared policy so
         # the scoping above, the validator, Silver and Gold cannot disagree.
         cleaned_df["event_date"] = parse_utc_mixed(cleaned_df["event_timestamp"]).dt.date
@@ -192,6 +202,7 @@ def main() -> None:
         deduper = Deduplicator()
         deduped_df, duplicates_df = deduper.deduplicate(cleaned_df)
         metrics.increment("duplicates_removed", len(duplicates_df))
+
         # Partition-scoped overwrite by event_date, same as the quarantine and
         # Silver (AGENTS.md red line 1: bare append is forbidden). Written even
         # when the frame is empty, so a covered day that no longer has
@@ -201,6 +212,7 @@ def main() -> None:
         if duplicate_files:
             logger.info("Duplicates written to %s", dup_dir)
         metrics.increment("silver_rows", len(deduped_df))
+
         # DATA-DESIGN.md section 2.3: _processed_timestamp is added automatically at
         # write time (pipeline processing timestamp, UTC), injected by the
         # entry boundary rather than read here (AGENTS.md section 3 red line 10)
@@ -208,6 +220,7 @@ def main() -> None:
 
         # 5. Write Silver layer
         silver_path = Path(config["storage"]["output_root"]) / config["storage"]["silver_subpath"]
+
         # Partition by event_date, written atomically through the shared helper
         # so a crash cannot destroy the partition that was already there.
         silver_files_written = write_table(deduped_df, silver_path, "event_date", scope=covered_dates)
@@ -234,11 +247,14 @@ def main() -> None:
         # every write goes through the shared helper for the same atomicity as
         # the rest of the pipeline.
         gold_base = Path(config["storage"]["output_root"]) / config["storage"]["gold_subpath"]
+
         # Fact table (partitioned)
         write_table(fact_df, gold_base / "fact_daily_events", "event_date")
+
         # Dimension tables (full snapshot, single file)
         for dim_name, dim_df in dims.items():
             write_table(dim_df, gold_base / dim_name)
+
         # Wide table (partitioned)
         write_table(wide_df, gold_base / "wide_daily_user_events", "event_date")
 

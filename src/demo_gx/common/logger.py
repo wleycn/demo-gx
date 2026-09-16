@@ -30,6 +30,7 @@ class JsonFormatter(logging.Formatter):
         Returns:
             str: A single-line JSON representation of the log record.
         """
+
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
@@ -62,6 +63,7 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> logging.L
     Returns:
         logging.Logger: The configured ``demo_gx`` logger.
     """
+
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(level.upper())
     formatter = JsonFormatter()
@@ -91,4 +93,5 @@ def get_logger(name: str = LOGGER_NAME) -> logging.Logger:
     Returns:
         logging.Logger: The logger instance.
     """
+
     return logging.getLogger(name)

@@ -12,6 +12,7 @@ from demo_gx.curation.builder import GoldBuilder
 
 def _silver_df() -> pd.DataFrame:
     """Two customers across two event dates, one duplicate-key-free sample."""
+
     rows = [
         # 2026-01-01: cust_a 2 purchases, cust_b 1 purchase
         {
@@ -58,6 +59,7 @@ def test_fact_table_aggregates_counts_and_amounts() -> None:
     assert row["event_count"] == 2
     assert row["total_amount"] == 30.0
     assert row["avg_amount"] == 15.0
+
     # 4 rows collapse to 3 grain rows (cust_a@purchase@01-01 is a 2-row group)
     assert len(fact) == 3
 
@@ -76,6 +78,7 @@ def test_wide_table_joins_without_column_collision() -> None:
     fact = GoldBuilder.build_fact_table(silver)
     dims = GoldBuilder.build_dimensions(silver)
     wide = GoldBuilder.build_wide_table(fact, dims)
+
     # no _x/_y suffix leakage from colliding merge keys
     assert not any("_x" in c or "_y" in c for c in wide.columns)
     assert "first_seen_date" in wide.columns

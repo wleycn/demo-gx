@@ -42,6 +42,7 @@ def classify_error(reason: str) -> str:
         str: ``"type_coercion_failed"`` when the reason mentions a coercion
         failure, otherwise ``"schema_mismatch"``.
     """
+
     return "type_coercion_failed" if any(h in reason for h in TYPE_COERCION_HINTS) else "schema_mismatch"
 
 
@@ -51,8 +52,10 @@ def _derive_event_date(invalid_df: pd.DataFrame) -> pd.Series:
     Returns a string Series: ``YYYY-MM-DD`` for parseable timestamps,
     ``"unknown"`` for unparseable ones.
     """
+
     if "event_timestamp" not in invalid_df.columns:
         return pd.Series(["unknown"] * len(invalid_df), index=invalid_df.index)
+
     # One parsing policy for the whole pipeline: parse_utc_mixed tolerates mixed
     # formats, where a plain pd.to_datetime would apply the first row's format
     # to every row and silently NaT the rest.
@@ -77,6 +80,7 @@ def build_error_envelope(
         pandas.DataFrame: Columns ``original_json``, ``error_type``,
         ``error_details``, ``ingestion_timestamp``, ``event_date``.
     """
+
     if "_raw_json" in invalid_df.columns:
         original = invalid_df["_raw_json"].astype(str)
     else:
@@ -119,5 +123,6 @@ def write_error_envelope(
     Returns:
         list[pathlib.Path]: The written partition files, one per event date.
     """
+
     envelope = build_error_envelope(invalid_df, ingestion_timestamp)
     return write_table(envelope, errors_dir, partition_col="event_date", scope=scope)

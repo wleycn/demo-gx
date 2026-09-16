@@ -49,6 +49,7 @@ THIRD = "h_" + "cc" * 8
 
 def _config(env: str = "dev") -> dict[str, Any]:
     """Stand-in for ``load_config``: paths only, no filesystem read."""
+
     return {
         "storage": {
             "output_root": "data/dev/output",
@@ -66,13 +67,16 @@ def _config(env: str = "dev") -> dict[str, Any]:
 @pytest.fixture
 def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A project skeleton whose root the viewer is pointed at."""
+
     root = tmp_path / "proj"
     (root / "docs" / "tables").mkdir(parents=True)
     output = root / "data" / "dev" / "output"
     output.mkdir(parents=True)
+
     # A completed run always leaves this file; its presence is what tells the
     # viewer that there is anything to look at.
     (output / "metrics.json").write_text('{"silver_rows": 1}', encoding="utf-8")
+
     # Both modules resolve paths, so both roots must point at the throw-away
     # tree. They are one module attribute each, not two sources of truth.
     monkeypatch.setattr(show_data, "PROJECT_ROOT", root)
@@ -88,6 +92,7 @@ def _output(project: Path) -> Path:
 
 def _write_contract(root: Path, name: str = "tiny_table") -> None:
     """Write one table contract under ``docs/tables``."""
+
     (root / "docs" / "tables" / f"{name}.md").write_text(CONTRACT, encoding="utf-8")
 
 
@@ -98,6 +103,7 @@ def _write_table(
     rows: int = 5,
 ) -> None:
     """Write a partitioned Gold Parquet table, one masked id per partition."""
+
     partitions = partitions if partitions is not None else {date(2026, 1, 1): [FIRST] * rows}
     for day, ids in partitions.items():
         target = _output(root) / "gold" / name / f"event_date={day.isoformat()}"
@@ -114,6 +120,7 @@ def _write_table(
 
 def _run(capsys: pytest.CaptureFixture[str], *args: str) -> tuple[int, str, str]:
     """Run the viewer and return its exit code with both output streams."""
+
     code = show_data.main(["--env", "dev", *args])
     captured = capsys.readouterr()
     return code, captured.out, captured.err
@@ -121,6 +128,7 @@ def _run(capsys: pytest.CaptureFixture[str], *args: str) -> tuple[int, str, str]
 
 def test_stored_values_reach_the_screen(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """The control case: the rows on disk must appear, not just a summary."""
+
     _write_contract(project)
     _write_table(project)
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table")
@@ -131,6 +139,7 @@ def test_stored_values_reach_the_screen(project: Path, capsys: pytest.CaptureFix
 
 def test_row_limit_is_respected(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--limit`` caps the rows shown, and says that it capped them."""
+
     _write_table(project)
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table", "--limit", "2")
     assert code == 0
@@ -144,6 +153,7 @@ def test_partitions_are_read_in_name_order_and_reported(project: Path, capsys: p
     The read starts at the first partition, and the line that names the source of
     the rows must not claim a single partition when more than one was read.
     """
+
     _write_table(project, partitions={date(2026, 1, 1): [FIRST], date(2026, 1, 2): [SECOND]})
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table")
     assert code == 0
@@ -155,6 +165,7 @@ def test_partitions_are_read_in_name_order_and_reported(project: Path, capsys: p
 
 def test_event_date_selects_one_partition(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--event-date`` reads that partition and reports the selection."""
+
     _write_table(project, partitions={date(2026, 1, 1): [FIRST], date(2026, 1, 2): [SECOND]})
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table", "--event-date", "2026-01-02")
     assert code == 0
@@ -165,6 +176,7 @@ def test_event_date_selects_one_partition(project: Path, capsys: pytest.CaptureF
 
 def test_columns_are_projected(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--columns`` narrows what is read and what is shown."""
+
     _write_table(project)
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table", "--columns", "customer_id")
     assert code == 0
@@ -174,6 +186,7 @@ def test_columns_are_projected(project: Path, capsys: pytest.CaptureFixture[str]
 
 def test_unknown_column_is_reported(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A column the artefact does not have must not print an empty table."""
+
     _write_table(project)
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table", "--columns", "ghost")
     assert code == 2
@@ -182,6 +195,7 @@ def test_unknown_column_is_reported(project: Path, capsys: pytest.CaptureFixture
 
 def test_unknown_table_is_reported(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Asking for a table that does not exist must not exit zero."""
+
     _write_table(project)
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "ghost")
     assert code == 2
@@ -190,6 +204,7 @@ def test_unknown_table_is_reported(project: Path, capsys: pytest.CaptureFixture[
 
 def test_schema_mode_reads_no_rows(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--schema`` prints names and types, and no stored value at all."""
+
     _write_table(project)
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table", "--schema")
     assert code == 0
@@ -200,6 +215,7 @@ def test_schema_mode_reads_no_rows(project: Path, capsys: pytest.CaptureFixture[
 
 def test_json_output_is_parseable(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--format json`` writes rows to stdout and the report to stderr."""
+
     _write_table(project)
     code, out, err = _run(capsys, "--layer", "gold", "--table", "tiny_table", "--limit", "2", "--format", "json")
     assert code == 0
@@ -211,6 +227,7 @@ def test_json_output_is_parseable(project: Path, capsys: pytest.CaptureFixture[s
 
 def test_csv_output_has_a_header(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--format csv`` writes a header line the reader can rely on."""
+
     _write_table(project)
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table", "--format", "csv")
     assert code == 0
@@ -219,6 +236,7 @@ def test_csv_output_has_a_header(project: Path, capsys: pytest.CaptureFixture[st
 
 def test_machine_format_needs_a_single_table(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Two tables in scope cannot share one JSON array, so that is refused."""
+
     _write_table(project)
     _write_table(project, name="other_table")
     code, out, _ = _run(capsys, "--layer", "gold", "--format", "json")
@@ -228,6 +246,7 @@ def test_machine_format_needs_a_single_table(project: Path, capsys: pytest.Captu
 
 def test_empty_partition_is_not_an_error(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """No matching rows is an answer, not a failure."""
+
     _write_table(project, partitions={date(2026, 1, 1): []})
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table")
     assert code == 0
@@ -236,6 +255,7 @@ def test_empty_partition_is_not_an_error(project: Path, capsys: pytest.CaptureFi
 
 def test_environment_without_a_run_is_reported(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Nothing was ever written, so there is nothing to look at."""
+
     (_output(project) / "metrics.json").unlink()
     code, out, _ = _run(capsys, "--layer", "gold")
     assert code == 3
@@ -244,6 +264,7 @@ def test_environment_without_a_run_is_reported(project: Path, capsys: pytest.Cap
 
 def test_a_contract_deviation_does_not_fail_the_viewer(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Showing data and judging data are different jobs: this tool only shows."""
+
     _write_table(project, partitions={date(2026, 1, 1): ["cust_001"]})
     code, out, _ = _run(capsys, "--layer", "gold", "--table", "tiny_table")
     assert code == 0
@@ -252,6 +273,7 @@ def test_a_contract_deviation_does_not_fail_the_viewer(project: Path, capsys: py
 
 def test_only_the_partitions_needed_are_read(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A small limit must stop early instead of reading every partition."""
+
     _write_table(
         project,
         partitions={
@@ -267,6 +289,7 @@ def test_only_the_partitions_needed_are_read(project: Path, capsys: pytest.Captu
 
 def test_bronze_layer_shows_raw_lines(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """The raw archive is data too, so the viewer shows its lines."""
+
     target = _output(project) / "bronze" / "api" / "dt=2026-01-01"
     target.mkdir(parents=True)
     (target / "events.json").write_text('{"customer_id": "h_aaaa", "amount": 12.34}\n', encoding="utf-8")
@@ -277,6 +300,7 @@ def test_bronze_layer_shows_raw_lines(project: Path, capsys: pytest.CaptureFixtu
 
 def test_overview_covers_every_table(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """With no table named, every table in the layer is shown."""
+
     _write_table(project, partitions={date(2026, 1, 1): [FIRST]})
     _write_table(project, name="other_table", partitions={date(2026, 1, 1): [SECOND]})
     code, out, _ = _run(capsys, "--layer", "gold")

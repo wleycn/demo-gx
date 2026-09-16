@@ -32,15 +32,18 @@ def load_config(env: str = "dev") -> dict[str, Any]:
     Raises:
         FileNotFoundError: If the configuration file does not exist.
     """
+
     config_path = PROJECT_ROOT / "config" / "env" / f"{env}.yaml"
     if not config_path.exists():
         raise FileNotFoundError(f"Config file {config_path} not found")
     with open(config_path) as f:
         config = yaml.safe_load(f)
+
     # Optional environment-variable override
     # e.g. if STORAGE_BASE_PATH is set, override the configured base path
     if os.getenv("STORAGE_BASE_PATH"):
         config["storage"]["base_path"] = os.getenv("STORAGE_BASE_PATH")
+
     # Derive the two directional roots from the environment root, so callers
     # read one entry instead of re-joining the same sub-path in every module:
     #   <env root>/input  — inbound drop location
@@ -48,6 +51,7 @@ def load_config(env: str = "dev") -> dict[str, Any]:
     storage = config["storage"]
     storage["input_root"] = str(Path(storage["base_path"]) / storage["input_subpath"])
     storage["output_root"] = str(Path(storage["base_path"]) / storage["output_subpath"])
+
     # Anchor artifact paths (metrics file, log file) under the output root, so
     # each env keeps its own artifacts and the repo root stays clean.
     _anchor_to_output(config, "metrics", "output_file")
@@ -60,6 +64,7 @@ def _anchor_to_output(config: dict[str, Any], section: str, key: str) -> None:
 
     An absolute path passes through unchanged.
     """
+
     value = config.get(section, {}).get(key)
     if not value:
         return
@@ -78,6 +83,7 @@ def load_schema() -> dict[str, Any]:
     Raises:
         FileNotFoundError: If ``config/contract/schema.yaml`` does not exist.
     """
+
     schema_path = PROJECT_ROOT / "config" / "contract" / "schema.yaml"
     if not schema_path.exists():
         raise FileNotFoundError(f"Schema file {schema_path} not found")

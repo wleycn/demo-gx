@@ -31,6 +31,7 @@ class DataCleaner:
             pandas.DataFrame: The DataFrame with timestamp columns as UTC
             datetimes and raw-string backups present.
         """
+
         for col in ["event_timestamp", "ingestion_timestamp"]:
             if col in df.columns:
                 # Back up the raw string only if the validator has not
@@ -59,6 +60,7 @@ class DataCleaner:
             pandas.DataFrame: The DataFrame with normalized currency values
             and an added ``_is_invalid_currency`` column.
         """
+
         if "currency" in df.columns:
             df["currency"] = df["currency"].astype(str).str.upper()
             valid_currencies = {"USD", "EUR", "GBP", "CNY", "JPY"}
@@ -83,12 +85,14 @@ class DataCleaner:
             numeric and a ``_raw_amount`` numeric backup column (the raw
             input word is preserved in ``_raw_json``).
         """
+
         if "amount" in df.columns:
             # Backup the pre-cleaner value (the validator has already coerced
             # it to numeric, so this is a numeric backup, not the raw input
             # string — the full raw word is preserved in _raw_json)
             if "_raw_amount" not in df.columns:
                 df["_raw_amount"] = df["amount"]
+
             # Defensive numeric coercion (never raises; NaN stays NaN).
             # Negative / non-numeric / over-precision amounts were already
             # quarantined by the validator before this stage.

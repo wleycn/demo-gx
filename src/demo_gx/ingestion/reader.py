@@ -46,10 +46,12 @@ def read_input(file_path: str, masked_fields: Iterable[str] | None = None, peppe
         ValueError: If the file extension is not one of ``.json``,
             ``.csv``, or ``.parquet``.
     """
+
     path = Path(file_path)
     if not path.exists():
         raise FileNotFoundError(f"Input file {file_path} not found")
     suffix = path.suffix.lower()
+
     # Records are kept for JSON input: the audit copy is built per record, and
     # a key that only some records carry has to stay missing on the others (see
     # _audit_copies). A tabular source has no per-record shape, so it yields None.
@@ -63,11 +65,13 @@ def read_input(file_path: str, masked_fields: Iterable[str] | None = None, peppe
         df = pd.read_parquet(path)
     else:
         raise ValueError(f"Unsupported file type: {suffix}")
+
     # If the input already carries an internal column name (_raw_json), preserve
     # the user column under a distinct name instead of silently overwriting it
     # (dev-review: input-column collision).
     if "_raw_json" in df.columns:
         df = df.rename(columns={"_raw_json": "_raw_json_user"})
+
     # Mask direct identifiers before the audit copy below is built. This is the
     # ingestion boundary the table contracts name, so no clear-text identifier
     # reaches Bronze, Silver, Gold, the quarantine or the logs.
@@ -90,6 +94,7 @@ def _read_json_lines(path: Path) -> list[dict[str, Any]]:
     Returns:
         list[dict]: One dictionary per non-empty line.
     """
+
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
@@ -119,6 +124,7 @@ def _audit_copies(
     Returns:
         list[str]: One JSON string per row, aligned with the frame index.
     """
+
     if records is None:
         return list(df.apply(lambda row: row.to_json(date_format="iso"), axis=1))
     assert len(records) == len(df), "record count and frame row count diverged"
@@ -172,7 +178,9 @@ def write_bronze(raw_df: pd.DataFrame, bronze_base: Path, run_ts: pd.Timestamp) 
         should report this count in metrics rather than assuming the full
         input batch was archived).
     """
+
     df = raw_df.drop(columns=["_raw_json"], errors="ignore").copy()
+
     # Partition keys must never drop a record: Bronze archives EVERY
     # arriving row, so a missing source/ingestion timestamp falls back to a
     # dedicated partition instead of being silently lost (groupby drops NaN
@@ -192,6 +200,7 @@ def write_bronze(raw_df: pd.DataFrame, bronze_base: Path, run_ts: pd.Timestamp) 
     written = 0
     for (source, dt), group in df.groupby(["source_system", "_ingestion_dt"], dropna=False):
         out = group.drop(columns=["_ingestion_dt"])
+
         # Same temporary-then-replace as every other table write: a crash must
         # not truncate the archive that is already on disk.
         with temp_then_replace(bronze_base / str(source) / f"dt={dt}" / "events.json") as target:

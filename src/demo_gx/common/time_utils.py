@@ -24,4 +24,5 @@ def parse_utc_mixed(series: pd.Series) -> pd.Series:
         pandas.Series: ``datetime64[ns, UTC]`` with NaT for unparseable
         values.
     """
+
     return pd.to_datetime(series, utc=True, errors="coerce", format="mixed")

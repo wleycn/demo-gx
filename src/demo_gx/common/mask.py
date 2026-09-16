@@ -37,6 +37,7 @@ def mask_value(value: str, pepper: str = "") -> str:
         str: ``h_`` followed by 16 hex characters of the HMAC-SHA256 digest.
         The same input always produces the same output for a given key.
     """
+
     digest = hmac.new(pepper.encode("utf-8"), str(value).encode("utf-8"), hashlib.sha256)
     return MASK_PREFIX + digest.hexdigest()[:MASK_HEX_LEN]
 
@@ -61,6 +62,7 @@ def mask_columns(df: pd.DataFrame, columns: Iterable[str], pepper: str = "") -> 
     Returns:
         pandas.DataFrame: A new frame; the input frame is left untouched.
     """
+
     masked = df.copy()
     for column in columns:
         if column in masked.columns:

@@ -41,6 +41,7 @@ class SchemaValidator:
                 given run validates reproducibly (AGENTS.md section 3 red
                 line 10).
         """
+
         self.schema = schema_config
         self.expected_fields = set(schema_config["fields"].keys())
         self.field_rules = schema_config["fields"]
@@ -68,8 +69,10 @@ class SchemaValidator:
             that pass all checks are in ``valid_df``; failing rows (with
             an ``error_reason`` column) are in ``invalid_df``.
         """
+
         # Copy first to avoid mutating the caller's DataFrame
         df = df.copy()
+
         # Initialize error-reason column (always present to avoid downstream
         # read/write errors on a non-existent column)
 
@@ -78,6 +81,7 @@ class SchemaValidator:
 
         # 1. Check for extra (unknown) fields
         actual_fields = set(df.columns)
+
         # Exclude internal columns so they are not mistaken for schema fields:
         # the _raw_json audit column, the _error_reason error column, and
         # _raw_json_user which preserves a source column that already used the
@@ -113,8 +117,10 @@ class SchemaValidator:
             df.loc[extra_mask, "_error_reason"] = (
                 df.loc[extra_mask, "_error_reason"].fillna("") + f" Extra fields: {extra_fields};"
             )
+
             # Drop extra field columns (keep only standard fields + _raw_json)
             df = df.drop(columns=list(extra_fields))
+
         # Drop the preserved user column before the frame leaves the validator:
         # it is internal plumbing, not a contract field.
         df = df.drop(columns=[c for c in ("_raw_json_user",) if c in df.columns])
@@ -128,6 +134,7 @@ class SchemaValidator:
                     df["_error_reason"] = df.get("_error_reason", "") + f" Missing required field: {field};"
                 continue
             series = df[field]
+
             # Type validation
             expected_type = rules.get("type")
             if expected_type == "string":
@@ -140,6 +147,7 @@ class SchemaValidator:
                     df.loc[non_scalar, "_error_reason"] = (
                         df.loc[non_scalar, "_error_reason"].fillna("") + f" Field {field} not a scalar string;"
                     )
+
                 # Ensure the column is string-typed
                 if not pd.api.types.is_string_dtype(series):
                     # Attempt conversion
@@ -150,6 +158,7 @@ class SchemaValidator:
                         df.loc[series.index, "_error_reason"] = (
                             df.loc[series.index, "_error_reason"].fillna("") + f" Field {field} not string;"
                         )
+
                 # Length constraint
                 if "max_length" in rules:
                     too_long = df[field].str.len() > rules["max_length"]
@@ -158,6 +167,7 @@ class SchemaValidator:
                         df.loc[too_long, "_error_reason"] = (
                             df.loc[too_long, "_error_reason"].fillna("") + f" Field {field} exceeds max length;"
                         )
+
                 # Regex pattern
                 if "pattern" in rules:
                     pattern = rules["pattern"]
@@ -166,6 +176,7 @@ class SchemaValidator:
                     df.loc[match_failed, "_error_reason"] = (
                         df.loc[match_failed, "_error_reason"].fillna("") + f" Field {field} pattern mismatch;"
                     )
+
                 # Enum check
                 if "enum" in rules:
                     not_in_enum = ~df[field].isin(rules["enum"])
@@ -179,6 +190,7 @@ class SchemaValidator:
                 # coercion must never crash the whole batch).
                 if not pd.api.types.is_numeric_dtype(series):
                     df[field] = pd.to_numeric(df[field], errors="coerce")
+
                 # Rows that were originally non-null but failed coercion
                 non_numeric = df[field].isna() & series.notna()
                 if non_numeric.any():
@@ -186,6 +198,7 @@ class SchemaValidator:
                     df.loc[non_numeric, "_error_reason"] = (
                         df.loc[non_numeric, "_error_reason"].fillna("") + f" Field {field} not numeric;"
                     )
+
                 # Minimum value (column is numeric now, so NaN comparisons are safe)
                 if "minimum" in rules:
                     below_min = df[field].notna() & (df[field] < rules["minimum"])
@@ -193,6 +206,7 @@ class SchemaValidator:
                     df.loc[below_min, "_error_reason"] = (
                         df.loc[below_min, "_error_reason"].fillna("") + f" Field {field} below minimum;"
                     )
+
                 # Non-finite values (inf after coercion) must not pollute sums
                 non_finite = df[field].isin([float("inf"), float("-inf")])
                 if non_finite.any():
@@ -200,9 +214,11 @@ class SchemaValidator:
                     df.loc[non_finite, "_error_reason"] = (
                         df.loc[non_finite, "_error_reason"].fillna("") + f" Field {field} not finite;"
                     )
+
                 # Precision: at most N decimal places when schema declares it
                 if "max_decimals" in rules:
                     scaled = df[field] * 10 ** rules["max_decimals"]
+
                     # Relative tolerance: multiplying by 10**n scales the float
                     # error with the value, so a fixed epsilon flags valid money
                     # once the amount is large enough (measured: 1e13 with two
@@ -222,8 +238,10 @@ class SchemaValidator:
                 # Attempt to parse as datetime and check parseability
                 # Back up the original string first, in case parsing fails
                 df[f"_raw_{field}"] = df[field]  # backup original value
+
                 # Shared parsing policy: mixed formats tolerated, no raise
                 dt_series = parse_utc_mixed(df[field])
+
                 # Rows where parsing failed (original non-null but result NaT)
                 failed_parse = df[field].notna() & dt_series.isna()
                 if failed_parse.any():
@@ -231,6 +249,7 @@ class SchemaValidator:
                     df.loc[failed_parse, "_error_reason"] = (
                         df.loc[failed_parse, "_error_reason"].fillna("") + f" Field {field} timestamp parse failed;"
                     )
+
                 # Reject future timestamps: the schema contract requires
                 # "<= current time" (see docs/business/PROJECT.md source-schema
                 # table); a record stamped in the future is quarantined here
@@ -243,6 +262,7 @@ class SchemaValidator:
                         df.loc[in_future, "_error_reason"].fillna("") + f" Field {field} in future;"
                     )
                 df[field] = dt_series  # converted UTC datetime
+
             # Other types...
         # Handle null values for required fields
         for field, rules in self.field_rules.items():
@@ -256,6 +276,7 @@ class SchemaValidator:
         # Split into valid / invalid partitions
         invalid_df = df[invalid_mask].copy()
         valid_df = df[~invalid_mask].copy()
+
         # invalid_df: rename _error_reason to error_reason; valid_df: drop
         # internal columns
         invalid_df = invalid_df.rename(columns={"_error_reason": "error_reason"})

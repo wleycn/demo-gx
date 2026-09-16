@@ -34,6 +34,7 @@ def _det_uuid(rng: random.Random) -> str:
     ``UUID(int=..., version=4)`` stamps the version and variant bits, so the
     value stays schema-valid while remaining reproducible.
     """
+
     return str(uuid.UUID(int=rng.getrandbits(128), version=4))
 
 
@@ -73,14 +74,17 @@ def generate_sample_data(
         instant, so a sample stamped with the wall clock would be rejected
         wholesale by any replay command that pins an older timestamp.
     """
+
     if output_path is None:
         output_path = f"data/{env}/input/sample_data.json"
     records = []
+
     # A private generator instance: importing this module must never disturb
     # the global random state that a caller may rely on.
     rng = random.Random(seed)
     base = _BASE_TS
     systems = ["web", "mobile", "api"]
+
     # XXX passes the schema's ^[A-Z]{3}$ format check but is not in the
     # cleaner whitelist → it exercises the normalize-to-USD + flag path
     currencies = ["USD", "EUR", "GBP", "CNY", "JPY", "XXX"]
@@ -97,6 +101,7 @@ def generate_sample_data(
             "ingestion_timestamp": base.isoformat(),
         }
         records.append(rec)
+
     # Intentionally add some anomalous records
     # 1. Missing event_id
     records.append(
@@ -110,6 +115,7 @@ def generate_sample_data(
             "ingestion_timestamp": base.isoformat(),
         }
     )
+
     # 2. Invalid amount (negative)
     records.append(
         {
@@ -123,6 +129,7 @@ def generate_sample_data(
             "ingestion_timestamp": base.isoformat(),
         }
     )
+
     # 3. Invalid source_system
     records.append(
         {
@@ -136,6 +143,7 @@ def generate_sample_data(
             "ingestion_timestamp": base.isoformat(),
         }
     )
+
     # 4. Future timestamp
     records.append(
         {
@@ -149,6 +157,7 @@ def generate_sample_data(
             "ingestion_timestamp": base.isoformat(),
         }
     )
+
     # 5. Duplicate event_id
     dup_id = _det_uuid(rng)
     records.append(
@@ -175,6 +184,7 @@ def generate_sample_data(
             "ingestion_timestamp": (base - timedelta(hours=1)).isoformat(),
         }
     )
+
     # 6. Non-numeric amount (exercises error_type=type_coercion_failed)
     records.append(
         {
@@ -198,6 +208,7 @@ def generate_sample_data(
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse the generator's command-line arguments."""
+
     parser = argparse.ArgumentParser(description="Generate sample pipeline input.")
     parser.add_argument(
         "--env", default="dev", choices=["dev", "test", "prod"], help="Environment input directory to write into"

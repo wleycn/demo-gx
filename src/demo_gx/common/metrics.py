@@ -25,6 +25,7 @@ class MetricsCollector:
         The ``start_time`` is recorded at construction; ``end_time`` is set
         when :meth:`save` is called.
         """
+
         self.metrics: dict[str, Any] = {
             "start_time": datetime.now(timezone.utc).isoformat(),
             "input_rows": 0,
@@ -45,6 +46,7 @@ class MetricsCollector:
             key (str): The metric key to increment.
             value (int): Amount to add.  Defaults to 1.
         """
+
         if key in self.metrics:
             self.metrics[key] += value
         else:
@@ -57,6 +59,7 @@ class MetricsCollector:
             key (str): The metric key.
             value: The value to set.
         """
+
         self.metrics[key] = value
 
     def add_error(self, error_msg: str) -> None:
@@ -65,6 +68,7 @@ class MetricsCollector:
         Args:
             error_msg (str): A human-readable error description.
         """
+
         self.metrics["errors"].append(error_msg)
 
     def save(self, output_path: str) -> None:
@@ -76,6 +80,7 @@ class MetricsCollector:
         Args:
             output_path (str): Path to the output JSON file.
         """
+
         self.metrics["end_time"] = datetime.now(timezone.utc).isoformat()
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:

@@ -39,6 +39,7 @@ def partition_dir(table_root: Path, partition_col: str, value: str) -> Path:
     Returns:
         pathlib.Path: ``<table_root>/<partition_col>=<value>``.
     """
+
     return table_root / f"{partition_col}={value}"
 
 
@@ -56,6 +57,7 @@ def partition_value(value: object) -> str:
     Returns:
         str: ``YYYY-MM-DD`` for date-likes, ``str(value)`` otherwise.
     """
+
     fmt = getattr(value, "strftime", None)
     if callable(fmt):
         return str(fmt("%Y-%m-%d"))
@@ -75,6 +77,7 @@ def temp_then_replace(path: Path) -> Iterator[Path]:
     Yields:
         pathlib.Path: The temporary path to write into.
     """
+
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
     try:
@@ -92,6 +95,7 @@ def write_one(df: pd.DataFrame, path: Path) -> None:
         df (pandas.DataFrame): Frame to write.
         path (pathlib.Path): Final file path.
     """
+
     with temp_then_replace(path) as tmp:
         df.to_parquet(tmp, index=False)
 
@@ -107,6 +111,7 @@ def clear_partition(table_root: Path, partition_col: str, value: str) -> bool:
     Returns:
         bool: ``True`` when a partition directory was there to remove.
     """
+
     part = partition_dir(table_root, partition_col, value)
     if not part.exists():
         return False
@@ -148,6 +153,7 @@ def write_table(
     Raises:
         ValueError: If ``partition_col`` is not a column of ``df``.
     """
+
     written: list[Path] = []
     if partition_col is None:
         write_one(df, table_root / DATA_FILE)

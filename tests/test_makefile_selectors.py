@@ -39,6 +39,7 @@ SELECTORS = (
 
 def _environment(**extra: str) -> dict[str, str]:
     """This shell's environment, minus anything ``make`` could mistake for a selector."""
+
     env = {
         name: value for name, value in os.environ.items() if name.lower() not in {lower for _, lower, _ in SELECTORS}
     }
@@ -50,6 +51,7 @@ def _environment(**extra: str) -> dict[str, str]:
 
 def command_for(target: str, *assignments: str, **extra_env: str) -> list[str]:
     """The argv ``make`` would run for ``target``, taken from a dry run."""
+
     result = subprocess.run(
         ["make", "-n", target, *assignments],
         cwd=REPO_ROOT,

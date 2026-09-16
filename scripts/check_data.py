@@ -64,6 +64,7 @@ LAYERS = ("bronze", "silver", "gold", "errors")
 # Each of these layers holds one dataset. Silver's name is its contract file
 # name; Bronze has no contract, so its name is a label.
 SINGLE_TABLE = {"silver": "silver_events", "bronze": "bronze_events"}
+
 # The errors layer holds two partitioned Parquet tables.
 ERRORS_TABLES = ("quarantine", "duplicates")
 PARTITION_KEY = {"bronze": "dt", "silver": "event_date", "gold": "event_date", "errors": "event_date"}
@@ -125,12 +126,14 @@ class Finding:
 
 def _section(text: str, title: str) -> str:
     """Return the body of a level-two section, or an empty string."""
+
     match = re.search(rf"^## {re.escape(title)}\s*$(.*?)(?=^## |\Z)", text, re.M | re.S)
     return match.group(1) if match else ""
 
 
 def parse_contract(table: str) -> Contract | None:
     """Read the field list, primary key and partition key from a contract."""
+
     path = PROJECT_ROOT / "docs" / "tables" / f"{table}.md"
     if not path.is_file():
         return None
@@ -159,12 +162,14 @@ def resolve_path(value: str) -> Path:
     Relative values are anchored at the project root, so the report describes
     the same tree whatever directory the verifier was started from.
     """
+
     path = Path(value)
     return path if path.is_absolute() else PROJECT_ROOT / path
 
 
 def partition_dirs(root: Path, key: str, event_date: str | None) -> list[Path]:
     """Return the hive-style ``key=value`` directories under ``root``."""
+
     dirs = sorted(p for p in root.glob(f"{key}=*") if p.is_dir())
     if event_date:
         dirs = [p for p in dirs if p.name == f"{key}={event_date}"]
@@ -180,6 +185,7 @@ def parquet_files(root: Path, key: str, event_date: str | None) -> list[Path]:
     and nowhere else: the verifier and the viewer must never disagree about
     where the data lives.
     """
+
     dirs = partition_dirs(root, key, event_date)
     files = sorted(path / "data.parquet" for path in dirs if (path / "data.parquet").is_file())
     if files:
@@ -189,6 +195,7 @@ def parquet_files(root: Path, key: str, event_date: str | None) -> list[Path]:
 
 def _schema_of(files: list[Path]) -> dict[str, str]:
     """Column name to physical type, taken from the first file."""
+
     schema = pq.ParquetFile(files[0]).schema_arrow
     return {name: str(schema.field(name).type) for name in schema.names}
 
@@ -200,11 +207,13 @@ def _read_columns(files: list[Path], columns: list[str]) -> list[pa.Table]:
     rule (AGENTS.md section 3 red line 2): no full-width read, and no
     whole-table frame is built. ``--event-date`` narrows it to one partition.
     """
+
     return [pq.read_table(path, columns=columns) for path in files]
 
 
 def _check_fields(contract: Contract, actual: dict[str, str]) -> Finding:
     """Compare column names and logical types against the contract."""
+
     declared = [name for name, _ in contract.fields]
     missing = [name for name in declared if name not in actual]
     extra = [name for name in actual if name not in declared]
@@ -230,6 +239,7 @@ def _check_fields(contract: Contract, actual: dict[str, str]) -> Finding:
 
 def _check_primary_key(files: list[Path], key: list[str], actual: dict[str, str]) -> Finding:
     """Assert the business primary key is unique across the whole table."""
+
     absent = [name for name in key if name not in actual]
     if absent:
         return Finding("primary key", FAIL, f"contract key column(s) {absent} are absent from the artefact")
@@ -253,12 +263,14 @@ def _check_primary_key(files: list[Path], key: list[str], actual: dict[str, str]
 
 def _check_masked(files: list[Path], fields: list[str]) -> Finding:
     """Every value of a configured PII field must be a keyed digest."""
+
     leaked: list[str] = []
     distinct = 0
     for table in _read_columns(files, fields):
         for name in fields:
             values = set(table.column(name).to_pylist())
             distinct += len(values)
+
             # A missing identifier is not a leak: the mask leaves nulls alone
             # (see mask.mask_columns), so there is nothing to match.
             leaked.extend(v for v in values if v is not None and (not isinstance(v, str) or not MASK_RX.match(v)))
@@ -276,6 +288,7 @@ def _check_currency_corrections(files: list[Path], rows: int) -> Finding:
     so the substitution was invisible. No threshold is invented here: the count
     and its share are the fact the flag exists for.
     """
+
     corrected = 0
     for table in _read_columns(files, ["_is_invalid_currency"]):
         corrected += sum(1 for value in table.column("_is_invalid_currency").to_pylist() if value)
@@ -287,6 +300,7 @@ def check_parquet_table(
     root: Path, contract: Contract | None, masked: list[str], event_date: str | None
 ) -> list[Finding]:
     """Checks for a partitioned Parquet table or a single-file snapshot."""
+
     key = PARTITION_KEY["gold"]
     dirs = partition_dirs(root, key, event_date)
     files = parquet_files(root, key, event_date)
@@ -341,6 +355,7 @@ def check_parquet_table(
 
 def check_bronze(root: Path, masked: list[str], event_date: str | None) -> list[Finding]:
     """Checks for the raw archive: JSON Lines, partitioned by source and date."""
+
     files = sorted(root.glob("*/dt=*/events.json"))
     if event_date:
         files = [path for path in files if path.parent.name == f"dt={event_date}"]
@@ -390,6 +405,7 @@ def check_quarantine(root: Path, event_date: str | None, table_name: str) -> lis
     Both are partitioned Parquet tables under ``errors/``, partitioned by
     ``event_date``. With ``event_date`` the check scopes to one partition.
     """
+
     table_root = root / table_name
     key = PARTITION_KEY["errors"]
     dirs = partition_dirs(table_root, key, event_date)
@@ -442,6 +458,7 @@ def discover(cfg: dict[str, Any], layer: str) -> list[tuple[str, Path]]:
     Gold is read off the filesystem, so a table added to the pipeline needs no
     edit here.
     """
+
     storage = cfg["storage"]
     output = resolve_path(storage["output_root"])
     if layer == "gold":
@@ -453,6 +470,7 @@ def discover(cfg: dict[str, Any], layer: str) -> list[tuple[str, Path]]:
         return [(SINGLE_TABLE["silver"], output / storage["silver_subpath"])]
     if layer == "bronze":
         return [(SINGLE_TABLE["bronze"], output / storage["bronze_subpath"])]
+
     # The errors layer holds two partitioned Parquet tables.
     errors_root = output / storage["errors_subpath"]
     return [(name, errors_root) for name in ERRORS_TABLES]
@@ -464,9 +482,11 @@ def missing_tables(cfg: dict[str, Any]) -> list[str]:
     A run is expected to write every table its contract describes, so this is a
     failure once the environment has run.
     """
+
     gold_root = resolve_path(cfg["storage"]["output_root"]) / cfg["storage"]["gold_subpath"]
     on_disk = {path.name for path in gold_root.iterdir() if path.is_dir()} if gold_root.is_dir() else set()
     declared = {path.stem for path in (PROJECT_ROOT / "docs" / "tables").glob("*.md")}
+
     # quarantine and duplicates live under errors/, not Gold.
     return sorted(declared - on_disk - {SINGLE_TABLE["silver"]} - set(ERRORS_TABLES))
 
@@ -478,11 +498,13 @@ def run_marker(cfg: dict[str, Any]) -> Path:
     than a failure. Reporting an unrun environment as broken would be a false
     red, and a false red teaches the reader to ignore the tool.
     """
+
     return resolve_path(cfg["metrics"]["output_file"])
 
 
 def report_run(cfg: dict[str, Any]) -> None:
     """Print the run envelope: where the input came from and what metrics say."""
+
     storage = cfg["storage"]
     metrics_file = resolve_path(cfg["metrics"]["output_file"])
     if metrics_file.is_file():
@@ -495,6 +517,7 @@ def report_run(cfg: dict[str, Any]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     """Run the verifier over the selected layers and tables."""
+
     parser = argparse.ArgumentParser(description="Verify the artefacts a pipeline run produced. Read-only.")
     parser.add_argument("--env", default="dev", choices=["dev", "test", "prod"], help="Environment to inspect")
     parser.add_argument("--layer", default="all", choices=[*LAYERS, "all"], help="Layer to inspect")

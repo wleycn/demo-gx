@@ -53,6 +53,7 @@ MASKED = "h_" + "ab" * 8
 
 def _config(env: str = "dev") -> dict[str, Any]:
     """Stand-in for ``load_config``: paths only, no filesystem read."""
+
     return {
         "storage": {
             "output_root": "data/dev/output",
@@ -70,10 +71,12 @@ def _config(env: str = "dev") -> dict[str, Any]:
 @pytest.fixture
 def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A project skeleton whose root the verifier is pointed at."""
+
     root = tmp_path / "proj"
     (root / "docs" / "tables").mkdir(parents=True)
     output = root / "data" / "dev" / "output"
     output.mkdir(parents=True)
+
     # A completed run always leaves this file; its presence is what tells the
     # verifier that the environment has run at all.
     (output / "metrics.json").write_text('{"silver_rows": 1}', encoding="utf-8")
@@ -84,6 +87,7 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _write_contract(root: Path, text: str = CONTRACT, name: str = "tiny_table") -> None:
     """Write one table contract under ``docs/tables``."""
+
     (root / "docs" / "tables" / f"{name}.md").write_text(text, encoding="utf-8")
 
 
@@ -99,6 +103,7 @@ def _write_table(
     partition: bool = True,
 ) -> None:
     """Write a Gold Parquet table with the given shape."""
+
     target = root / "data" / "dev" / "output" / "gold" / name
     if partition:
         target = target / "event_date=2026-01-01"
@@ -120,12 +125,14 @@ def _write_table(
 
 def _run(capsys: pytest.CaptureFixture[str], *args: str) -> tuple[int, str]:
     """Run the verifier and return its exit code with its report."""
+
     code = check_data.main(["--env", "dev", *args])
     return code, capsys.readouterr().out
 
 
 def test_compliant_artefact_passes(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """The control case: a clean table must report zero failures."""
+
     _write_contract(project)
     _write_table(project)
     code, out = _run(capsys, "--layer", "gold")
@@ -136,6 +143,7 @@ def test_compliant_artefact_passes(project: Path, capsys: pytest.CaptureFixture[
 
 def test_undeclared_column_fails(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A column the contract does not declare must fail, not pass quietly."""
+
     _write_contract(project)
     _write_table(project, extra=True)
     code, out = _run(capsys, "--layer", "gold")
@@ -145,6 +153,7 @@ def test_undeclared_column_fails(project: Path, capsys: pytest.CaptureFixture[st
 
 def test_declared_column_missing_fails(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """The reverse direction: a contract field with no column must fail too."""
+
     _write_contract(project)
     _write_table(project, omit=("n",))
     code, out = _run(capsys, "--layer", "gold")
@@ -154,6 +163,7 @@ def test_declared_column_missing_fails(project: Path, capsys: pytest.CaptureFixt
 
 def test_type_drift_fails(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A stored type outside the contract's equivalence set must fail."""
+
     _write_contract(project)
     _write_table(project, counts=["1"], count_type=pa.string())
     code, out = _run(capsys, "--layer", "gold")
@@ -163,6 +173,7 @@ def test_type_drift_fails(project: Path, capsys: pytest.CaptureFixture[str]) -> 
 
 def test_duplicate_primary_key_fails(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """The declared business primary key must be unique over the table."""
+
     _write_contract(project)
     _write_table(project, dates=[date(2026, 1, 1)] * 2, customers=[MASKED] * 2, counts=[1, 2])
     code, out = _run(capsys, "--layer", "gold")
@@ -172,6 +183,7 @@ def test_duplicate_primary_key_fails(project: Path, capsys: pytest.CaptureFixtur
 
 def test_plaintext_pii_fails(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A configured PII column that is not a digest must fail."""
+
     _write_contract(project)
     _write_table(project, customers=["cust_001"])
     code, out = _run(capsys, "--layer", "gold")
@@ -181,6 +193,7 @@ def test_plaintext_pii_fails(project: Path, capsys: pytest.CaptureFixture[str]) 
 
 def test_snapshot_contract_with_partitions_fails(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A snapshot contract that meets partition directories must fail."""
+
     _write_contract(project, SNAPSHOT_CONTRACT)
     _write_table(project, partition=True)
     code, out = _run(capsys, "--layer", "gold")
@@ -190,6 +203,7 @@ def test_snapshot_contract_with_partitions_fails(project: Path, capsys: pytest.C
 
 def test_missing_contract_warns_without_failing(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """No contract is a warning: the artefacts are still worth reporting."""
+
     _write_table(project)
     code, out = _run(capsys, "--layer", "gold")
     assert code == 0
@@ -199,6 +213,7 @@ def test_missing_contract_warns_without_failing(project: Path, capsys: pytest.Ca
 
 def test_empty_scope_is_not_a_pass(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Scanning nothing must not look like scanning everything."""
+
     code, out = _run(capsys, "--layer", "gold")
     assert code == 3
     assert "NOT SCANNED" in out
@@ -206,6 +221,7 @@ def test_empty_scope_is_not_a_pass(project: Path, capsys: pytest.CaptureFixture[
 
 def test_environment_without_a_run_is_skipped(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """An environment that never ran is a skip, not a failure."""
+
     (project / "data" / "dev" / "output" / "metrics.json").unlink()
     code, out = _run(capsys, "--layer", "all")
     assert code == 3
@@ -214,6 +230,7 @@ def test_environment_without_a_run_is_skipped(project: Path, capsys: pytest.Capt
 
 def test_contract_without_an_artefact_fails(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Once a run happened, a declared table that is absent must fail."""
+
     _write_contract(project)
     _write_contract(project, CONTRACT, name="ghost_table")
     _write_table(project)
@@ -224,6 +241,7 @@ def test_contract_without_an_artefact_fails(project: Path, capsys: pytest.Captur
 
 def test_unknown_table_is_reported(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Asking for a table that does not exist must not exit zero."""
+
     _write_contract(project)
     _write_table(project)
     code, out = _run(capsys, "--layer", "gold", "--table", "ghost")
@@ -239,6 +257,7 @@ def test_an_absent_error_table_reports_no_records(project: Path, capsys: pytest.
     possible outcome — nothing rejected, nothing duplicated — the one that
     broke CI (audit finding, 2026-09-15).
     """
+
     code, out = _run(capsys, "--layer", "errors")
     assert code == 0, out
     assert "no records" in out
@@ -247,6 +266,7 @@ def test_an_absent_error_table_reports_no_records(project: Path, capsys: pytest.
 
 def test_a_scoped_absent_error_table_is_also_a_pass(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """The same rule holds when the check names one partition."""
+
     code, out = _run(capsys, "--layer", "errors", "--event-date", "2026-01-01")
     assert code == 0, out
     assert "no records for event_date=2026-01-01" in out
@@ -259,6 +279,7 @@ def test_currency_corrections_are_reported(project: Path, capsys: pytest.Capture
     ``_is_invalid_currency``, and the contract documents that column. Nothing
     reported it, so the substitution was invisible to whoever reads the report.
     """
+
     contract = CONTRACT.replace(
         "| `n` | bigint | Count |",
         "| `n` | bigint | Count |\n| `_is_invalid_currency` | boolean | Corrected code |",

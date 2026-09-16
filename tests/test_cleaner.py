@@ -23,6 +23,7 @@ def _clean_df(**overrides: object) -> pd.DataFrame:
 
 def test_standardize_timestamps_utc_conversion() -> None:
     """Timestamps parse to UTC and the raw string is backed up unchanged."""
+
     df = _clean_df()
     out = DataCleaner.standardize_timestamps(df.copy())
     ts = pd.Timestamp("2026-01-01T00:00:00+08:00", tz="UTC")
@@ -32,6 +33,7 @@ def test_standardize_timestamps_utc_conversion() -> None:
 
 def test_standardize_timestamps_keeps_existing_raw_backup() -> None:
     """If the validator already backed up the raw string, do not overwrite it."""
+
     df = _clean_df(event_timestamp="2026-01-01T07:00:00Z")
     df["_raw_event_timestamp"] = "ORIGINAL-RAW"
     out = DataCleaner.standardize_timestamps(df)
@@ -40,6 +42,7 @@ def test_standardize_timestamps_keeps_existing_raw_backup() -> None:
 
 def test_normalize_currency_uppercases_and_flags_non_whitelist() -> None:
     """Lowercase codes uppercase; codes outside the whitelist become USD+flag."""
+
     df = pd.DataFrame(
         [
             _clean_df().iloc[0].to_dict(),
@@ -58,6 +61,7 @@ def test_normalize_currency_uppercases_and_flags_non_whitelist() -> None:
 
 def test_check_amount_backs_up_and_coerces() -> None:
     """_raw_amount preserves the pre-coercion value; amount becomes numeric."""
+
     df = pd.DataFrame([_clean_df(amount="12.5").iloc[0].to_dict()])
     out = DataCleaner.check_amount(df)
     assert out["_raw_amount"].iloc[0] == "12.5"

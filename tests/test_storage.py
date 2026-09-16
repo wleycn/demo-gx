@@ -27,22 +27,26 @@ from demo_gx.common import storage
 
 def _frame(dates: list[date], values: list[float]) -> pd.DataFrame:
     """A frame partitioned by ``event_date``."""
+
     return pd.DataFrame({"event_date": dates, "amount": values})
 
 
 def _empty_frame() -> pd.DataFrame:
     """A frame with the partition column and no rows."""
+
     return pd.DataFrame({"event_date": pd.Series([], dtype="object"), "amount": pd.Series([], dtype="float64")})
 
 
 def test_partition_value_renders_days_and_literals() -> None:
     """Dates render as ISO days; the quarantine's ``unknown`` stays a literal."""
+
     assert storage.partition_value(date(2026, 9, 10)) == "2026-09-10"
     assert storage.partition_value("unknown") == "unknown"
 
 
 def test_single_file_table_leaves_no_temporary(tmp_path: pathlib.Path) -> None:
     """A single-file table is written through a temporary that is then moved."""
+
     root = tmp_path / "dim_customer"
     written = storage.write_table(_frame([date(2026, 9, 10)], [1.0]).drop(columns="event_date"), root)
     assert written == [root / "data.parquet"]
@@ -56,6 +60,7 @@ def test_crash_mid_write_keeps_the_previous_partition(tmp_path: pathlib.Path, mo
     Without the temporary-file move the failing write truncates the target
     first, which is exactly the state a partition overwrite must never leave.
     """
+
     root = tmp_path / "silver"
     storage.write_table(_frame([date(2026, 9, 10)], [1.0]), root, "event_date")
     target = root / "event_date=2026-09-10" / "data.parquet"
@@ -76,6 +81,7 @@ def test_crash_mid_write_keeps_the_previous_partition(tmp_path: pathlib.Path, mo
 
 def test_scope_clears_the_partitions_that_lost_their_rows(tmp_path: pathlib.Path) -> None:
     """A partition inside the scope with no rows this run is removed."""
+
     root = tmp_path / "quarantine"
     storage.write_table(_frame([date(2026, 9, 10), date(2026, 9, 11)], [1.0, 2.0]), root, "event_date")
     storage.write_table(
@@ -90,6 +96,7 @@ def test_scope_clears_the_partitions_that_lost_their_rows(tmp_path: pathlib.Path
 
 def test_scope_never_reaches_outside_itself(tmp_path: pathlib.Path) -> None:
     """A scoped run leaves other days alone (scoped backfill, DATA-DESIGN 2.6)."""
+
     root = tmp_path / "quarantine"
     storage.write_table(
         _frame([date(2026, 9, 10), date(2026, 9, 12)], [1.0, 2.0]),
@@ -102,6 +109,7 @@ def test_scope_never_reaches_outside_itself(tmp_path: pathlib.Path) -> None:
 
 def test_a_run_with_no_rows_leaves_no_table(tmp_path: pathlib.Path) -> None:
     """An empty scope-cleared table reads as absent, not as an empty directory."""
+
     root = tmp_path / "quarantine"
     storage.write_table(_frame([date(2026, 9, 10)], [1.0]), root, "event_date")
     written = storage.write_table(_empty_frame(), root, "event_date", scope=["2026-09-10"])
@@ -111,5 +119,6 @@ def test_a_run_with_no_rows_leaves_no_table(tmp_path: pathlib.Path) -> None:
 
 def test_a_missing_partition_column_is_an_error(tmp_path: pathlib.Path) -> None:
     """Failing to partition is loud, because a silent one writes to one directory."""
+
     with pytest.raises(ValueError, match="partition column"):
         storage.write_table(_frame([date(2026, 9, 10)], [1.0]), tmp_path / "silver", "event_date_x")

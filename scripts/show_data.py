@@ -80,11 +80,13 @@ BRONZE_GLOB = "*/dt=*/events.json"
 
 def _cell(value: Any) -> str:
     """Render one value the way it would be typed."""
+
     return "" if value is None else str(value)
 
 
 def _columns_of(path: Path) -> dict[str, str]:
     """Column name to physical type, from the file metadata alone."""
+
     schema = pq.ParquetFile(path).schema_arrow
     return {name: str(schema.field(name).type) for name in schema.names}
 
@@ -96,6 +98,7 @@ def _read_rows(files: list[Path], columns: list[str], limit: int) -> tuple[list[
     read short. Batches keep the peak memory flat and let a small limit stop
     after one batch instead of after the whole table.
     """
+
     rows: list[dict[str, Any]] = []
     opened: list[Path] = []
     for path in files:
@@ -112,6 +115,7 @@ def _read_rows(files: list[Path], columns: list[str], limit: int) -> tuple[list[
 
 def _read_lines(files: list[Path], limit: int) -> tuple[list[str], int, bool]:
     """The JSON Lines equivalent of ``_read_rows``, with the same early stop."""
+
     lines: list[str] = []
     opened = 0
     for path in files:
@@ -129,6 +133,7 @@ def _read_lines(files: list[Path], limit: int) -> tuple[list[str], int, bool]:
 
 def _json_files(layer: str, root: Path, event_date: str) -> list[Path]:
     """The text files a JSON Lines layer holds."""
+
     files = sorted(root.glob(BRONZE_GLOB))
     if event_date:
         files = [path for path in files if path.parent.name == f"dt={event_date}"]
@@ -137,6 +142,7 @@ def _json_files(layer: str, root: Path, event_date: str) -> list[Path]:
 
 def _partition_note(labels: list[str], key: str, event_date: str, note: str) -> str:
     """State which partitions exist, without claiming which ones were read."""
+
     if not labels:
         return note
     if event_date:
@@ -146,6 +152,7 @@ def _partition_note(labels: list[str], key: str, event_date: str, note: str) -> 
 
 def _rows_note(opened: list[Path]) -> str:
     """Name the partitions the shown rows came from, and no more than that."""
+
     labels: list[str] = []
     for path in opened:
         label = path.parent.name if "=" in path.parent.name else "the table directory"
@@ -158,18 +165,21 @@ def _rows_note(opened: list[Path]) -> str:
 
 def _contract_label(name: str) -> str:
     """The contract path when there is one, so the reader can jump to it."""
+
     contract = parse_contract(name)
     return "none" if contract is None else str(contract.path.relative_to(PROJECT_ROOT))
 
 
 def _render_table(rows: list[dict[str, Any]], columns: list[str]) -> str:
     """Render rows as an aligned text table, one line per row."""
+
     widths = {name: max(len(name), *(len(_cell(row.get(name))) for row in rows)) for name in columns}
     lines = [
         "  ".join(name.ljust(widths[name]) for name in columns),
         "  ".join("-" * widths[name] for name in columns),
     ]
     lines.extend("  ".join(_cell(row.get(name)).ljust(widths[name]) for name in columns) for row in rows)
+
     # Right-trim: padding the last column leaves trailing blanks in the file
     # when the report is redirected.
     return "\n".join(INDENT + line.rstrip() for line in lines)
@@ -177,6 +187,7 @@ def _render_table(rows: list[dict[str, Any]], columns: list[str]) -> str:
 
 def _write_machine(rows: list[dict[str, Any]], columns: list[str], fmt: str) -> None:
     """Write the rows to stdout in the shape the caller asked for."""
+
     if fmt == "json":
         print(json.dumps(rows, default=str))
         return
@@ -201,6 +212,7 @@ def show_parquet(
 
     Returns 2 when a requested column does not exist, otherwise None.
     """
+
     key = PARTITION_KEY[layer]
     files = parquet_files(root, key, event_date)
     if not files:
@@ -244,6 +256,7 @@ def show_parquet(
 
 def show_json(layer: str, name: str, root: Path, event_date: str, limit: int, schema_only: bool, report: Any) -> None:
     """Show the lines of one JSON Lines layer."""
+
     files = _json_files(layer, root, event_date)
     if not files:
         print(f"{INDENT}{'artefact':<{LABEL_WIDTH}}no JSON Lines file under {root}", file=report)
@@ -274,6 +287,7 @@ def show_json(layer: str, name: str, root: Path, event_date: str, limit: int, sc
 
 def main(argv: list[str] | None = None) -> int:
     """Show the selected rows. See the module docstring for the exit statuses."""
+
     parser = argparse.ArgumentParser(
         description="Show the rows a pipeline run produced. Read-only.",
         epilog="Exit 0 shown, 2 the request does not match the data, 3 nothing to look at.",
@@ -326,6 +340,7 @@ def main(argv: list[str] | None = None) -> int:
         if layer in JSON_LAYERS:
             show_json(layer, name, root, event_date, args.limit, args.schema, report)
             continue
+
         # The errors layer root is errors/, but each table lives one level
         # deeper: errors/quarantine/ and errors/duplicates/.
         table_root = root / name if layer == "errors" else root

@@ -31,13 +31,16 @@ class Deduplicator:
             first element contains the deduplicated rows; the second
             contains the superseded duplicates for audit logging.
         """
+
         if "event_id" not in df.columns or "ingestion_timestamp" not in df.columns:
             return df, pd.DataFrame()
+
         # Ensure ingestion_timestamp is a datetime column. The parsing policy
         # lives in one place (common.time_utils), so this defensive path cannot
         # drift from the validator's own parsing.
         if not pd.api.types.is_datetime64_any_dtype(df["ingestion_timestamp"]):
             df["ingestion_timestamp"] = parse_utc_mixed(df["ingestion_timestamp"])
+
         # Sort by ingestion_timestamp so the last row per event_id is the newest.
         # Stable sort: on an exact timestamp tie the last-occurring input row
         # wins (documented keep-last semantics, round-2 writer QC #7).
@@ -45,6 +48,7 @@ class Deduplicator:
         # of the winning seat: keep-last would otherwise promote the row that
         # carries no usable timestamp over the one that does.
         df_sorted = df.sort_values("ingestion_timestamp", kind="stable", na_position="first")
+
         # Mark duplicates (keep the last occurrence)
         duplicated_mask = df_sorted.duplicated(subset=["event_id"], keep="last")
         duplicates = df_sorted[duplicated_mask].copy()
