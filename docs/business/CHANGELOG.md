@@ -5,6 +5,8 @@ A commit that only updates this file cannot list itself, so the newest hash here
 
 ## 2026-09-16
 
+- `ce2b3b2` style: give every comment and docstring its blank line [AI]
+- `7deeaef` chore(lint): adopt the four layout rules and drop D202 for them [AI]
 - `a874ca8` chore(lint): put the readability and naming rules behind a machine gate [AI]
 
 ## 2026-09-15
