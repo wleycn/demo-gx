@@ -443,3 +443,12 @@
 - **Verification**: the sweep is 251 inserted lines across 27 files, with zero deletions. `ruff format --check` reports all 33 files already formatted, which is the evidence that the new blank lines survive the formatter. `ruff check`, `mypy`, 113 tests and the gate are clean. The gate's new check carries 15 two-way probes. The probe suite missed one case at first and a whole-tree audit caught it: a two-line comment must stay glued. A whole-tree audit of both rules over 33 files now reports zero violations.
 - **Rollback**: revert both commits. The gate returns to eleven checks, and the files return to their previous spacing.
 - **Related**: `docs/business/CHANGELOG.md`, branch `fix/config-layout-propagation`.
+
+## 20260918 · commit-provenance-policy — Drop the author-type marker from commits
+
+- **Motivation**: the rule asked every agent-session commit to carry the `[AI]` marker so the history could be told apart from human work. The user ruled that out: an agent acts on his behalf, so its commit is his commit, and the message should say what changed and why rather than who typed it. The marker added a third vocabulary to the same sentence the reader needs for the change itself.
+- **Scope**: `AGENTS.md` section 5, `docs/rules/CODING-STANDARD.md` (the commit-message bullet), `README.md` (the provenance line), and `scripts/hooks/commit-msg`, which existed only to enforce the marker.
+- **Behaviour and contract changes**: commit messages carry no author-type marker. The header comment `[AI-GENERATED] model=<m> date=<d> reviewed_by=<human>` stays: it records where the code came from and whether a human has reviewed it, which is unrelated to who owns the commit. The commit-msg hook is deleted, so nothing blocks a commit that omits the marker; the pre-commit gate keeps its other checks.
+- **Verification**: the three rule files were edited byte-wise and still hold CRLF throughout (138 / 132 / 228 lines, zero bare LF). `grep -rn '\[AI\]'` now hits only the AGENTS sentence that says the marker is gone. The hook file and its installed copy are removed; `git config core.hooksPath` was never set in this clone, so no local commit was gated by it.
+- **Rollback**: revert the commit and restore `scripts/hooks/commit-msg`. Rollback is documentation plus one shell file, with no data or contract effect.
+- **Related**: `docs/business/CHANGELOG.md`, the upstream AGENTS core template (both languages) and the fr2052a project, which made the same change.

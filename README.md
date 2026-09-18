@@ -107,7 +107,7 @@ The gate blocks a commit when any of these checks fails:
 - oversized files
 - test suite
 - `AGENTS.md` structure check
-- commit-message provenance: an agent-session commit must carry the `[AI]` marker
+- commit-message provenance: a commit states what changed and why, and carries no author-type marker
 
 The test command uses the project venv (`.venv/bin/python -m pytest -q`), so no external interpreter is required.
 The hook sources live in `scripts/hooks/`, which keeps them reviewable and reproducible. The

@@ -85,7 +85,7 @@ except Exception:
 ```markdown
 - Every file generated or modified by AI carries a header comment:
   # [AI-GENERATED] model=<model-name> date=<YYYY-MM-DD> reviewed_by=<human>
-- The commit message contains the `[AI]` marker, easing audit tracing
+- The commit message states what changed and why; it carries no author-type marker, because an agent commit is the user’s commit
 - AI-generated migration/DDL scripts must be reviewed line by line by a human in the PR with a confirming comment
 - AI-generated code must not be pushed directly to main; it must go through a feature branch + PR flow
 ```
