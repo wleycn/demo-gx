@@ -83,9 +83,10 @@ except Exception:
 ## 9. AI-Generated Code Audit Trail 🔴
 
 ```markdown
-- Every file generated or modified by AI carries a header comment:
+- Every **new or rewritten** code file created by AI carries a header comment:
   # [AI-GENERATED] model=<model-name> date=<YYYY-MM-DD> reviewed_by=<human>
-- The commit message states what changed and why; it carries no author-type marker, because an agent commit is the user’s commit
+- A commit message states what changed and why, with no `[AI]` style marker: an agent acts on the user's behalf, so its commit is the user's commit
+- Files still lacking a header go through a one-off backfill batch (field conventions: the case file in the `rule-mechanization` skill); afterwards the enforced rule is "a changed code file must carry a header"
 - AI-generated migration/DDL scripts must be reviewed line by line by a human in the PR with a confirming comment
 - AI-generated code must not be pushed directly to main; it must go through a feature branch + PR flow
 ```
