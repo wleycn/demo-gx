@@ -4,6 +4,22 @@ This document records known pitfalls, design decisions, and rejected alternative
 The deviation table in the "Skeleton Deviations" section points to the anchors defined in this document. Items that have been migrated out of this list are listed under "Resolved Migration Items" at the end.
 ---
 
+### #agents-map-dangling-hook — AGENTS project map points at a deleted hook file
+
+**Symptom**: `ng/tools/test_agents_assembly_verify.py` reports this repository as failing, with `§9 项目地图指向不存在的路径: ['scripts/hooks/commit-msg']`.
+**Root cause**: commit `59ed1bf` removed the `[AI]` commit marker gate together with its hook file `scripts/hooks/commit-msg`, but the §9 project map in `AGENTS.md` still lists that path. The path check runs only when the assembly verifier is pointed at this repository, so nothing failed at commit time.
+**Impact**: the verifier reports a red result for this repository, and a reader following the map looks for a file that no longer exists.
+**Disposition**: accepted for now. The fix is to drop that row from the §9 map; restoring the hook would contradict the revocation. Recorded on 2026-09-19, not acted on.
+**Related**: AGENTS.md §9, `ng/tools/test_agents_assembly_verify.py`.
+---
+### #agents-header-wording-stale — AGENTS §5 still describes the revoked commit marker
+
+**Symptom**: `AGENTS.md` §5 phrases the header rule as "each changed **code** file" and says the provenance of an exempt file is "the commit marker below", while the next bullet states that no author-type marker is used.
+**Root cause**: the revocation (`59ed1bf`) rewrote the commit-message bullet but left those two phrases in place. The upstream English core template was updated on 2026-09-19 to the "new or rewritten" wording; this repository's AGENTS was assembled before that.
+**Impact**: the section contradicts itself, and the rule about when a file gains a header is ambiguous.
+**Disposition**: accepted for now. The fix is the two phrase edits. Recorded on 2026-09-19, not acted on.
+**Related**: AGENTS.md §5, upstream `AGENTS.core.template.md`.
+---
 ### #coverage-gate-off — No coverage gate enabled
 
 **Symptom**: the project does not run a coverage tool. There is no `--cov` flag in the pytest configuration or CI pipeline.

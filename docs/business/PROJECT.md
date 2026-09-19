@@ -125,6 +125,8 @@ The following known issues are documented in [KNOWN-ISSUE.md](KNOWN-ISSUE.md):
 | `#amount-float` | `amount` column uses `float64` instead of `DECIMAL` |
 | `#table-contract-approval` | No approval chain for table contracts |
 | `#clock-reads-outside-data-stamping` | Telemetry modules still read the clock; no data-stamping site does |
+| `#agents-map-dangling-hook` | AGENTS §9 map lists a hook file deleted with the marker gate |
+| `#agents-header-wording-stale` | AGENTS §5 wording still mentions the revoked commit marker |
 
 Resolved migration items are listed under "Resolved Migration Items" in [KNOWN-ISSUE.md](KNOWN-ISSUE.md).
 
